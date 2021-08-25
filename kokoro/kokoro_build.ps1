@@ -35,13 +35,4 @@ $build_id = if ($build_id -eq $null) { "dev" } else { $build_id }
   "--ninja=$top\prebuilts\ninja\windows-x86\ninja.exe",
   "--android-cmake=$top\external\android-cmake"
 
-# TODO: We use our Clang prebuilt on Linux and Darwin, but it doesn't currently work on Windows.
-# Consider making it work on Windows, or maybe just use the default C++ compilers (g++, XCode
-# clang++, MSVC). See http://fusion2/0a310044-d597-497b-9f5e-9ee4b880748b, which fails with:
-#     ninja: fatal: CreateProcess: This version of %1 is not compatible with the version of Windows
-#     you're running.
-# The likely problem is that clang-cl.exe is a symlink with newer Android Clang prebuilts, and
-# kokoro isn't creating an NTFS symlink (e.g. maybe because mklink requires elevation).
-# "--clang-repo=$top\prebuilts\clang\host\windows-x86"
-
 exit $LASTEXITCODE

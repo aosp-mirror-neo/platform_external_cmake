@@ -4,6 +4,7 @@ import argparse
 import enum
 import glob
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -44,7 +45,9 @@ def parse_arguments():
                         help='Path to ninja binary.')
     parser.add_argument('--android-cmake',
                         help='Path to android-cmake repository.')
-    parser.add_argument('--clang-repo', help='Path to clang repo.')
+    parser.add_argument('--extra-notices',
+                        default='',
+                        help='Extra license files to install.')
     return parser.parse_args()
 
 
@@ -70,9 +73,7 @@ def get_toolchain_flags(host):
     if host == Host.Linux:
         ldflags.append('-static-libstdc++')
         ldflags.append('-static-libgcc')
-        ldflags.append('-lpthread')
-    if host == Host.Linux:
-        ldflags.append('-fuse-ld=lld')
+        ldflags.append('-pthread')
     return (cflags, ldflags)
 
 
@@ -83,17 +84,6 @@ def normalize_cmake_path(path):
 def get_cmake_defines(host, args):
     defines = {}
     defines['CMAKE_BUILD_TYPE'] = 'Release'
-
-    if args.clang_repo:
-        clang_path = find_latest_clang(args.clang_repo)
-        if host == Host.Windows:
-            cc = os.path.join(clang_path, 'bin', 'clang-cl.exe')
-            cxx = cc
-        else:
-            cc = os.path.join(clang_path, 'bin', 'clang')
-            cxx = os.path.join(clang_path, 'bin', 'clang++')
-        defines['CMAKE_C_COMPILER'] = normalize_cmake_path(cc)
-        defines['CMAKE_CXX_COMPILER'] = normalize_cmake_path(cxx)
 
     cflags, ldflags = get_toolchain_flags(host)
     cflags_str = ' '.join(cflags)
@@ -145,6 +135,13 @@ def build_cmake_target(host, args):
     else:
         ninja_target = 'install/strip'
     check_call([args.ninja, ninja_target], cwd=build_dir)
+
+    # e.g.: /path/to/openssl-1.1.1k/LICENSE:doc/openssl-1.1.1k/LICENSE
+    for notice in args.extra_notices.split():
+        (src, dst) = notice.split(':')
+        dst = os.path.join(install_dir, dst)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
 
     return install_dir
 
