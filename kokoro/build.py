@@ -104,6 +104,7 @@ def get_cmake_defines(host, args):
         # This will be used to set -mmacosx-version-min. And helps to choose SDK.
         # To specify a SDK, set CMAKE_OSX_SYSROOT or SDKROOT environment variable.
         defines['CMAKE_OSX_DEPLOYMENT_TARGET'] = '10.9'
+        defines['CMAKE_OSX_ARCHITECTURES'] = 'x86_64;arm64'
     return defines
 
 
