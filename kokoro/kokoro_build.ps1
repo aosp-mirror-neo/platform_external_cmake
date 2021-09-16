@@ -1,7 +1,6 @@
 $top       = (Resolve-Path "$PSScriptRoot\..\..\..")
 $out       = "$top\out\cmake"
 $cmake_src = "$top\external\cmake"
-$python    = "$top\prebuilts\python\windows-x86\python.exe"
 
 Remove-Item $out -Recurse -ErrorAction Ignore
 
@@ -30,9 +29,14 @@ $ENV:PATH = ($ENV:PATH.Split(';') | Where-Object { $_ -notmatch 'cygwin' }) -joi
 $build_id = $ENV:KOKORO_BUILD_ID
 $build_id = if ($build_id -eq $null) { "dev" } else { $build_id }
 
-& $python "$PSScriptRoot\build.py", $cmake_src, $out, "$out\artifact", $build_id,
+& py -3 --version
+& py -3 "$PSScriptRoot\build.py", $cmake_src, $out, "$out\artifact", $build_id,
   "--cmake=$top\prebuilts\cmake\windows-x86\bin\cmake.exe",
   "--ninja=$top\prebuilts\ninja\windows-x86\ninja.exe",
   "--android-cmake=$top\external\android-cmake"
+
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+& py -3 "$top\toolchain\ndk-kokoro\gen_manifest.py" --root "$top" -o "$out\artifact\manifest-$build_id.xml"
 
 exit $LASTEXITCODE

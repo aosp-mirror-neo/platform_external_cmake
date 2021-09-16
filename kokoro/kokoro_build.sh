@@ -50,9 +50,12 @@ fi
 
 rm -fr $out
 
-$top/prebuilts/python/$host/bin/python3 \
-  $cmake_src/kokoro/build.py $cmake_src $out $out/artifact "${KOKORO_BUILD_ID:-dev}" \
+python3 --version
+python3 $cmake_src/kokoro/build.py $cmake_src $out $out/artifact "${KOKORO_BUILD_ID:-dev}" \
   --cmake=$top/prebuilts/cmake/$host/bin/cmake \
   --ninja=$top/prebuilts/ninja/$host/ninja \
   --android-cmake=$top/external/android-cmake \
   --extra-notices="$extra_notices"
+
+$top/toolchain/ndk-kokoro/gen_manifest.py --root $top \
+  -o "$out/artifact/manifest-${KOKORO_BUILD_ID:-dev}.xml"

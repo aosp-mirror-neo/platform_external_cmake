@@ -8,5 +8,7 @@ RUN yum -y update && \
   yum -y install \
     devtoolset-10-gcc \
     devtoolset-10-gcc-c++ \
+    git \
     make \
-    perl
+    perl \
+    python3
