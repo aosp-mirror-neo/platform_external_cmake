@@ -188,6 +188,10 @@ def package_target_for_studio(install_dir, package_name, cmake_version,
         zip.writestr("source.properties", source_properties)
         zip.write(ninja_path, os.path.join("bin",
                                            os.path.basename(ninja_path)))
+        ninja_license_path = os.path.join(os.path.dirname(ninja_path),
+                                          "LICENSE")
+        zip.write(ninja_license_path, os.path.join("doc", "ninja", "LICENSE"))
+
         for cmake_file in ["AndroidNdkModules.cmake", "AndroidNdkGdb.cmake"]:
             file_path = os.path.join(android_cmake, cmake_file)
             zip.write(
