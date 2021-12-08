@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmDefinitions_h
-#define cmDefinitions_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -14,6 +13,7 @@
 
 #include "cmLinkedTree.h"
 #include "cmString.hxx"
+#include "cmValue.h"
 
 /** \class cmDefinitions
  * \brief Store a scope of variable definitions for CMake language.
@@ -29,8 +29,7 @@ class cmDefinitions
 public:
   // -- Static member functions
 
-  static const std::string* Get(const std::string& key, StackIter begin,
-                                StackIter end);
+  static cmValue Get(const std::string& key, StackIter begin, StackIter end);
 
   static void Raise(const std::string& key, StackIter begin, StackIter end);
 
@@ -48,9 +47,6 @@ public:
   /** Unset a definition.  */
   void Unset(const std::string& key);
 
-  /** List of unused keys.  */
-  std::vector<std::string> UnusedKeys() const;
-
 private:
   /** String with existence boolean.  */
   struct Def
@@ -62,7 +58,6 @@ private:
     {
     }
     cm::String Value;
-    bool Used = false;
   };
   static Def NoDef;
 
@@ -71,5 +66,3 @@ private:
   static Def const& GetInternal(const std::string& key, StackIter begin,
                                 StackIter end, bool raise);
 };
-
-#endif

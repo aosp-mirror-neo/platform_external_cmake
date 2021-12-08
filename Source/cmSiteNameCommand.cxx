@@ -7,8 +7,8 @@
 #include "cmExecutionStatus.h"
 #include "cmMakefile.h"
 #include "cmStateTypes.h"
-#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 
 // cmSiteNameCommand
 bool cmSiteNameCommand(std::vector<std::string> const& args,
@@ -26,15 +26,15 @@ bool cmSiteNameCommand(std::vector<std::string> const& args,
   paths.emplace_back("/sbin");
   paths.emplace_back("/usr/local/bin");
 
-  const char* cacheValue = status.GetMakefile().GetDefinition(args[0]);
+  cmValue cacheValue = status.GetMakefile().GetDefinition(args[0]);
   if (cacheValue) {
     return true;
   }
 
-  const char* temp = status.GetMakefile().GetDefinition("HOSTNAME");
+  cmValue temp = status.GetMakefile().GetDefinition("HOSTNAME");
   std::string hostname_cmd;
   if (temp) {
-    hostname_cmd = temp;
+    hostname_cmd = *temp;
   } else {
     hostname_cmd = cmSystemTools::FindProgram("hostname", paths);
   }

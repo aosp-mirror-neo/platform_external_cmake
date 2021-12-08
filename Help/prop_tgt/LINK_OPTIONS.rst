@@ -1,6 +1,8 @@
 LINK_OPTIONS
 ------------
 
+.. versionadded:: 3.13
+
 List of options to use for the link step of shared library, module
 and executable targets as well as the device link step. Targets that are static
 libraries need to use the :prop_tgt:`STATIC_LIBRARY_OPTIONS` target property.
@@ -26,3 +28,9 @@ for more on defining buildsystem properties.
 .. note::
 
   This property must be used in preference to :prop_tgt:`LINK_FLAGS` property.
+
+.. include:: ../command/DEVICE_LINK_OPTIONS.txt
+
+.. include:: ../command/OPTIONS_SHELL.txt
+
+.. include:: ../command/LINK_OPTIONS_LINKER.txt

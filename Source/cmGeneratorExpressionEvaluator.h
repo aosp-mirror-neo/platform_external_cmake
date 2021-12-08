@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmGeneratorExpressionEvaluator_h
-#define cmGeneratorExpressionEvaluator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -61,7 +60,7 @@ struct TextContent : public cmGeneratorExpressionEvaluator
 
   void Extend(size_t length) { this->Length += length; }
 
-  size_t GetLength() { return this->Length; }
+  size_t GetLength() const { return this->Length; }
 
 private:
   const char* Content;
@@ -109,11 +108,8 @@ private:
     std::vector<cmGeneratorExpressionEvaluatorVector>::const_iterator pit)
     const;
 
-private:
   cmGeneratorExpressionEvaluatorVector IdentifierChildren;
   std::vector<cmGeneratorExpressionEvaluatorVector> ParamChildren;
   const char* StartContent;
   size_t ContentLength;
 };
-
-#endif

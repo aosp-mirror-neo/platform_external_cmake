@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmExportBuildFileGenerator_h
-#define cmExportBuildFileGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -61,11 +60,11 @@ protected:
     cmGeneratorTarget const* target) const;
   void HandleMissingTarget(std::string& link_libs,
                            std::vector<std::string>& missingTargets,
-                           cmGeneratorTarget* depender,
+                           cmGeneratorTarget const* depender,
                            cmGeneratorTarget* dependee) override;
 
-  void ComplainAboutMissingTarget(cmGeneratorTarget* depender,
-                                  cmGeneratorTarget* dependee,
+  void ComplainAboutMissingTarget(cmGeneratorTarget const* depender,
+                                  cmGeneratorTarget const* dependee,
                                   std::vector<std::string> const& namespaces);
 
   /** Fill in properties indicating built file locations.  */
@@ -74,7 +73,7 @@ protected:
                                  cmGeneratorTarget* target,
                                  ImportPropertyMap& properties);
 
-  std::string InstallNameDir(cmGeneratorTarget* target,
+  std::string InstallNameDir(cmGeneratorTarget const* target,
                              const std::string& config) override;
 
   std::pair<std::vector<std::string>, std::string> FindBuildExportInfo(
@@ -85,5 +84,3 @@ protected:
   std::vector<cmGeneratorTarget*> Exports;
   cmLocalGenerator* LG;
 };
-
-#endif

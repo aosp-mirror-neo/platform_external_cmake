@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCommand_h
-#define cmCommand_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -45,7 +44,7 @@ public:
   cmMakefile* GetMakefile() { return this->Makefile; }
 
   void SetExecutionStatus(cmExecutionStatus* s);
-  cmExecutionStatus* GetExecutionStatus() { return this->Status; };
+  cmExecutionStatus* GetExecutionStatus() { return this->Status; }
 
   /**
    * This is called by the cmMakefile when the command is first
@@ -96,5 +95,3 @@ public:
 private:
   std::unique_ptr<cmCommand> Command;
 };
-
-#endif

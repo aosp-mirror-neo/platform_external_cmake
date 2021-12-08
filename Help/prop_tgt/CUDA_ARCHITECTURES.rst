@@ -1,6 +1,8 @@
 CUDA_ARCHITECTURES
 ------------------
 
+.. versionadded:: 3.18
+
 List of architectures to generate device code for.
 
 An architecture can be suffixed by either ``-real`` or ``-virtual`` to specify
@@ -23,7 +25,7 @@ Examples
 
 .. code-block:: cmake
 
-  set_property(TARGET tgt PROPERTY CUDA_ARCHITECTURES 35 50 72)
+  set_target_properties(tgt PROPERTIES CUDA_ARCHITECTURES "35;50;72")
 
 Generates code for real and virtual architectures ``30``, ``50`` and ``72``.
 

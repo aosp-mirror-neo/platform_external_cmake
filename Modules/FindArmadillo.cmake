@@ -8,6 +8,9 @@ FindArmadillo
 Find the Armadillo C++ library.
 Armadillo is a library for linear algebra & scientific computing.
 
+.. versionadded:: 3.18
+  Support for linking wrapped libraries directly (``ARMA_DONT_USE_WRAPPER``).
+
 Using Armadillo:
 
 ::
@@ -84,6 +87,7 @@ if(_ARMA_USE_WRAPPER)
   # Link to the armadillo wrapper library.
   find_library(ARMADILLO_LIBRARY
     NAMES armadillo
+    NAMES_PER_DIR
     PATHS
       "$ENV{ProgramFiles}/Armadillo/lib"
       "$ENV{ProgramFiles}/Armadillo/lib64"

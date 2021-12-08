@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8.12)
 project(TryCompile)
 
 macro(TEST_ASSERT value msg)
@@ -283,11 +283,15 @@ TEST_ASSERT(C_RUN_SHOULD_WORK "CHECK_C_SOURCE_RUNS() failed")
 
 CHECK_CXX_SOURCE_COMPILES("I don't build" CXX_BUILD_SHOULD_FAIL)
 CHECK_CXX_SOURCE_COMPILES("int main() {return 0;}" CXX_BUILD_SHOULD_WORK)
+CHECK_CXX_SOURCE_COMPILES("void l(char const (&x)[2]){}; int main() { l(\"\\\\n\"); return 0;}"
+  CXX_BUILD_SHOULD_WORK_COMPLEX)
+
 CHECK_CXX_SOURCE_RUNS("int main() {return 2;}" CXX_RUN_SHOULD_FAIL)
 CHECK_CXX_SOURCE_RUNS("int main() {return 0;}" CXX_RUN_SHOULD_WORK)
 
 TEST_FAIL(CXX_BUILD_SHOULD_FAIL "CHECK_CXX_SOURCE_COMPILES() succeeded, but should have failed")
 TEST_ASSERT(CXX_BUILD_SHOULD_WORK "CHECK_CXX_SOURCE_COMPILES() failed")
+TEST_ASSERT(CXX_BUILD_SHOULD_WORK_COMPLEX "CHECK_CXX_SOURCE_COMPILES() failed")
 TEST_FAIL(CXX_RUN_SHOULD_FAIL "CHECK_CXX_SOURCE_RUNS() succeeded, but should have failed")
 TEST_ASSERT(CXX_RUN_SHOULD_WORK "CHECK_CXX_SOURCE_RUNS() failed")
 
@@ -301,11 +305,21 @@ unset(C_BOGUS_FLAG CACHE)
 include(CheckCCompilerFlag)
 CHECK_C_COMPILER_FLAG(${C_DD}-_this_is_not_a_flag_ C_BOGUS_FLAG)
 TEST_FAIL(C_BOGUS_FLAG "CHECK_C_COMPILER_FLAG() succeeded, but should have failed")
+unset(C_BOGUS_FLAG CACHE)
+if(DEFINED C_BOGUS_FLAG)
+  # Verify that CHECK_C_COMPILER_FLAG didn't construct a normal variable
+  message(SEND_ERROR "CHECK_C_COMPILER_FLAG shouldn't construct C_BOGUS_FLAG as a normal variable")
+endif()
 
 unset(CXX_BOGUS_FLAG CACHE)
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG(${CXX_DD}-_this_is_not_a_flag_ CXX_BOGUS_FLAG)
 TEST_FAIL(CXX_BOGUS_FLAG "CHECK_CXX_COMPILER_FLAG() succeeded, but should have failed")
+unset(CXX_BOGUS_FLAG CACHE)
+if(DEFINED CXX_BOGUS_FLAG)
+  # Verify that CHECK_C_COMPILER_FLAG didn't construct a normal variable
+  message(SEND_ERROR "CHECK_CXX_COMPILER_FLAG shouldn't construct CXX_BOGUS_FLAG as a normal variable")
+endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
   unset(C_STRICT_PROTOTYPES CACHE)

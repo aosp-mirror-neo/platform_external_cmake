@@ -21,6 +21,7 @@
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 #include "cmXMLWriter.h"
 #include "cmake.h"
 
@@ -95,7 +96,7 @@ struct Tree
   std::string path; // only one component of the path
   std::vector<Tree> folders;
   std::set<std::string> files;
-  void InsertPath(const std::vector<std::string>& splitted,
+  void InsertPath(const std::vector<std::string>& split,
                   std::vector<std::string>::size_type start,
                   const std::string& fileName);
   void BuildVirtualFolder(cmXMLWriter& xml) const;
@@ -106,43 +107,43 @@ struct Tree
                      const std::string& fsPath) const;
 };
 
-void Tree::InsertPath(const std::vector<std::string>& splitted,
+void Tree::InsertPath(const std::vector<std::string>& split,
                       std::vector<std::string>::size_type start,
                       const std::string& fileName)
 {
-  if (start == splitted.size()) {
-    files.insert(fileName);
+  if (start == split.size()) {
+    this->files.insert(fileName);
     return;
   }
-  for (Tree& folder : folders) {
-    if (folder.path == splitted[start]) {
-      if (start + 1 < splitted.size()) {
-        folder.InsertPath(splitted, start + 1, fileName);
+  for (Tree& folder : this->folders) {
+    if (folder.path == split[start]) {
+      if (start + 1 < split.size()) {
+        folder.InsertPath(split, start + 1, fileName);
         return;
       }
-      // last part of splitted
+      // last part of split
       folder.files.insert(fileName);
       return;
     }
   }
   // Not found in folders, thus insert
   Tree newFolder;
-  newFolder.path = splitted[start];
-  if (start + 1 < splitted.size()) {
-    newFolder.InsertPath(splitted, start + 1, fileName);
-    folders.push_back(newFolder);
+  newFolder.path = split[start];
+  if (start + 1 < split.size()) {
+    newFolder.InsertPath(split, start + 1, fileName);
+    this->folders.push_back(newFolder);
     return;
   }
-  // last part of splitted
+  // last part of split
   newFolder.files.insert(fileName);
-  folders.push_back(newFolder);
+  this->folders.push_back(newFolder);
 }
 
 void Tree::BuildVirtualFolder(cmXMLWriter& xml) const
 {
   xml.StartElement("Option");
   std::string virtualFolders = "CMake Files\\;";
-  for (Tree const& folder : folders) {
+  for (Tree const& folder : this->folders) {
     folder.BuildVirtualFolderImpl(virtualFolders, "");
   }
   xml.Attribute("virtualFolders", virtualFolders);
@@ -152,15 +153,15 @@ void Tree::BuildVirtualFolder(cmXMLWriter& xml) const
 void Tree::BuildVirtualFolderImpl(std::string& virtualFolders,
                                   const std::string& prefix) const
 {
-  virtualFolders += "CMake Files\\" + prefix + path + "\\;";
-  for (Tree const& folder : folders) {
-    folder.BuildVirtualFolderImpl(virtualFolders, prefix + path + "\\");
+  virtualFolders += "CMake Files\\" + prefix + this->path + "\\;";
+  for (Tree const& folder : this->folders) {
+    folder.BuildVirtualFolderImpl(virtualFolders, prefix + this->path + "\\");
   }
 }
 
 void Tree::BuildUnit(cmXMLWriter& xml, const std::string& fsPath) const
 {
-  for (std::string const& f : files) {
+  for (std::string const& f : this->files) {
     xml.StartElement("Unit");
     xml.Attribute("filename", fsPath + f);
 
@@ -170,7 +171,7 @@ void Tree::BuildUnit(cmXMLWriter& xml, const std::string& fsPath) const
 
     xml.EndElement();
   }
-  for (Tree const& folder : folders) {
+  for (Tree const& folder : this->folders) {
     folder.BuildUnitImpl(xml, "", fsPath);
   }
 }
@@ -179,20 +180,21 @@ void Tree::BuildUnitImpl(cmXMLWriter& xml,
                          const std::string& virtualFolderPath,
                          const std::string& fsPath) const
 {
-  for (std::string const& f : files) {
+  for (std::string const& f : this->files) {
     xml.StartElement("Unit");
-    xml.Attribute("filename", cmStrCat(fsPath, path, "/", f));
+    xml.Attribute("filename", cmStrCat(fsPath, this->path, "/", f));
 
     xml.StartElement("Option");
-    xml.Attribute("virtualFolder",
-                  cmStrCat("CMake Files\\", virtualFolderPath, path, "\\"));
+    xml.Attribute(
+      "virtualFolder",
+      cmStrCat("CMake Files\\", virtualFolderPath, this->path, "\\"));
     xml.EndElement();
 
     xml.EndElement();
   }
-  for (Tree const& folder : folders) {
-    folder.BuildUnitImpl(xml, cmStrCat(virtualFolderPath, path, "\\"),
-                         cmStrCat(fsPath, path, "/"));
+  for (Tree const& folder : this->folders) {
+    folder.BuildUnitImpl(xml, cmStrCat(virtualFolderPath, this->path, "\\"),
+                         cmStrCat(fsPath, this->path, "/"));
   }
 }
 
@@ -224,11 +226,11 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
 
       const std::string& relative = cmSystemTools::RelativePath(
         it.second[0]->GetSourceDirectory(), listFile);
-      std::vector<std::string> splitted;
-      cmSystemTools::SplitPath(relative, splitted, false);
+      std::vector<std::string> split;
+      cmSystemTools::SplitPath(relative, split, false);
       // Split filename from path
-      std::string fileName = *(splitted.end() - 1);
-      splitted.erase(splitted.end() - 1, splitted.end());
+      std::string fileName = *(split.end() - 1);
+      split.erase(split.end() - 1, split.end());
 
       // We don't want paths with CMakeFiles in them
       // or do we?
@@ -236,13 +238,12 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
       //
       // Also we can disable external (outside the project) files by setting ON
       // CMAKE_CODEBLOCKS_EXCLUDE_EXTERNAL_FILES variable.
-      const bool excludeExternal =
-        cmIsOn(it.second[0]->GetMakefile()->GetSafeDefinition(
-          "CMAKE_CODEBLOCKS_EXCLUDE_EXTERNAL_FILES"));
-      if (!splitted.empty() &&
+      const bool excludeExternal = it.second[0]->GetMakefile()->IsOn(
+        "CMAKE_CODEBLOCKS_EXCLUDE_EXTERNAL_FILES");
+      if (!split.empty() &&
           (!excludeExternal || (relative.find("..") == std::string::npos)) &&
           relative.find("CMakeFiles") == std::string::npos) {
-        tree.InsertPath(splitted, 1, fileName);
+        tree.InsertPath(split, 1, fileName);
       }
     }
   }
@@ -340,7 +341,7 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
   all_files_map_t allFiles;
   std::vector<std::string> cFiles;
 
-  auto cm = this->GlobalGenerator->GetCMakeInstance();
+  auto* cm = this->GlobalGenerator->GetCMakeInstance();
 
   for (cmLocalGenerator* lg : lgs) {
     cmMakefile* makefile = lg->GetMakefile();
@@ -365,12 +366,13 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
               continue;
             }
 
-            // check whether it is a C/C++/CUDA implementation file
+            // check whether it is a C/C++/CUDA/HIP implementation file
             bool isCFile = false;
             std::string lang = s->GetOrDetermineLanguage();
-            if (lang == "C" || lang == "CXX" || lang == "CUDA") {
+            if (lang == "C" || lang == "CXX" || lang == "CUDA" ||
+                lang == "HIP") {
               std::string const& srcext = s->GetExtension();
-              isCFile = cm->IsSourceExtension(srcext);
+              isCFile = cm->IsACLikeSourceExtension(srcext);
             }
 
             std::string const& fullPath = s->ResolveFullPath();
@@ -380,9 +382,8 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
               cmSystemTools::RelativePath(lg->GetSourceDirectory(), fullPath);
             // Do not add this file if it has ".." in relative path and
             // if CMAKE_CODEBLOCKS_EXCLUDE_EXTERNAL_FILES variable is on.
-            const bool excludeExternal =
-              cmIsOn(lg->GetMakefile()->GetSafeDefinition(
-                "CMAKE_CODEBLOCKS_EXCLUDE_EXTERNAL_FILES"));
+            const bool excludeExternal = lg->GetMakefile()->IsOn(
+              "CMAKE_CODEBLOCKS_EXCLUDE_EXTERNAL_FILES");
             if (excludeExternal &&
                 (relative.find("..") != std::string::npos)) {
               continue;
@@ -395,8 +396,8 @@ void cmExtraCodeBlocksGenerator::CreateNewProjectFile(
             CbpUnit& cbpUnit = allFiles[fullPath];
             cbpUnit.Targets.push_back(target.get());
           }
-        }
-        default: // intended fallthrough
+        } break;
+        default:
           break;
       }
     }
@@ -498,15 +499,15 @@ void cmExtraCodeBlocksGenerator::AppendTarget(
     if (target->GetType() == cmStateEnums::EXECUTABLE) {
       // Determine the directory where the executable target is created, and
       // set the working directory to this dir.
-      const char* runtimeOutputDir =
+      cmValue runtimeOutputDir =
         makefile->GetDefinition("CMAKE_RUNTIME_OUTPUT_DIRECTORY");
-      if (runtimeOutputDir != nullptr) {
-        workingDir = runtimeOutputDir;
+      if (runtimeOutputDir) {
+        workingDir = *runtimeOutputDir;
       } else {
-        const char* executableOutputDir =
+        cmValue executableOutputDir =
           makefile->GetDefinition("EXECUTABLE_OUTPUT_PATH");
-        if (executableOutputDir != nullptr) {
-          workingDir = executableOutputDir;
+        if (executableOutputDir) {
+          workingDir = *executableOutputDir;
         }
       }
     }
@@ -691,7 +692,8 @@ int cmExtraCodeBlocksGenerator::GetCBTargetType(cmGeneratorTarget* target)
 {
   switch (target->GetType()) {
     case cmStateEnums::EXECUTABLE:
-      if ((target->GetPropertyAsBool("WIN32_EXECUTABLE")) ||
+      if ((target->IsWin32Executable(
+            target->Makefile->GetSafeDefinition("CMAKE_BUILD_TYPE"))) ||
           (target->GetPropertyAsBool("MACOSX_BUNDLE"))) {
         return 0;
       }

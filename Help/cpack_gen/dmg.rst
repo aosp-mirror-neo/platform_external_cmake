@@ -30,6 +30,8 @@ on macOS:
 
 .. variable:: CPACK_DMG_DS_STORE_SETUP_SCRIPT
 
+ .. versionadded:: 3.5
+
  Path to a custom AppleScript file.  This AppleScript is used to generate
  a ``.DS_Store`` file which specifies the Finder window position/geometry and
  layout (such as hidden toolbars, placement of the icons etc.).
@@ -47,10 +49,14 @@ on macOS:
 
 .. variable:: CPACK_DMG_DISABLE_APPLICATIONS_SYMLINK
 
- Default behaviour is to include a symlink to ``/Applications`` in the DMG.
+ .. versionadded:: 3.6
+
+ Default behavior is to include a symlink to ``/Applications`` in the DMG.
  Set this option to ``ON`` to avoid adding the symlink.
 
 .. variable:: CPACK_DMG_SLA_DIR
+
+  .. versionadded:: 3.5
 
   Directory where license and menu files for different languages are stored.
   Setting this causes CPack to look for a ``<language>.menu.txt`` and
@@ -61,7 +67,12 @@ on macOS:
   ``<language>.license.txt`` and ``<language>.license.rtf`` exist, the ``.txt``
   file will be used.
 
+  .. versionadded:: 3.17
+    RTF support.
+
 .. variable:: CPACK_DMG_SLA_LANGUAGES
+
+  .. versionadded:: 3.5
 
   Languages for which a license agreement is provided when mounting the
   generated DMG. A menu file consists of 9 lines of text. The first line is
@@ -85,10 +96,20 @@ on macOS:
 
 .. variable:: CPACK_DMG_<component>_FILE_NAME
 
+ .. versionadded:: 3.17
+
  File name when packaging ``<component>`` as its own DMG
  (``CPACK_COMPONENTS_GROUPING`` set to IGNORE).
 
  - Default: ``CPACK_PACKAGE_FILE_NAME-<component>``
+
+.. variable:: CPACK_DMG_FILESYSTEM
+
+ .. versionadded:: 3.21
+
+ The filesystem format. Common values are ``APFS`` and ``HFS+``.
+ See ``man hdiutil`` for a full list of supported formats.
+ Defaults to ``HFS+``.
 
 .. variable:: CPACK_COMMAND_HDIUTIL
 

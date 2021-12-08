@@ -5,9 +5,9 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
-#include <cstring>
 #include <iterator>
 #include <sstream>
+#include <unordered_map>
 #include <utility>
 
 #include <cm/memory>
@@ -22,6 +22,7 @@
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmTarget.h"
+#include "cmValue.h"
 #include "cmake.h"
 
 /*
@@ -253,15 +254,21 @@ cmComputeLinkDepends::Compute()
   // Compute the final set of link entries.
   // Iterate in reverse order so we can keep only the last occurrence
   // of a shared library.
-  std::set<int> emmitted;
+  std::set<int> emitted;
   for (int i : cmReverseRange(this->FinalLinkOrder)) {
     LinkEntry const& e = this->EntryList[i];
     cmGeneratorTarget const* t = e.Target;
     // Entries that we know the linker will re-use do not need to be repeated.
     bool uniquify = t && t->GetType() == cmStateEnums::SHARED_LIBRARY;
-    if (!uniquify || emmitted.insert(i).second) {
+    if (!uniquify || emitted.insert(i).second) {
       this->FinalLinkEntries.push_back(e);
     }
+  }
+  // Place explicitly linked object files in the front.  The linker will
+  // always use them anyway, and they may depend on symbols from libraries.
+  // Append in reverse order since we reverse the final order below.
+  for (int i : cmReverseRange(this->ObjectEntries)) {
+    this->FinalLinkEntries.emplace_back(this->EntryList[i]);
   }
   // Reverse the resulting order since we iterated in reverse.
   std::reverse(this->FinalLinkEntries.begin(), this->FinalLinkEntries.end());
@@ -315,9 +322,9 @@ int cmComputeLinkDepends::AddLinkEntry(cmLinkItem const& item)
   } else {
     // Look for an old-style <item>_LIB_DEPENDS variable.
     std::string var = cmStrCat(entry.Item.Value, "_LIB_DEPENDS");
-    if (const char* val = this->Makefile->GetDefinition(var)) {
+    if (cmValue val = this->Makefile->GetDefinition(var)) {
       // The item dependencies are known.  Follow them.
-      BFSEntry qe = { index, val };
+      BFSEntry qe = { index, val->c_str() };
       this->BFSQueue.push(qe);
     } else if (!entry.IsFlag) {
       // The item dependencies are not known.  We need to infer them.
@@ -326,6 +333,27 @@ int cmComputeLinkDepends::AddLinkEntry(cmLinkItem const& item)
   }
 
   return index;
+}
+
+void cmComputeLinkDepends::AddLinkObject(cmLinkItem const& item)
+{
+  // Check if the item entry has already been added.
+  auto lei = this->LinkEntryIndex.find(item);
+  if (lei != this->LinkEntryIndex.end()) {
+    return;
+  }
+
+  // Allocate a spot for the item entry.
+  lei = this->AllocateLinkEntry(item);
+
+  // Initialize the item entry.
+  int index = lei->second;
+  LinkEntry& entry = this->EntryList[index];
+  entry.Item = BT<std::string>(item.AsStr(), item.Backtrace);
+  entry.IsObject = true;
+
+  // Record explicitly linked object files separately.
+  this->ObjectEntries.emplace_back(index);
 }
 
 void cmComputeLinkDepends::FollowLinkEntry(BFSEntry qe)
@@ -343,6 +371,13 @@ void cmComputeLinkDepends::FollowLinkEntry(BFSEntry qe)
         entry.Target->GetType() == cmStateEnums::INTERFACE_LIBRARY;
       // This target provides its own link interface information.
       this->AddLinkEntries(depender_index, iface->Libraries);
+      this->AddLinkObjects(iface->Objects);
+      for (auto const& language : iface->Languages) {
+        auto runtimeEntries = iface->LanguageRuntimeLibraries.find(language);
+        if (runtimeEntries != iface->LanguageRuntimeLibraries.end()) {
+          this->AddLinkEntries(depender_index, runtimeEntries->second);
+        }
+      }
 
       if (isIface) {
         return;
@@ -454,10 +489,10 @@ void cmComputeLinkDepends::AddVarLinkEntries(int depender_index,
       // lower.
       if (!haveLLT) {
         std::string var = cmStrCat(d, "_LINK_TYPE");
-        if (const char* val = this->Makefile->GetDefinition(var)) {
-          if (strcmp(val, "debug") == 0) {
+        if (cmValue val = this->Makefile->GetDefinition(var)) {
+          if (*val == "debug") {
             llt = DEBUG_LibraryType;
-          } else if (strcmp(val, "optimized") == 0) {
+          } else if (*val == "optimized") {
             llt = OPTIMIZED_LibraryType;
           }
         }
@@ -487,6 +522,14 @@ void cmComputeLinkDepends::AddDirectLinkEntries()
   cmLinkImplementation const* impl =
     this->Target->GetLinkImplementation(this->Config);
   this->AddLinkEntries(-1, impl->Libraries);
+  this->AddLinkObjects(impl->Objects);
+
+  for (auto const& language : impl->Languages) {
+    auto runtimeEntries = impl->LanguageRuntimeLibraries.find(language);
+    if (runtimeEntries != impl->LanguageRuntimeLibraries.end()) {
+      this->AddLinkEntries(-1, runtimeEntries->second);
+    }
+  }
   for (cmLinkItem const& wi : impl->WrongConfigLibraries) {
     this->CheckWrongConfigItem(wi);
   }
@@ -546,6 +589,13 @@ void cmComputeLinkDepends::AddLinkEntries(int depender_index,
   }
 }
 
+void cmComputeLinkDepends::AddLinkObjects(std::vector<cmLinkItem> const& objs)
+{
+  for (cmLinkItem const& obj : objs) {
+    this->AddLinkObject(obj);
+  }
+}
+
 cmLinkItem cmComputeLinkDepends::ResolveLinkItem(int depender_index,
                                                  const std::string& name)
 {
@@ -557,7 +607,7 @@ cmLinkItem cmComputeLinkDepends::ResolveLinkItem(int depender_index,
       from = depender;
     }
   }
-  return from->ResolveLinkItem(name, cmListFileBacktrace());
+  return from->ResolveLinkItem(BT<std::string>(name));
 }
 
 void cmComputeLinkDepends::InferDependencies()
@@ -626,6 +676,7 @@ void cmComputeLinkDepends::OrderLinkEntires()
   // constraints disallow it.
   this->CCG =
     cm::make_unique<cmComputeComponentGraph>(this->EntryConstraintGraph);
+  this->CCG->Compute();
 
   // The component graph is guaranteed to be acyclic.  Start a DFS
   // from every entry to compute a topological order for the

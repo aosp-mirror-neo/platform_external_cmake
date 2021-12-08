@@ -3,8 +3,9 @@
 #include "cmExportTryCompileFileGenerator.h"
 
 #include <map>
-#include <memory>
 #include <utility>
+
+#include <cm/memory>
 
 #include "cmGeneratorExpression.h"
 #include "cmGeneratorExpressionDAGChecker.h"
@@ -12,10 +13,10 @@
 #include "cmGlobalGenerator.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
-#include "cmProperty.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmTarget.h"
+#include "cmValue.h"
 
 cmExportTryCompileFileGenerator::cmExportTryCompileFileGenerator(
   cmGlobalGenerator* gg, const std::vector<std::string>& targets,
@@ -59,14 +60,22 @@ std::string cmExportTryCompileFileGenerator::FindTargets(
   const std::string& propName, cmGeneratorTarget const* tgt,
   std::string const& language, std::set<cmGeneratorTarget const*>& emitted)
 {
-  cmProp prop = tgt->GetProperty(propName);
+  cmValue prop = tgt->GetProperty(propName);
   if (!prop) {
     return std::string();
   }
 
   cmGeneratorExpression ge;
 
-  cmGeneratorExpressionDAGChecker dagChecker(tgt, propName, nullptr, nullptr);
+  std::unique_ptr<cmGeneratorExpressionDAGChecker> parentDagChecker;
+  if (propName == "INTERFACE_LINK_OPTIONS") {
+    // To please constraint checks of DAGChecker, this property must have
+    // LINK_OPTIONS property as parent
+    parentDagChecker = cm::make_unique<cmGeneratorExpressionDAGChecker>(
+      tgt, "LINK_OPTIONS", nullptr, nullptr);
+  }
+  cmGeneratorExpressionDAGChecker dagChecker(tgt, propName, nullptr,
+                                             parentDagChecker.get());
 
   std::unique_ptr<cmCompiledGeneratorExpression> cge = ge.Parse(*prop);
 
@@ -117,7 +126,7 @@ void cmExportTryCompileFileGenerator::PopulateProperties(
 }
 
 std::string cmExportTryCompileFileGenerator::InstallNameDir(
-  cmGeneratorTarget* target, const std::string& config)
+  cmGeneratorTarget const* target, const std::string& config)
 {
   std::string install_name_dir;
 

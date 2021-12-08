@@ -21,7 +21,7 @@ cmCPackIFWCommon::cmCPackIFWCommon()
 {
 }
 
-const char* cmCPackIFWCommon::GetOption(const std::string& op) const
+cmValue cmCPackIFWCommon::GetOption(const std::string& op) const
 {
   return this->Generator ? this->Generator->cmCPackGenerator::GetOption(op)
                          : nullptr;
@@ -44,36 +44,34 @@ bool cmCPackIFWCommon::IsSetToEmpty(const std::string& op) const
                          : false;
 }
 
-bool cmCPackIFWCommon::IsVersionLess(const char* version)
+bool cmCPackIFWCommon::IsVersionLess(const char* version) const
 {
   if (!this->Generator) {
     return false;
   }
 
   return cmSystemTools::VersionCompare(
-    cmSystemTools::OP_LESS, this->Generator->FrameworkVersion.data(), version);
+    cmSystemTools::OP_LESS, this->Generator->FrameworkVersion, version);
 }
 
-bool cmCPackIFWCommon::IsVersionGreater(const char* version)
+bool cmCPackIFWCommon::IsVersionGreater(const char* version) const
 {
   if (!this->Generator) {
     return false;
   }
 
   return cmSystemTools::VersionCompare(
-    cmSystemTools::OP_GREATER, this->Generator->FrameworkVersion.data(),
-    version);
+    cmSystemTools::OP_GREATER, this->Generator->FrameworkVersion, version);
 }
 
-bool cmCPackIFWCommon::IsVersionEqual(const char* version)
+bool cmCPackIFWCommon::IsVersionEqual(const char* version) const
 {
   if (!this->Generator) {
     return false;
   }
 
   return cmSystemTools::VersionCompare(
-    cmSystemTools::OP_EQUAL, this->Generator->FrameworkVersion.data(),
-    version);
+    cmSystemTools::OP_EQUAL, this->Generator->FrameworkVersion, version);
 }
 
 void cmCPackIFWCommon::ExpandListArgument(
@@ -118,7 +116,7 @@ void cmCPackIFWCommon::ExpandListArgument(
   }
 }
 
-void cmCPackIFWCommon::WriteGeneratedByToStrim(cmXMLWriter& xout)
+void cmCPackIFWCommon::WriteGeneratedByToStrim(cmXMLWriter& xout) const
 {
   if (!this->Generator) {
     return;

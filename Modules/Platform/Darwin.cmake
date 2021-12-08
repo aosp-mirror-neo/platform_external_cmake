@@ -47,9 +47,7 @@ set(CMAKE_SHARED_MODULE_PREFIX "lib")
 set(CMAKE_SHARED_MODULE_SUFFIX ".so")
 set(CMAKE_MODULE_EXISTS 1)
 set(CMAKE_DL_LIBS "")
-
-# Enable rpath support for 10.5 and greater where it is known to work.
-if("${DARWIN_MAJOR_VERSION}" GREATER 8)
+if(NOT "${_CURRENT_OSX_VERSION}" VERSION_LESS "10.5")
   set(CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG "-Wl,-rpath,")
 endif()
 
@@ -216,6 +214,13 @@ set(CMAKE_SYSTEM_APPBUNDLE_PATH
 unset(_apps_paths)
 
 include(Platform/UnixPaths)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+  list(PREPEND CMAKE_SYSTEM_PREFIX_PATH
+    /opt/homebrew # Brew on Apple Silicon
+    )
+endif()
+
 if(_CMAKE_OSX_SYSROOT_PATH)
   if(EXISTS ${_CMAKE_OSX_SYSROOT_PATH}/usr/include)
     list(INSERT CMAKE_SYSTEM_PREFIX_PATH 0 ${_CMAKE_OSX_SYSROOT_PATH}/usr)

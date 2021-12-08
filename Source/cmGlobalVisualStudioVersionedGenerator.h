@@ -1,13 +1,14 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmGlobalVisualStudioVersionedGenerator_h
-#define cmGlobalVisualStudioVersionedGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
 #include <iosfwd>
 #include <memory>
 #include <string>
+
+#include <cm/optional>
 
 #include "cmGlobalVisualStudio14Generator.h"
 #include "cmVSSetupHelper.h"
@@ -22,6 +23,7 @@ class cmGlobalVisualStudioVersionedGenerator
 public:
   static std::unique_ptr<cmGlobalGeneratorFactory> NewFactory15();
   static std::unique_ptr<cmGlobalGeneratorFactory> NewFactory16();
+  static std::unique_ptr<cmGlobalGeneratorFactory> NewFactory17();
 
   bool MatchesGeneratorName(const std::string& name) const override;
 
@@ -29,12 +31,18 @@ public:
 
   bool GetVSInstance(std::string& dir) const;
 
-  bool GetVSInstanceVersion(unsigned long long& vsInstanceVersion) const;
+  cm::optional<std::string> FindMSBuildCommandEarly(cmMakefile* mf) override;
 
-  bool IsDefaultToolset(const std::string& version) const override;
-  std::string GetAuxiliaryToolset() const override;
+  cm::optional<std::string> GetVSInstanceVersion() const override;
+
+  AuxToolset FindAuxToolset(std::string& version,
+                            std::string& props) const override;
 
   bool IsStdOutEncodingSupported() const override;
+
+  bool IsUtf8EncodingSupported() const override;
+
+  const char* GetAndroidApplicationTypeRevision() const override;
 
 protected:
   cmGlobalVisualStudioVersionedGenerator(
@@ -55,7 +63,7 @@ protected:
   // Check for a Win 8 SDK known to the registry or VS installer tool.
   bool IsWin81SDKInstalled() const;
 
-  std::string GetWindows10SDKMaxVersion() const override;
+  std::string GetWindows10SDKMaxVersionDefault(cmMakefile*) const override;
 
   std::string FindMSBuildCommand() override;
   std::string FindDevEnvCommand() override;
@@ -65,6 +73,8 @@ private:
   friend class Factory15;
   class Factory16;
   friend class Factory16;
+  class Factory17;
+  friend class Factory17;
   mutable cmVSSetupAPIHelper vsSetupAPIHelper;
+  cm::optional<std::string> LastGeneratorInstanceString;
 };
-#endif

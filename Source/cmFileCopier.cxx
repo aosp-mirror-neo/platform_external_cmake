@@ -12,6 +12,7 @@
 #include "cmMakefile.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 
 #ifdef _WIN32
 #  include "cmsys/FStream.hxx"
@@ -71,7 +72,7 @@ bool cmFileCopier::SetPermissions(const std::string& toFile,
                                   mode_t permissions)
 {
   if (permissions) {
-#ifdef WIN32
+#ifdef _WIN32
     if (Makefile->IsOn("CMAKE_CROSSCOMPILING")) {
       // Store the mode in an NTFS alternate stream.
       std::string mode_t_adt_filename = toFile + ":cmake_mode_t";
@@ -171,11 +172,11 @@ void cmFileCopier::DefaultDirectoryPermissions()
 bool cmFileCopier::GetDefaultDirectoryPermissions(mode_t** mode)
 {
   // check if default dir creation permissions were set
-  const char* default_dir_install_permissions = this->Makefile->GetDefinition(
+  cmValue default_dir_install_permissions = this->Makefile->GetDefinition(
     "CMAKE_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS");
-  if (default_dir_install_permissions && *default_dir_install_permissions) {
+  if (cmNonempty(default_dir_install_permissions)) {
     std::vector<std::string> items =
-      cmExpandedList(default_dir_install_permissions);
+      cmExpandedList(*default_dir_install_permissions);
     for (const auto& arg : items) {
       if (!this->CheckPermissions(arg, **mode)) {
         this->Status.SetError(

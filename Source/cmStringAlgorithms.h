@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmStringAlgorithms_h
-#define cmStringAlgorithms_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -16,9 +15,17 @@
 #include <cm/string_view>
 
 #include "cmRange.h"
+#include "cmValue.h"
 
 /** String range type.  */
 using cmStringRange = cmRange<std::vector<std::string>::const_iterator>;
+
+/** Returns length of a literal string.  */
+template <size_t N>
+constexpr size_t cmStrLen(const char (&/*str*/)[N])
+{
+  return N - 1;
+}
 
 /** Callable string comparison struct.  */
 struct cmStrCmp
@@ -28,7 +35,7 @@ struct cmStrCmp
   {
   }
 
-  bool operator()(cm::string_view sv) const { return Test_ == sv; }
+  bool operator()(cm::string_view sv) const { return this->Test_ == sv; }
 
 private:
   std::string const Test_;
@@ -67,6 +74,17 @@ std::string cmJoin(Range const& rng, cm::string_view separator)
   return os.str();
 }
 
+/**
+ * Faster overloads for std::string ranges.
+ * If @a initial is provided, it prepends the resulted string without
+ * @a separator between them.
+ */
+std::string cmJoin(std::vector<std::string> const& rng,
+                   cm::string_view separator, cm::string_view initial = {});
+
+std::string cmJoin(cmStringRange const& rng, cm::string_view separator,
+                   cm::string_view initial = {});
+
 /** Extract tokens that are separated by any of the characters in @a sep.  */
 std::vector<std::string> cmTokenize(cm::string_view str, cm::string_view sep);
 
@@ -76,6 +94,13 @@ std::vector<std::string> cmTokenize(cm::string_view str, cm::string_view sep);
  */
 void cmExpandList(cm::string_view arg, std::vector<std::string>& argsOut,
                   bool emptyArgs = false);
+inline void cmExpandList(cmValue arg, std::vector<std::string>& argsOut,
+                         bool emptyArgs = false)
+{
+  if (arg) {
+    cmExpandList(*arg, argsOut, emptyArgs);
+  }
+}
 
 /**
  * Expand out any arguments in the string range [@a first, @a last) that have
@@ -97,6 +122,14 @@ void cmExpandLists(InputIt first, InputIt last,
  */
 std::vector<std::string> cmExpandedList(cm::string_view arg,
                                         bool emptyArgs = false);
+inline std::vector<std::string> cmExpandedList(cmValue arg,
+                                               bool emptyArgs = false)
+{
+  if (!arg) {
+    return {};
+  }
+  return cmExpandedList(*arg, emptyArgs);
+}
 
 /**
  * Same as cmExpandList but a new vector is created containing the expanded
@@ -132,9 +165,9 @@ public:
   {
   }
   cmAlphaNum(char ch)
-    : View_(Digits_, 1)
+    : View_(this->Digits_, 1)
   {
-    Digits_[0] = ch;
+    this->Digits_[0] = ch;
   }
   cmAlphaNum(int val);
   cmAlphaNum(unsigned int val);
@@ -144,8 +177,12 @@ public:
   cmAlphaNum(unsigned long long int val);
   cmAlphaNum(float val);
   cmAlphaNum(double val);
+  cmAlphaNum(cmValue value)
+    : View_(*value)
+  {
+  }
 
-  cm::string_view View() const { return View_; }
+  cm::string_view View() const { return this->View_; }
 
 private:
   cm::string_view View_;
@@ -182,51 +219,6 @@ std::string cmWrap(char prefix, Range const& rng, char suffix,
                 sep);
 }
 
-/**
- * Does a string indicates that CMake/CPack/CTest internally
- * forced this value. This is not the same as On, but this
- * may be considered as "internally switched on".
- */
-bool cmIsInternallyOn(cm::string_view val);
-inline bool cmIsInternallyOn(const char* val)
-{
-  if (!val) {
-    return false;
-  }
-  return cmIsInternallyOn(cm::string_view(val));
-}
-
-/** Return true if value is NOTFOUND or ends in -NOTFOUND.  */
-bool cmIsNOTFOUND(cm::string_view val);
-
-/**
- * Does a string indicate a true or ON value? This is not the same as ifdef.
- */
-bool cmIsOn(cm::string_view val);
-inline bool cmIsOn(const char* val)
-{
-  if (!val) {
-    return false;
-  }
-  return cmIsOn(cm::string_view(val));
-}
-
-/**
- * Does a string indicate a false or off value ? Note that this is
- * not the same as !IsOn(...) because there are a number of
- * ambiguous values such as "/usr/local/bin" a path will result in
- * IsON and IsOff both returning false. Note that the special path
- * NOTFOUND, *-NOTFOUND or IGNORE will cause IsOff to return true.
- */
-bool cmIsOff(cm::string_view val);
-inline bool cmIsOff(const char* val)
-{
-  if (!val) {
-    return true;
-  }
-  return cmIsOff(cm::string_view(val));
-}
-
 /** Returns true if string @a str starts with the character @a prefix.  */
 inline bool cmHasPrefix(cm::string_view str, char prefix)
 {
@@ -237,6 +229,16 @@ inline bool cmHasPrefix(cm::string_view str, char prefix)
 inline bool cmHasPrefix(cm::string_view str, cm::string_view prefix)
 {
   return str.compare(0, prefix.size(), prefix) == 0;
+}
+
+/** Returns true if string @a str starts with string @a prefix.  */
+inline bool cmHasPrefix(cm::string_view str, cmValue prefix)
+{
+  if (!prefix) {
+    return false;
+  }
+
+  return str.compare(0, prefix->size(), *prefix) == 0;
 }
 
 /** Returns true if string @a str starts with string @a prefix.  */
@@ -257,6 +259,17 @@ inline bool cmHasSuffix(cm::string_view str, cm::string_view suffix)
 {
   return str.size() >= suffix.size() &&
     str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+/** Returns true if string @a str ends with string @a suffix.  */
+inline bool cmHasSuffix(cm::string_view str, cmValue suffix)
+{
+  if (!suffix) {
+    return false;
+  }
+
+  return str.size() >= suffix->size() &&
+    str.compare(str.size() - suffix->size(), suffix->size(), *suffix) == 0;
 }
 
 /** Returns true if string @a str ends with string @a suffix.  */
@@ -290,5 +303,3 @@ bool cmStrToLong(std::string const& str, long* value);
  * integer */
 bool cmStrToULong(const char* str, unsigned long* value);
 bool cmStrToULong(std::string const& str, unsigned long* value);
-
-#endif

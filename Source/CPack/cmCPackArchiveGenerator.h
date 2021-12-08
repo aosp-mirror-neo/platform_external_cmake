@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCPackArchiveGenerator_h
-#define cmCPackArchiveGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -86,12 +85,10 @@ private:
     return this->OutputExtension.c_str();
   }
 
-  bool SetArchiveOptions(cmArchiveWrite* archive);
+  int GetThreadCount() const;
 
 private:
   cmArchiveWrite::Compress Compress;
   std::string ArchiveFormat;
   std::string OutputExtension;
 };
-
-#endif

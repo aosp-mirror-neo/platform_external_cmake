@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmWorkerPool_h
-#define cmWorkerPool_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -29,7 +28,8 @@ public:
     void reset();
     bool error() const
     {
-      return (ExitStatus != 0) || (TermSignal != 0) || !ErrorMessage.empty();
+      return (this->ExitStatus != 0) || (this->TermSignal != 0) ||
+        !this->ErrorMessage.empty();
     }
 
     std::int64_t ExitStatus = 0;
@@ -61,7 +61,7 @@ public:
      * - no jobs later in the queue will be processed before this job was
      *   processed
      */
-    bool IsFence() const { return Fence_; }
+    bool IsFence() const { return this->Fence_; }
 
   protected:
     /**
@@ -81,13 +81,13 @@ public:
      * Get the worker pool.
      * Only valid during the JobT::Process() call!
      */
-    cmWorkerPool* Pool() const { return Pool_; }
+    cmWorkerPool* Pool() const { return this->Pool_; }
 
     /**
      * Get the user data.
      * Only valid during the JobT::Process() call!
      */
-    void* UserData() const { return Pool_->UserData(); };
+    void* UserData() const { return this->Pool_->UserData(); }
 
     /**
      * Get the worker index.
@@ -96,7 +96,7 @@ public:
      * Concurrently processing jobs will never have the same WorkerIndex().
      * Only valid during the JobT::Process() call!
      */
-    unsigned int WorkerIndex() const { return WorkerIndex_; }
+    unsigned int WorkerIndex() const { return this->WorkerIndex_; }
 
     /**
      * Run an external read only process.
@@ -112,12 +112,11 @@ public:
     //! Worker thread entry method.
     void Work(cmWorkerPool* pool, unsigned int workerIndex)
     {
-      Pool_ = pool;
-      WorkerIndex_ = workerIndex;
+      this->Pool_ = pool;
+      this->WorkerIndex_ = workerIndex;
       this->Process();
     }
 
-  private:
     cmWorkerPool* Pool_ = nullptr;
     unsigned int WorkerIndex_ = 0;
     bool Fence_ = false;
@@ -139,7 +138,7 @@ public:
     {
     }
     //! Does nothing
-    void Process() override{};
+    void Process() override {}
   };
 
   /**
@@ -151,10 +150,9 @@ public:
   {
   public:
     //! Does nothing
-    void Process() override { Pool()->Abort(); }
+    void Process() override { this->Pool()->Abort(); }
   };
 
-public:
   // -- Methods
   cmWorkerPool();
   ~cmWorkerPool();
@@ -162,7 +160,7 @@ public:
   /**
    * Number of worker threads.
    */
-  unsigned int ThreadCount() const { return ThreadCount_; }
+  unsigned int ThreadCount() const { return this->ThreadCount_; }
 
   /**
    * Set the number of worker threads.
@@ -185,7 +183,7 @@ public:
    *
    * Only valid during Process().
    */
-  void* UserData() const { return UserData_; }
+  void* UserData() const { return this->UserData_; }
 
   // -- Job processing interface
 
@@ -213,7 +211,7 @@ public:
   template <class T, typename... Args>
   bool EmplaceJob(Args&&... args)
   {
-    return PushJob(cm::make_unique<T>(std::forward<Args>(args)...));
+    return this->PushJob(cm::make_unique<T>(std::forward<Args>(args)...));
   }
 
 private:
@@ -221,5 +219,3 @@ private:
   unsigned int ThreadCount_ = 1;
   std::unique_ptr<cmWorkerPoolInternal> Int_;
 };
-
-#endif

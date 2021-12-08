@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCTestMemCheckHandler_h
-#define cmCTestMemCheckHandler_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -30,7 +29,7 @@ public:
 
   void Initialize() override;
 
-  int GetDefectCount();
+  int GetDefectCount() const;
 
 protected:
   int PreProcessHandler() override;
@@ -46,6 +45,7 @@ private:
     DRMEMORY,
     BOUNDS_CHECKER,
     // checkers after here do not use the standard error list
+    CUDA_SANITIZER,
     ADDRESS_SANITIZER,
     LEAK_SANITIZER,
     THREAD_SANITIZER,
@@ -119,9 +119,9 @@ private:
   bool InitializeMemoryChecking();
 
   /**
-   * Generate the Dart compatible output
+   * Generate CTest DynamicAnalysis.xml files
    */
-  void GenerateDartOutput(cmXMLWriter& xml) override;
+  void GenerateCTestXML(cmXMLWriter& xml) override;
 
   std::vector<std::string> CustomPreMemCheck;
   std::vector<std::string> CustomPostMemCheck;
@@ -137,6 +137,8 @@ private:
                                      std::vector<int>& results);
   bool ProcessMemCheckPurifyOutput(const std::string& str, std::string& log,
                                    std::vector<int>& results);
+  bool ProcessMemCheckCudaOutput(const std::string& str, std::string& log,
+                                 std::vector<int>& results);
   bool ProcessMemCheckSanitizerOutput(const std::string& str, std::string& log,
                                       std::vector<int>& results);
   bool ProcessMemCheckBoundsCheckerOutput(const std::string& str,
@@ -154,5 +156,3 @@ private:
   //! generate the output filename for the given test index
   void TestOutputFileNames(int test, std::vector<std::string>& files);
 };
-
-#endif

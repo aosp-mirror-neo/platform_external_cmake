@@ -14,10 +14,11 @@
 #endif
 
 cmGeneratedFileStream::cmGeneratedFileStream(Encoding encoding)
+  : OriginalLocale(this->getloc())
 {
 #ifndef CMAKE_BOOTSTRAP
   if (encoding != codecvt::None) {
-    imbue(std::locale(getloc(), new codecvt(encoding)));
+    this->imbue(std::locale(this->OriginalLocale, new codecvt(encoding)));
   }
 #else
   static_cast<void>(encoding);
@@ -27,7 +28,7 @@ cmGeneratedFileStream::cmGeneratedFileStream(Encoding encoding)
 cmGeneratedFileStream::cmGeneratedFileStream(std::string const& name,
                                              bool quiet, Encoding encoding)
   : cmGeneratedFileStreamBase(name)
-  , Stream(TempName.c_str())
+  , Stream(this->TempName.c_str())
 {
   // Check if the file opened.
   if (!*this && !quiet) {
@@ -36,11 +37,16 @@ cmGeneratedFileStream::cmGeneratedFileStream(std::string const& name,
   }
 #ifndef CMAKE_BOOTSTRAP
   if (encoding != codecvt::None) {
-    imbue(std::locale(getloc(), new codecvt(encoding)));
+    this->imbue(std::locale(this->getloc(), new codecvt(encoding)));
   }
 #else
   static_cast<void>(encoding);
 #endif
+  if (encoding == codecvt::UTF8_WITH_BOM) {
+    // Write the BOM encoding header into the file
+    char magic[] = { char(0xEF), char(0xBB), char(0xBF) };
+    this->write(magic, 3);
+  }
 }
 
 cmGeneratedFileStream::~cmGeneratedFileStream()
@@ -122,10 +128,17 @@ void cmGeneratedFileStreamBase::Open(std::string const& name)
   // Create the name of the temporary file.
   this->TempName = name;
 #if defined(__VMS)
-  this->TempName += "_tmp";
+  this->TempName += "_";
 #else
-  this->TempName += ".tmp";
+  this->TempName += ".";
 #endif
+  if (!this->TempExt.empty()) {
+    this->TempName += this->TempExt;
+  } else {
+    char buf[64];
+    sprintf(buf, "tmp%05x", cmSystemTools::RandomSeed() & 0xFFFFF);
+    this->TempName += buf;
+  }
 
   // Make sure the temporary file that will be used is not present.
   cmSystemTools::RemoveFile(this->TempName);
@@ -215,4 +228,20 @@ int cmGeneratedFileStreamBase::RenameFile(std::string const& oldname,
 void cmGeneratedFileStream::SetName(const std::string& fname)
 {
   this->Name = fname;
+}
+
+void cmGeneratedFileStream::SetTempExt(std::string const& ext)
+{
+  this->TempExt = ext;
+}
+
+void cmGeneratedFileStream::WriteRaw(std::string const& data)
+{
+#ifndef CMAKE_BOOTSTRAP
+  std::locale activeLocale = this->imbue(this->OriginalLocale);
+  this->write(data.data(), data.size());
+  this->imbue(activeLocale);
+#else
+  this->write(data.data(), data.size());
+#endif
 }

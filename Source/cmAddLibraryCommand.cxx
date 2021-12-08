@@ -2,8 +2,6 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmAddLibraryCommand.h"
 
-#include <cmext/algorithm>
-
 #include "cmExecutionStatus.h"
 #include "cmGeneratorExpression.h"
 #include "cmGlobalGenerator.h"
@@ -14,6 +12,7 @@
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmTarget.h"
+#include "cmValue.h"
 
 bool cmAddLibraryCommand(std::vector<std::string> const& args,
                          cmExecutionStatus& status)
@@ -111,20 +110,10 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
           "INTERFACE library specified with conflicting ALIAS type.");
         return false;
       }
-      if (excludeFromAll) {
-        status.SetError(
-          "INTERFACE library may not be used with EXCLUDE_FROM_ALL.");
-        return false;
-      }
       ++s;
       type = cmStateEnums::INTERFACE_LIBRARY;
       haveSpecifiedType = true;
     } else if (*s == "EXCLUDE_FROM_ALL") {
-      if (type == cmStateEnums::INTERFACE_LIBRARY) {
-        status.SetError(
-          "INTERFACE library may not be used with EXCLUDE_FROM_ALL.");
-        return false;
-      }
       ++s;
       excludeFromAll = true;
     } else if (*s == "IMPORTED") {
@@ -143,10 +132,6 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
   }
 
   if (type == cmStateEnums::INTERFACE_LIBRARY) {
-    if (s != args.end()) {
-      status.SetError("INTERFACE library requires no source arguments.");
-      return false;
-    }
     if (importGlobal && !importTarget) {
       status.SetError(
         "INTERFACE library specified as GLOBAL, but not as IMPORTED.");
@@ -254,16 +239,6 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
       status.SetError("called with IMPORTED argument but no library type.");
       return false;
     }
-    if (type == cmStateEnums::OBJECT_LIBRARY) {
-      std::string reason;
-      if (!mf.GetGlobalGenerator()->HasKnownObjectFileLocation(&reason)) {
-        mf.IssueMessage(
-          MessageType::FATAL_ERROR,
-          "The OBJECT library type may not be used for IMPORTED libraries" +
-            reason + ".");
-        return true;
-      }
-    }
     if (type == cmStateEnums::INTERFACE_LIBRARY) {
       if (!cmGeneratorExpression::IsValidTargetName(libName)) {
         status.SetError(cmStrCat(
@@ -302,8 +277,6 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
     }
   }
 
-  std::vector<std::string> srclists;
-
   if (type == cmStateEnums::INTERFACE_LIBRARY) {
     if (!cmGeneratorExpression::IsValidTargetName(libName) ||
         libName.find("::") != std::string::npos) {
@@ -311,14 +284,10 @@ bool cmAddLibraryCommand(std::vector<std::string> const& args,
         cmStrCat("Invalid name for INTERFACE library target: ", libName));
       return false;
     }
-
-    mf.AddLibrary(libName, type, srclists, excludeFromAll);
-    return true;
   }
 
-  cm::append(srclists, s, args.end());
-
-  mf.AddLibrary(libName, type, srclists, excludeFromAll);
+  std::vector<std::string> srcs(s, args.end());
+  mf.AddLibrary(libName, type, srcs, excludeFromAll);
 
   return true;
 }

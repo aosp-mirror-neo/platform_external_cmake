@@ -6,8 +6,10 @@ set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY "ON" CACHE BOOL "")
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "")
 set(CMake_TEST_INSTALL "OFF" CACHE BOOL "")
 
-if (NOT "$ENV{CMAKE_BUILD_TYPE}" STREQUAL "")
-  set(CMAKE_BUILD_TYPE "$ENV{CMAKE_BUILD_TYPE}" CACHE STRING "")
+if (NOT "$ENV{CMAKE_CI_BUILD_TYPE}" STREQUAL "")
+  set(CMAKE_BUILD_TYPE "$ENV{CMAKE_CI_BUILD_TYPE}" CACHE STRING "")
 endif ()
 
-include("${CMAKE_CURRENT_LIST_DIR}/configure_sccache.cmake")
+if (NOT configure_no_sccache)
+  include("${CMAKE_CURRENT_LIST_DIR}/configure_sccache.cmake")
+endif()

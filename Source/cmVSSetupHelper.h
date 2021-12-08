@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmVSSetupHelper_h
-#define cmVSSetupHelper_h
+#pragma once
 
 #ifndef NOMINMAX
 #  define NOMINMAX // Undefine min and max defined by windows.h
@@ -89,7 +88,7 @@ struct VSInstanceInfo
   std::wstring VSInstallLocation;
   std::wstring Version;
   std::string VCToolsetVersion;
-  ULONGLONG ullVersion = 0;
+  ULONGLONG ullVersion = 0; // A.B.C.D = (A<<48)|(B<<32)|(C<<16)|D
   bool IsWin10SDKInstalled = false;
   bool IsWin81SDKInstalled = false;
 
@@ -106,7 +105,7 @@ public:
 
   bool IsVSInstalled();
   bool GetVSInstanceInfo(std::string& vsInstallLocation);
-  bool GetVSInstanceVersion(unsigned long long& vsInstanceVersion);
+  bool GetVSInstanceVersion(std::string& vsInstanceVersion);
   bool GetVCToolsetVersion(std::string& vsToolsetVersion);
   bool IsWin10SDKInstalled();
   bool IsWin81SDKInstalled();
@@ -136,5 +135,3 @@ private:
 
   std::string SpecifiedVSInstallLocation;
 };
-
-#endif

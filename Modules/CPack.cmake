@@ -22,9 +22,13 @@ section below for details.
 The generated binary installers will contain all files that have been installed
 via CMake's :command:`install` command (and the deprecated commands
 :command:`install_files`, :command:`install_programs`, and
-:command:`install_targets`).  Certain kinds of binary installers can be
-configured such that users can select individual application components to
-install.  See the :module:`CPackComponent` module for further details.
+:command:`install_targets`). Note that the ``DESTINATION`` option of the
+:command:`install` command must be a relative path; otherwise installed files
+are ignored by CPack.
+
+Certain kinds of binary installers can be configured such that users can select
+individual application components to install.  See the :module:`CPackComponent`
+module for further details.
 
 Source packages (configured through ``CPackSourceConfig.cmake`` and generated
 by the :cpack_gen:`CPack Archive Generator`) will contain all source files in
@@ -190,6 +194,8 @@ installers.  The most commonly-used variables are:
 
 .. variable:: CPACK_PACKAGE_CHECKSUM
 
+  .. versionadded:: 3.7
+
   An algorithm that will be used to generate an additional file with the
   checksum of the package.  The output file name will be::
 
@@ -267,12 +273,45 @@ installers.  The most commonly-used variables are:
 
 .. variable:: CPACK_VERBATIM_VARIABLES
 
+  .. versionadded:: 3.4
+
   If set to ``TRUE``, values of variables prefixed with ``CPACK_`` will be
   escaped before being written to the configuration files, so that the cpack
   program receives them exactly as they were specified.  If not, characters
   like quotes and backslashes can cause parsing errors or alter the value
   received by the cpack program.  Defaults to ``FALSE`` for backwards
   compatibility.
+
+.. variable:: CPACK_THREADS
+
+  .. versionadded:: 3.20
+
+  Number of threads to use when performing parallelized operations, such
+  as compressing the installer package.
+
+  Some compression methods used by CPack generators such as Debian or Archive
+  may take advantage of multiple CPU cores to speed up compression.
+  ``CPACK_THREADS`` can be set to specify how many threads will be
+  used for compression.
+
+  A positive integer can be used to specify an exact desired thread count.
+
+  When given a negative integer CPack will use the absolute value
+  as the upper limit but may choose a lower value based on
+  the available hardware concurrency.
+
+  Given 0 CPack will try to use all available CPU cores.
+
+  By default ``CPACK_THREADS`` is set to ``1``.
+
+  Currently only ``xz`` compression *may* take advantage of multiple cores.
+  Other compression methods ignore this value and use only one thread.
+
+  .. versionadded:: 3.21
+
+    Official CMake binaries available on ``cmake.org`` now ship
+    with a ``liblzma`` that supports parallel compression.
+    Older versions did not.
 
 Variables for Source Package Generators
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -352,8 +391,10 @@ The following variables are for advanced uses of CPack:
 
 .. variable:: CPACK_INSTALL_SCRIPTS
 
+  .. versionadded:: 3.16
+
   Extra CMake scripts executed by CPack during its local staging
-  installation, which is done right before packaging the files.
+  installation.  They are executed before installing the files to be packaged.
   The scripts are not called by a standalone install (e.g.: ``make install``).
   For every script, the following variables will be set:
   :variable:`CMAKE_CURRENT_SOURCE_DIR`, :variable:`CMAKE_CURRENT_BINARY_DIR`
@@ -361,6 +402,39 @@ The following variables are for advanced uses of CPack:
   directory).  The singular form ``CMAKE_INSTALL_SCRIPT`` is supported as
   an alternative variable for historical reasons, but its value is ignored if
   ``CMAKE_INSTALL_SCRIPTS`` is set and a warning will be issued.
+
+  See also :variable:`CPACK_PRE_BUILD_SCRIPTS` and
+  :variable:`CPACK_POST_BUILD_SCRIPTS` which can be used to specify scripts
+  to be executed later in the packaging process.
+
+.. variable:: CPACK_PRE_BUILD_SCRIPTS
+
+  .. versionadded:: 3.19
+
+  List of CMake scripts to execute after CPack has installed the files to
+  be packaged into a staging directory and before producing the package(s)
+  from those files. See also :variable:`CPACK_INSTALL_SCRIPTS` and
+  :variable:`CPACK_POST_BUILD_SCRIPTS`.
+
+.. variable:: CPACK_POST_BUILD_SCRIPTS
+
+  .. versionadded:: 3.19
+
+  List of CMake scripts to execute after CPack has produced the resultant
+  packages and before copying them back to the build directory.
+  See also :variable:`CPACK_INSTALL_SCRIPTS`,
+  :variable:`CPACK_PRE_BUILD_SCRIPTS` and :variable:`CPACK_PACKAGE_FILES`.
+
+.. variable:: CPACK_PACKAGE_FILES
+
+  .. versionadded:: 3.19
+
+  List of package files created in the staging directory, with each file
+  provided as a full absolute path.  This variable is populated by CPack
+  just before invoking the post-build scripts listed in
+  :variable:`CPACK_POST_BUILD_SCRIPTS`.  It is the preferred way for the
+  post-build scripts to know the set of package files to operate on.
+  Projects should not try to set this variable themselves.
 
 .. variable:: CPACK_INSTALLED_DIRECTORIES
 
@@ -420,7 +494,7 @@ endmacro()
 # find any variable that starts with CPACK and create a variable
 # _CPACK_OTHER_VARIABLES_ that contains SET commands for
 # each cpack variable.  _CPACK_OTHER_VARIABLES_ is then
-# used as an @ replacment in configure_file for the CPackConfig.
+# used as an @ replacement in configure_file for the CPackConfig.
 function(cpack_encode_variables)
   set(commands "")
   get_cmake_property(res VARIABLES)
@@ -703,6 +777,7 @@ _cpack_set_default(CPACK_INSTALL_CMAKE_PROJECTS
   "${CMAKE_BINARY_DIR};${CMAKE_PROJECT_NAME};ALL;/")
 _cpack_set_default(CPACK_CMAKE_GENERATOR "${CMAKE_GENERATOR}")
 _cpack_set_default(CPACK_TOPLEVEL_TAG "${CPACK_SYSTEM_NAME}")
+_cpack_set_default(CPACK_THREADS 1)
 # if the user has set CPACK_NSIS_DISPLAY_NAME remember it
 if(DEFINED CPACK_NSIS_DISPLAY_NAME)
   set(CPACK_NSIS_DISPLAY_NAME_SET TRUE)

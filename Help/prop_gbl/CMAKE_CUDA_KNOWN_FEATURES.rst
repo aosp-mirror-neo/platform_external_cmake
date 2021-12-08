@@ -1,6 +1,8 @@
 CMAKE_CUDA_KNOWN_FEATURES
 -------------------------
 
+.. versionadded:: 3.17
+
 List of CUDA features known to this version of CMake.
 
 The features listed in this global property may be known to be available to the
@@ -28,3 +30,8 @@ The features known to this version of CMake are:
 
 ``cuda_std_20``
   Compiler mode is at least CUDA/C++ 20.
+
+``cuda_std_23``
+  .. versionadded:: 3.20
+
+  Compiler mode is at least CUDA/C++ 23.

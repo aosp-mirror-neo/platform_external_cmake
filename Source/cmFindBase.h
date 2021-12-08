@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmFindBase_h
-#define cmFindBase_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -10,6 +9,7 @@
 #include <vector>
 
 #include "cmFindCommon.h"
+#include "cmStateTypes.h"
 
 class cmExecutionStatus;
 
@@ -22,7 +22,7 @@ class cmExecutionStatus;
 class cmFindBase : public cmFindCommon
 {
 public:
-  cmFindBase(cmExecutionStatus& status);
+  cmFindBase(std::string findCommandName, cmExecutionStatus& status);
   virtual ~cmFindBase() = default;
 
   /**
@@ -35,13 +35,20 @@ protected:
   friend class cmFindBaseDebugState;
   void ExpandPaths();
 
-  // see if the VariableName is already set in the cache,
+  // see if the VariableName is already set,
   // also copy the documentation from the cache to VariableDocumentation
   // if it has documentation in the cache
-  bool CheckForVariableInCache();
+  bool CheckForVariableDefined();
+
+  void NormalizeFindResult();
+  void StoreFindResult(const std::string& value);
+
+  // actual find command name
+  std::string FindCommandName;
 
   // use by command during find
   std::string VariableDocumentation;
+  cmStateEnums::CacheEntryType VariableType = cmStateEnums::UNINITIALIZED;
   std::string VariableName;
   std::vector<std::string> Names;
   bool NamesPerDir = false;
@@ -50,8 +57,9 @@ protected:
   // CMAKE_*_PATH CMAKE_SYSTEM_*_PATH FRAMEWORK|LIBRARY|INCLUDE|PROGRAM
   std::string EnvironmentPath; // LIB,INCLUDE
 
-  bool AlreadyInCache = false;
+  bool AlreadyDefined = false;
   bool AlreadyInCacheWithoutMetaInfo = false;
+  bool StoreResultInCache = true;
 
   bool Required = false;
 
@@ -94,5 +102,3 @@ private:
   std::vector<DebugLibState> FailedSearchLocations;
   DebugLibState FoundSearchLocation;
 };
-
-#endif

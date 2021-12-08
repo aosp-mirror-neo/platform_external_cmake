@@ -1,16 +1,21 @@
 Visual Studio 15 2017
 ---------------------
 
+.. versionadded:: 3.7.1
+
 Generates Visual Studio 15 (VS 2017) project files.
 
 Project Types
 ^^^^^^^^^^^^^
 
-Only Visual C++ and C# projects may be generated.  Other types of
-projects (JavaScript, Powershell, Python, etc.) are not supported.
+Only Visual C++ and C# projects may be generated (and Fortran with
+Intel compiler integration).  Other types of projects (JavaScript,
+Powershell, Python, etc.) are not supported.
 
 Instance Selection
 ^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 3.11
 
 VS 2017 supports multiple installations on the same machine.
 The :variable:`CMAKE_GENERATOR_INSTANCE` variable may be set as a
@@ -59,4 +64,4 @@ via the :manual:`cmake(1)` ``-T`` option, to specify another toolset.
 .. |VS_TOOLSET_HOST_ARCH_DEFAULT| replace::
    By default this generator uses the 32-bit variant even on a 64-bit host.
 
-.. include:: VS_TOOLSET_HOST_ARCH.txt
+.. include:: VS_TOOLSET_HOST_ARCH_LEGACY.txt

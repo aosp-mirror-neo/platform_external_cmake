@@ -11,7 +11,7 @@ endif()
 
 include(CMakeTestCompilerCommon)
 
-# work around enforced code signing and / or missing exectuable target type
+# work around enforced code signing and / or missing executable target type
 set(__CMAKE_SAVED_TRY_COMPILE_TARGET_TYPE ${CMAKE_TRY_COMPILE_TARGET_TYPE})
 if(_CMAKE_FEATURE_DETECTION_TARGET_TYPE)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE ${_CMAKE_FEATURE_DETECTION_TARGET_TYPE})
@@ -46,6 +46,9 @@ if(NOT CMAKE_OBJCXX_COMPILER_WORKS)
     "# error \"The CMAKE_OBJCXX_COMPILER is not an Objective-C++ compiler\"\n"
     "#endif\n"
     "int main(){return 0;}\n")
+  # Clear result from normal variable.
+  unset(CMAKE_OBJCXX_COMPILER_WORKS)
+  # Puts test result in cache variable.
   try_compile(CMAKE_OBJCXX_COMPILER_WORKS ${CMAKE_BINARY_DIR}
     ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testOBJCXXCompiler.mm
     OUTPUT_VARIABLE __CMAKE_OBJCXX_COMPILER_OUTPUT)

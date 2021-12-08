@@ -136,6 +136,9 @@ __reportIfWrongStatus("${status}" 0)
 # Print status because we check its message too
 message(STATUS "${status}")
 
+# do not use proxy for lookup of invalid site (DNS failure by proxy looks
+# different than DNS failure without proxy)
+set(ENV{no_proxy} "$ENV{no_proxy},badhostname.invalid")
 message(STATUS "FileDownload:11")
 file(DOWNLOAD
   badhostname.invalid
@@ -163,3 +166,16 @@ __reportIfWrongStatus("${status}" 0)
 if(NOT EXISTS file12.png)
   message(SEND_ERROR "file12.png not downloaded: ${status}")
 endif()
+
+message(STATUS "FileDownload:13")
+file(DOWNLOAD
+  ${url}
+  TIMEOUT ${timeout}
+  STATUS status
+  )
+__reportIfWrongStatus("${status}" 0)
+if(EXISTS TIMEOUT)
+  file(REMOVE TIMEOUT)
+  message(SEND_ERROR "TIMEOUT argument was incorrectly interpreted as a filename")
+endif()
+message(STATUS "${status}")

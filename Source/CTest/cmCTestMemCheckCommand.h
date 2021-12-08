@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCTestMemCheckCommand_h
-#define cmCTestMemCheckCommand_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -14,6 +13,7 @@
 #include "cmCommand.h"
 
 class cmCTestGenericHandler;
+class cmCTestTestHandler;
 
 /** \class cmCTestMemCheck
  * \brief Run a ctest script
@@ -37,11 +37,9 @@ public:
 protected:
   void BindArguments() override;
 
-  cmCTestGenericHandler* InitializeActualHandler() override;
+  cmCTestTestHandler* InitializeActualHandler() override;
 
   void ProcessAdditionalValues(cmCTestGenericHandler* handler) override;
 
   std::string DefectCount;
 };
-
-#endif

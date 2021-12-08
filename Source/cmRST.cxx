@@ -25,7 +25,7 @@ cmRST::cmRST(std::ostream& os, std::string docroot)
   , Markup(MarkupNone)
   , Directive(DirectiveNone)
   , CMakeDirective("^.. (cmake:)?("
-                   "command|variable"
+                   "command|envvar|genex|variable"
                    ")::[ \t]+([^ \t\n]+)$")
   , CMakeModuleDirective("^.. cmake-module::[ \t]+([^ \t\n]+)$")
   , ParsedLiteralDirective("^.. parsed-literal::[ \t]*(.*)$")
@@ -35,9 +35,11 @@ cmRST::cmRST(std::ostream& os, std::string docroot)
   , TocTreeDirective("^.. toctree::[ \t]*(.*)$")
   , ProductionListDirective("^.. productionlist::[ \t]*(.*)$")
   , NoteDirective("^.. note::[ \t]*(.*)$")
+  , VersionDirective("^.. version(added|changed)::[ \t]*(.*)$")
   , ModuleRST(R"(^#\[(=*)\[\.rst:$)")
   , CMakeRole("(:cmake)?:("
-              "command|cpack_gen|generator|variable|envvar|module|policy|"
+              "command|cpack_gen|generator|genex|"
+              "variable|envvar|module|policy|"
               "prop_cache|prop_dir|prop_gbl|prop_inst|prop_sf|"
               "prop_test|prop_tgt|"
               "manual"
@@ -207,6 +209,10 @@ void cmRST::ProcessLine(std::string const& line)
       this->NormalLine(line);
     } else if (this->NoteDirective.find(line)) {
       // Output note directives and their content normally.
+      this->NormalLine(line);
+    } else if (this->VersionDirective.find(line)) {
+      // Output versionadded and versionchanged directives and their content
+      // normally.
       this->NormalLine(line);
     }
   }

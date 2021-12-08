@@ -8,22 +8,41 @@
 #include "cmGeneratorTarget.h"
 #include "cmMakefile.h"
 #include "cmOutputConverter.h"
+#include "cmState.h"
+#include "cmStateDirectory.h"
+#include "cmStateSnapshot.h"
 #include "cmStringAlgorithms.h"
+#include "cmValue.h"
 
 class cmGlobalGenerator;
 
 cmLocalCommonGenerator::cmLocalCommonGenerator(cmGlobalGenerator* gg,
-                                               cmMakefile* mf, std::string wd)
+                                               cmMakefile* mf, WorkDir wd)
   : cmLocalGenerator(gg, mf)
-  , WorkingDirectory(std::move(wd))
+  , WorkingDirectory(wd)
 {
-  this->Makefile->GetConfigurations(this->ConfigNames);
-  if (this->ConfigNames.empty()) {
-    this->ConfigNames.emplace_back();
-  }
+  this->ConfigNames =
+    this->Makefile->GetGeneratorConfigs(cmMakefile::IncludeEmptyConfig);
 }
 
 cmLocalCommonGenerator::~cmLocalCommonGenerator() = default;
+
+std::string const& cmLocalCommonGenerator::GetWorkingDirectory() const
+{
+  if (this->WorkingDirectory == WorkDir::TopBin) {
+    return this->GetState()->GetBinaryDirectory();
+  }
+  return this->StateSnapshot.GetDirectory().GetCurrentBinary();
+}
+
+std::string cmLocalCommonGenerator::MaybeRelativeToWorkDir(
+  std::string const& path) const
+{
+  if (this->WorkingDirectory == WorkDir::TopBin) {
+    return this->MaybeRelativeToTopBinDir(path);
+  }
+  return this->MaybeRelativeToCurBinDir(path);
+}
 
 std::string cmLocalCommonGenerator::GetTargetFortranFlags(
   cmGeneratorTarget const* target, std::string const& config)
@@ -36,11 +55,10 @@ std::string cmLocalCommonGenerator::GetTargetFortranFlags(
 
   // Add a module output directory flag if necessary.
   std::string mod_dir =
-    target->GetFortranModuleDirectory(this->WorkingDirectory);
+    target->GetFortranModuleDirectory(this->GetWorkingDirectory());
   if (!mod_dir.empty()) {
     mod_dir = this->ConvertToOutputFormat(
-      this->MaybeConvertToRelativePath(this->WorkingDirectory, mod_dir),
-      cmOutputConverter::SHELL);
+      this->MaybeRelativeToWorkDir(mod_dir), cmOutputConverter::SHELL);
   } else {
     mod_dir =
       this->Makefile->GetSafeDefinition("CMAKE_Fortran_MODDIR_DEFAULT");
@@ -64,13 +82,13 @@ std::string cmLocalCommonGenerator::GetTargetFortranFlags(
   // If there is a separate module path flag then duplicate the
   // include path with it.  This compiler does not search the include
   // path for modules.
-  if (const char* modpath_flag =
+  if (cmValue modpath_flag =
         this->Makefile->GetDefinition("CMAKE_Fortran_MODPATH_FLAG")) {
     std::vector<std::string> includes;
     this->GetIncludeDirectories(includes, target, "C", config);
     for (std::string const& id : includes) {
       std::string flg =
-        cmStrCat(modpath_flag,
+        cmStrCat(*modpath_flag,
                  this->ConvertToOutputFormat(id, cmOutputConverter::SHELL));
       this->AppendFlags(flags, flg);
     }

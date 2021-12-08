@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmFileAPI_h
-#define cmFileAPI_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -57,6 +56,7 @@ private:
     CodeModel,
     Cache,
     CMakeFiles,
+    Toolchains,
     InternalTest
   };
 
@@ -201,9 +201,11 @@ private:
     ClientRequest& r, std::vector<RequestVersion> const& versions);
   Json::Value BuildCMakeFiles(Object const& object);
 
+  void BuildClientRequestToolchains(
+    ClientRequest& r, std::vector<RequestVersion> const& versions);
+  Json::Value BuildToolchains(Object const& object);
+
   void BuildClientRequestInternalTest(
     ClientRequest& r, std::vector<RequestVersion> const& versions);
   Json::Value BuildInternalTest(Object const& object);
 };
-
-#endif

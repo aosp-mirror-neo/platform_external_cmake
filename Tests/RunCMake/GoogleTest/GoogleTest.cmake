@@ -1,9 +1,12 @@
-project(test_include_dirs LANGUAGES CXX)
+enable_language(CXX)
 include(GoogleTest)
 
 enable_testing()
 
+include(xcode_sign_adhoc.cmake)
+
 add_executable(fake_gtest fake_gtest.cpp)
+xcode_sign_adhoc(fake_gtest)
 
 gtest_discover_tests(
   fake_gtest
@@ -21,7 +24,26 @@ gtest_discover_tests(
   PROPERTIES LABELS TEST2
 )
 
+gtest_discover_tests(
+  fake_gtest
+  TEST_PREFIX TEST:
+  TEST_SUFFIX !3
+  TEST_FILTER basic*
+  EXTRA_ARGS how now "\"brown\" cow"
+  PROPERTIES LABELS TEST3
+)
+
+gtest_discover_tests(
+  fake_gtest
+  TEST_PREFIX TEST:
+  TEST_SUFFIX !4
+  TEST_FILTER typed*
+  EXTRA_ARGS how now "\"brown\" cow"
+  PROPERTIES LABELS TEST4
+)
+
 add_executable(no_tests_defined no_tests_defined.cpp)
+xcode_sign_adhoc(no_tests_defined)
 
 gtest_discover_tests(
   no_tests_defined
@@ -33,6 +55,7 @@ gtest_discover_tests(
 # 3.10.3 and later behavior, old behavior added in 3.10.1
 # is not supported.
 add_executable(property_timeout_test timeout_test.cpp)
+xcode_sign_adhoc(property_timeout_test)
 target_compile_definitions(property_timeout_test PRIVATE sleepSec=10)
 
 gtest_discover_tests(
@@ -50,6 +73,7 @@ gtest_discover_tests(
 )
 
 add_executable(skip_test skip_test.cpp)
+xcode_sign_adhoc(skip_test)
 
 gtest_discover_tests(
   skip_test

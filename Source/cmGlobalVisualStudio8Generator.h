@@ -1,7 +1,8 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmGlobalVisualStudio8Generator_h
-#define cmGlobalVisualStudio8Generator_h
+#pragma once
+
+#include <cm/optional>
 
 #include "cmGlobalVisualStudio71Generator.h"
 
@@ -24,6 +25,10 @@ public:
   virtual void AddPlatformDefinitions(cmMakefile* mf);
 
   bool SetGeneratorPlatform(std::string const& p, cmMakefile* mf) override;
+
+  cm::optional<std::string> const& GetTargetFrameworkVersion() const;
+  cm::optional<std::string> const& GetTargetFrameworkIdentifier() const;
+  cm::optional<std::string> const& GetTargetFrameworkTargetsVersion() const;
 
   /**
    * Override Configure and Generate to add the build-system check
@@ -77,5 +82,8 @@ protected:
 
   std::string Name;
   std::string WindowsCEVersion;
+
+  cm::optional<std::string> DefaultTargetFrameworkVersion;
+  cm::optional<std::string> DefaultTargetFrameworkIdentifier;
+  cm::optional<std::string> DefaultTargetFrameworkTargetsVersion;
 };
-#endif

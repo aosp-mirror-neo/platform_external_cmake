@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmSourceFile_h
-#define cmSourceFile_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -11,28 +10,28 @@
 
 #include "cmCustomCommand.h"
 #include "cmListFileCache.h"
-#include "cmProperty.h"
 #include "cmPropertyMap.h"
 #include "cmSourceFileLocation.h"
 #include "cmSourceFileLocationKind.h"
+#include "cmValue.h"
 
 class cmMakefile;
 
 /** \class cmSourceFile
  * \brief Represent a class loaded from a makefile.
  *
- * cmSourceFile is represents a class loaded from
- * a makefile.
+ * cmSourceFile represents a class loaded from a makefile.
  */
 class cmSourceFile
 {
 public:
   /**
-   * Construct with the makefile storing the source and the initial
-   * name referencing it.
+   * Construct with the makefile storing the source and the initial name
+   * referencing it. If it shall be marked as generated, this source file's
+   * kind is assumed to be known, regardless of the given value.
    */
   cmSourceFile(
-    cmMakefile* mf, const std::string& name,
+    cmMakefile* mf, const std::string& name, bool generated,
     cmSourceFileLocationKind kind = cmSourceFileLocationKind::Ambiguous);
 
   /**
@@ -43,21 +42,46 @@ public:
 
   //! Set/Get a property of this source file
   void SetProperty(const std::string& prop, const char* value);
+  void SetProperty(const std::string& prop, cmValue value);
+  void SetProperty(const std::string& prop, const std::string& value)
+  {
+    this->SetProperty(prop, cmValue(value));
+  }
   void AppendProperty(const std::string& prop, const std::string& value,
                       bool asString = false);
   //! Might return a nullptr if the property is not set or invalid
-  cmProp GetProperty(const std::string& prop) const;
+  cmValue GetProperty(const std::string& prop) const;
   //! Always returns a valid pointer
-  const char* GetSafeProperty(const std::string& prop) const;
+  const std::string& GetSafeProperty(const std::string& prop) const;
   bool GetPropertyAsBool(const std::string& prop) const;
 
   /** Implement getting a property when called from a CMake language
       command like get_property or get_source_file_property.  */
-  const char* GetPropertyForUser(const std::string& prop);
+  cmValue GetPropertyForUser(const std::string& prop);
 
-  //! Checks is the GENERATED property is set and true
-  /// @return Equivalent to GetPropertyAsBool("GENERATED")
-  bool GetIsGenerated() const { return this->IsGenerated; }
+  /// Marks this file as generated
+  /**
+   * This stores this file's path in the global table for all generated source
+   * files.
+   */
+  void MarkAsGenerated();
+  enum class CheckScope
+  {
+    Global,
+    GlobalAndLocal
+  };
+  /// Determines if this source file is marked as generated.
+  /**
+   * This will check if this file's path is stored in the global table of all
+   * generated source files. If that is not the case and checkScope is set to
+   * GlobalAndLocal the value of the possibly existing local GENERATED property
+   * is returned instead.
+   * @param checkScope Determines if alternatively for backwards-compatibility
+   * a local GENERATED property should be considered, too.
+   * @return true if this source file is marked as generated, otherwise false.
+   */
+  bool GetIsGenerated(
+    CheckScope checkScope = CheckScope::GlobalAndLocal) const;
 
   const std::vector<BT<std::string>>& GetCompileOptions() const
   {
@@ -78,7 +102,8 @@ public:
    * Resolves the full path to the file.  Attempts to locate the file on disk
    * and finalizes its location.
    */
-  std::string const& ResolveFullPath(std::string* error = nullptr);
+  std::string const& ResolveFullPath(std::string* error = nullptr,
+                                     std::string* cmp0115Warning = nullptr);
 
   /**
    * The resolved full path to the file.  The returned file name might be empty
@@ -125,6 +150,9 @@ public:
   std::string GetObjectLibrary() const;
 
 private:
+  template <typename ValueType>
+  void StoreProperty(const std::string& prop, ValueType value);
+
   cmSourceFileLocation Location;
   cmPropertyMap Properties;
   std::unique_ptr<cmCustomCommand> CustomCommand;
@@ -139,7 +167,7 @@ private:
   bool FindFullPathFailed = false;
   bool IsGenerated = false;
 
-  bool FindFullPath(std::string* error);
+  bool FindFullPath(std::string* error, std::string* cmp0115Warning);
   void CheckExtension();
   void CheckLanguage(std::string const& ext);
 
@@ -155,11 +183,9 @@ private:
 #define CM_HEADER_REGEX "\\.(h|hh|h\\+\\+|hm|hpp|hxx|in|txx|inl)$"
 
 #define CM_SOURCE_REGEX                                                       \
-  "\\.(C|F|M|c|c\\+\\+|cc|cpp|cxx|cu|f|f90|for|fpp|ftn|m|mm|"                 \
+  "\\.(C|F|M|c|c\\+\\+|cc|cpp|mpp|cxx|ixx|cppm|cu|f|f90|for|fpp|ftn|m|mm|"    \
   "rc|def|r|odl|idl|hpj|bat)$"
 
 #define CM_PCH_REGEX "cmake_pch(_[^.]+)?\\.(h|hxx)$"
 
 #define CM_RESOURCE_REGEX "\\.(pdf|plist|png|jpeg|jpg|storyboard|xcassets)$"
-
-#endif

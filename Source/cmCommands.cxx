@@ -16,7 +16,9 @@
 #include "cmAddTestCommand.h"
 #include "cmBreakCommand.h"
 #include "cmBuildCommand.h"
+#include "cmCMakeLanguageCommand.h"
 #include "cmCMakeMinimumRequired.h"
+#include "cmCMakePathCommand.h"
 #include "cmCMakePolicyCommand.h"
 #include "cmCommand.h"
 #include "cmConfigureFileCommand.h"
@@ -92,7 +94,6 @@
 #  include "cmAuxSourceDirectoryCommand.h"
 #  include "cmBuildNameCommand.h"
 #  include "cmCMakeHostSystemInformationCommand.h"
-#  include "cmCMakeLanguageCommand.h"
 #  include "cmExportCommand.h"
 #  include "cmExportLibraryDependenciesCommand.h"
 #  include "cmFLTKWrapUICommand.h"
@@ -118,11 +119,20 @@
 
 void GetScriptingCommands(cmState* state)
 {
-  state->AddBuiltinCommand("break", cmBreakCommand);
+  state->AddFlowControlCommand("break", cmBreakCommand);
+  state->AddFlowControlCommand("continue", cmContinueCommand);
+  state->AddFlowControlCommand("foreach", cmForEachCommand);
+  state->AddFlowControlCommand("function", cmFunctionCommand);
+  state->AddFlowControlCommand("if", cmIfCommand);
+  state->AddFlowControlCommand("macro", cmMacroCommand);
+  state->AddFlowControlCommand("return", cmReturnCommand);
+  state->AddFlowControlCommand("while", cmWhileCommand);
+
+  state->AddBuiltinCommand("cmake_language", cmCMakeLanguageCommand);
   state->AddBuiltinCommand("cmake_minimum_required", cmCMakeMinimumRequired);
+  state->AddBuiltinCommand("cmake_path", cmCMakePathCommand);
   state->AddBuiltinCommand("cmake_policy", cmCMakePolicyCommand);
   state->AddBuiltinCommand("configure_file", cmConfigureFileCommand);
-  state->AddBuiltinCommand("continue", cmContinueCommand);
   state->AddBuiltinCommand("exec_program", cmExecProgramCommand);
   state->AddBuiltinCommand("execute_process", cmExecuteProcessCommand);
   state->AddBuiltinCommand("file", cmFileCommand);
@@ -131,26 +141,21 @@ void GetScriptingCommands(cmState* state)
   state->AddBuiltinCommand("find_package", cmFindPackage);
   state->AddBuiltinCommand("find_path", cmFindPath);
   state->AddBuiltinCommand("find_program", cmFindProgram);
-  state->AddBuiltinCommand("foreach", cmForEachCommand);
-  state->AddBuiltinCommand("function", cmFunctionCommand);
   state->AddBuiltinCommand("get_cmake_property", cmGetCMakePropertyCommand);
   state->AddBuiltinCommand("get_directory_property",
                            cmGetDirectoryPropertyCommand);
   state->AddBuiltinCommand("get_filename_component",
                            cmGetFilenameComponentCommand);
   state->AddBuiltinCommand("get_property", cmGetPropertyCommand);
-  state->AddBuiltinCommand("if", cmIfCommand);
   state->AddBuiltinCommand("include", cmIncludeCommand);
   state->AddBuiltinCommand("include_guard", cmIncludeGuardCommand);
   state->AddBuiltinCommand("list", cmListCommand);
-  state->AddBuiltinCommand("macro", cmMacroCommand);
   state->AddBuiltinCommand("make_directory", cmMakeDirectoryCommand);
   state->AddBuiltinCommand("mark_as_advanced", cmMarkAsAdvancedCommand);
   state->AddBuiltinCommand("math", cmMathCommand);
   state->AddBuiltinCommand("message", cmMessageCommand);
   state->AddBuiltinCommand("option", cmOptionCommand);
   state->AddBuiltinCommand("cmake_parse_arguments", cmParseArgumentsCommand);
-  state->AddBuiltinCommand("return", cmReturnCommand);
   state->AddBuiltinCommand("separate_arguments", cmSeparateArgumentsCommand);
   state->AddBuiltinCommand("set", cmSetCommand);
   state->AddBuiltinCommand("set_directory_properties",
@@ -159,38 +164,37 @@ void GetScriptingCommands(cmState* state)
   state->AddBuiltinCommand("site_name", cmSiteNameCommand);
   state->AddBuiltinCommand("string", cmStringCommand);
   state->AddBuiltinCommand("unset", cmUnsetCommand);
-  state->AddBuiltinCommand("while", cmWhileCommand);
 
-  state->AddUnexpectedCommand(
+  state->AddUnexpectedFlowControlCommand(
     "else",
     "An ELSE command was found outside of a proper "
     "IF ENDIF structure. Or its arguments did not match "
     "the opening IF command.");
-  state->AddUnexpectedCommand(
+  state->AddUnexpectedFlowControlCommand(
     "elseif",
     "An ELSEIF command was found outside of a proper "
     "IF ENDIF structure.");
-  state->AddUnexpectedCommand(
+  state->AddUnexpectedFlowControlCommand(
     "endforeach",
     "An ENDFOREACH command was found outside of a proper "
     "FOREACH ENDFOREACH structure. Or its arguments did "
     "not match the opening FOREACH command.");
-  state->AddUnexpectedCommand(
+  state->AddUnexpectedFlowControlCommand(
     "endfunction",
     "An ENDFUNCTION command was found outside of a proper "
     "FUNCTION ENDFUNCTION structure. Or its arguments did not "
     "match the opening FUNCTION command.");
-  state->AddUnexpectedCommand(
+  state->AddUnexpectedFlowControlCommand(
     "endif",
     "An ENDIF command was found outside of a proper "
     "IF ENDIF structure. Or its arguments did not match "
     "the opening IF command.");
-  state->AddUnexpectedCommand(
+  state->AddUnexpectedFlowControlCommand(
     "endmacro",
     "An ENDMACRO command was found outside of a proper "
     "MACRO ENDMACRO structure. Or its arguments did not "
     "match the opening MACRO command.");
-  state->AddUnexpectedCommand(
+  state->AddUnexpectedFlowControlCommand(
     "endwhile",
     "An ENDWHILE command was found outside of a proper "
     "WHILE ENDWHILE structure. Or its arguments did not "
@@ -199,7 +203,6 @@ void GetScriptingCommands(cmState* state)
 #if !defined(CMAKE_BOOTSTRAP)
   state->AddBuiltinCommand("cmake_host_system_information",
                            cmCMakeHostSystemInformationCommand);
-  state->AddBuiltinCommand("cmake_language", cmCMakeLanguageCommand);
   state->AddBuiltinCommand("load_cache", cmLoadCacheCommand);
   state->AddBuiltinCommand("remove", cmRemoveCommand);
   state->AddBuiltinCommand("variable_watch", cmVariableWatchCommand);

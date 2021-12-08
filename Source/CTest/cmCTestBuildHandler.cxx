@@ -3,7 +3,6 @@
 #include "cmCTestBuildHandler.h"
 
 #include <cstdlib>
-#include <cstring>
 #include <set>
 #include <utility>
 
@@ -14,6 +13,7 @@
 #include "cmsys/Process.h"
 
 #include "cmCTest.h"
+#include "cmCTestLaunchReporter.h"
 #include "cmDuration.h"
 #include "cmFileTimeCache.h"
 #include "cmGeneratedFileStream.h"
@@ -22,6 +22,7 @@
 #include "cmStringAlgorithms.h"
 #include "cmStringReplaceHelper.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 #include "cmXMLWriter.h"
 
 static const char* cmCTestErrorMatches[] = {
@@ -248,13 +249,14 @@ void cmCTestBuildHandler::PopulateCustomVectors(cmMakefile* mf)
   }
 
   // Record the user-specified custom warning rules.
-  if (const char* customWarningMatchers =
+  if (cmValue customWarningMatchers =
         mf->GetDefinition("CTEST_CUSTOM_WARNING_MATCH")) {
-    cmExpandList(customWarningMatchers, this->ReallyCustomWarningMatches);
+    cmExpandList(*customWarningMatchers, this->ReallyCustomWarningMatches);
   }
-  if (const char* customWarningExceptions =
+  if (cmValue customWarningExceptions =
         mf->GetDefinition("CTEST_CUSTOM_WARNING_EXCEPTION")) {
-    cmExpandList(customWarningExceptions, this->ReallyCustomWarningExceptions);
+    cmExpandList(*customWarningExceptions,
+                 this->ReallyCustomWarningExceptions);
   }
 }
 
@@ -654,14 +656,14 @@ bool cmCTestBuildHandler::IsLaunchedErrorFile(const char* fname)
 {
   // error-{hash}.xml
   return (cmHasLiteralPrefix(fname, "error-") &&
-          strcmp(fname + strlen(fname) - 4, ".xml") == 0);
+          cmHasLiteralSuffix(fname, ".xml"));
 }
 
 bool cmCTestBuildHandler::IsLaunchedWarningFile(const char* fname)
 {
   // warning-{hash}.xml
   return (cmHasLiteralPrefix(fname, "warning-") &&
-          strcmp(fname + strlen(fname) - 4, ".xml") == 0);
+          cmHasLiteralSuffix(fname, ".xml"));
 }
 
 //######################################################################
@@ -885,15 +887,29 @@ int cmCTestBuildHandler::RunMakeCommand(const std::string& command,
       if (*retVal) {
         // If there was an error running command, report that on the
         // dashboard.
-        cmCTestBuildErrorWarning errorwarning;
-        errorwarning.LogLine = 1;
-        errorwarning.Text = cmStrCat(
-          "*** WARNING non-zero return value in ctest from: ", argv[0]);
-        errorwarning.PreContext.clear();
-        errorwarning.PostContext.clear();
-        errorwarning.Error = false;
-        this->ErrorsAndWarnings.push_back(std::move(errorwarning));
-        this->TotalWarnings++;
+        if (this->UseCTestLaunch) {
+          cmCTestLaunchReporter reporter;
+          reporter.RealArgs = args;
+          reporter.ComputeFileNames();
+          reporter.ExitCode = *retVal;
+          reporter.Process = cp;
+          // Use temporary BuildLog file to populate this error for CDash.
+          ofs.flush();
+          reporter.LogOut = this->LogFileNames["Build"];
+          reporter.LogOut += ".tmp";
+          reporter.WriteXML();
+        } else {
+          cmCTestBuildErrorWarning errorwarning;
+          errorwarning.LineNumber = 0;
+          errorwarning.LogLine = 1;
+          errorwarning.Text = cmStrCat(
+            "*** WARNING non-zero return value in ctest from: ", argv[0]);
+          errorwarning.PreContext.clear();
+          errorwarning.PostContext.clear();
+          errorwarning.Error = false;
+          this->ErrorsAndWarnings.push_back(std::move(errorwarning));
+          this->TotalWarnings++;
+        }
       }
     }
   } else if (result == cmsysProcess_State_Exception) {
@@ -909,6 +925,7 @@ int cmCTestBuildHandler::RunMakeCommand(const std::string& command,
   } else if (result == cmsysProcess_State_Error) {
     // If there was an error running command, report that on the dashboard.
     cmCTestBuildErrorWarning errorwarning;
+    errorwarning.LineNumber = 0;
     errorwarning.LogLine = 1;
     errorwarning.Text =
       cmStrCat("*** ERROR executing: ", cmsysProcess_GetErrorString(cp));

@@ -1,12 +1,12 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmGlobalVisualStudio7Generator_h
-#define cmGlobalVisualStudio7Generator_h
+#pragma once
 
 #include <memory>
 
 #include "cmGlobalGeneratorFactory.h"
 #include "cmGlobalVisualStudioGenerator.h"
+#include "cmValue.h"
 
 class cmTarget;
 struct cmIDEFlagTable;
@@ -143,7 +143,7 @@ protected:
 
   virtual void WriteExternalProject(
     std::ostream& fout, const std::string& name, const std::string& path,
-    const char* typeGuid,
+    cmValue typeGuid,
     const std::set<BT<std::pair<std::string, bool>>>& dependencies) = 0;
 
   std::string ConvertToSolutionPath(const std::string& path);
@@ -174,5 +174,3 @@ private:
 };
 
 #define CMAKE_CHECK_BUILD_SYSTEM_TARGET "ZERO_CHECK"
-
-#endif

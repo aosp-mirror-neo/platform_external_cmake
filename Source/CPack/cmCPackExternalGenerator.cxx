@@ -18,6 +18,7 @@
 #include "cmMakefile.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 
 int cmCPackExternalGenerator::InitializeInternal()
 {
@@ -60,8 +61,8 @@ int cmCPackExternalGenerator::PackageFiles()
     return 0;
   }
 
-  const char* packageScript = this->GetOption("CPACK_EXTERNAL_PACKAGE_SCRIPT");
-  if (packageScript && *packageScript) {
+  cmValue packageScript = this->GetOption("CPACK_EXTERNAL_PACKAGE_SCRIPT");
+  if (cmNonempty(packageScript)) {
     if (!cmSystemTools::FileIsFullPath(packageScript)) {
       cmCPackLogger(
         cmCPackLog::LOG_ERROR,
@@ -74,6 +75,11 @@ int cmCPackExternalGenerator::PackageFiles()
 
     if (cmSystemTools::GetErrorOccuredFlag() || !res) {
       return 0;
+    }
+
+    cmValue builtPackages = this->GetOption("CPACK_EXTERNAL_BUILT_PACKAGES");
+    if (builtPackages) {
+      cmExpandList(builtPackages, this->packageFileNames, false);
     }
   }
 
@@ -89,7 +95,7 @@ int cmCPackExternalGenerator::InstallProjectViaInstallCommands(
   bool setDestDir, const std::string& tempInstallDirectory)
 {
   if (this->StagingEnabled()) {
-    return cmCPackGenerator::InstallProjectViaInstallCommands(
+    return this->cmCPackGenerator::InstallProjectViaInstallCommands(
       setDestDir, tempInstallDirectory);
   }
 
@@ -100,7 +106,7 @@ int cmCPackExternalGenerator::InstallProjectViaInstallScript(
   bool setDestDir, const std::string& tempInstallDirectory)
 {
   if (this->StagingEnabled()) {
-    return cmCPackGenerator::InstallProjectViaInstallScript(
+    return this->cmCPackGenerator::InstallProjectViaInstallScript(
       setDestDir, tempInstallDirectory);
   }
 
@@ -112,7 +118,7 @@ int cmCPackExternalGenerator::InstallProjectViaInstalledDirectories(
   const mode_t* default_dir_mode)
 {
   if (this->StagingEnabled()) {
-    return cmCPackGenerator::InstallProjectViaInstalledDirectories(
+    return this->cmCPackGenerator::InstallProjectViaInstalledDirectories(
       setDestDir, tempInstallDirectory, default_dir_mode);
   }
 
@@ -124,7 +130,7 @@ int cmCPackExternalGenerator::RunPreinstallTarget(
   cmGlobalGenerator* globalGenerator, const std::string& buildConfig)
 {
   if (this->StagingEnabled()) {
-    return cmCPackGenerator::RunPreinstallTarget(
+    return this->cmCPackGenerator::RunPreinstallTarget(
       installProjectName, installDirectory, globalGenerator, buildConfig);
   }
 
@@ -139,7 +145,7 @@ int cmCPackExternalGenerator::InstallCMakeProject(
   std::string& absoluteDestFiles)
 {
   if (this->StagingEnabled()) {
-    return cmCPackGenerator::InstallCMakeProject(
+    return this->cmCPackGenerator::InstallCMakeProject(
       setDestDir, installDirectory, baseTempInstallDirectory, default_dir_mode,
       component, componentInstall, installSubDirectory, buildConfig,
       absoluteDestFiles);
@@ -175,43 +181,42 @@ int cmCPackExternalGenerator::cmCPackExternalVersionGenerator::WriteToJSON(
     return 0;
   }
 
-  const char* packageName = this->Parent->GetOption("CPACK_PACKAGE_NAME");
+  cmValue packageName = this->Parent->GetOption("CPACK_PACKAGE_NAME");
   if (packageName) {
-    root["packageName"] = packageName;
+    root["packageName"] = *packageName;
   }
 
-  const char* packageVersion =
-    this->Parent->GetOption("CPACK_PACKAGE_VERSION");
+  cmValue packageVersion = this->Parent->GetOption("CPACK_PACKAGE_VERSION");
   if (packageVersion) {
-    root["packageVersion"] = packageVersion;
+    root["packageVersion"] = *packageVersion;
   }
 
-  const char* packageDescriptionFile =
+  cmValue packageDescriptionFile =
     this->Parent->GetOption("CPACK_PACKAGE_DESCRIPTION_FILE");
   if (packageDescriptionFile) {
-    root["packageDescriptionFile"] = packageDescriptionFile;
+    root["packageDescriptionFile"] = *packageDescriptionFile;
   }
 
-  const char* packageDescriptionSummary =
+  cmValue packageDescriptionSummary =
     this->Parent->GetOption("CPACK_PACKAGE_DESCRIPTION_SUMMARY");
   if (packageDescriptionSummary) {
-    root["packageDescriptionSummary"] = packageDescriptionSummary;
+    root["packageDescriptionSummary"] = *packageDescriptionSummary;
   }
 
-  const char* buildConfigCstr = this->Parent->GetOption("CPACK_BUILD_CONFIG");
+  cmValue buildConfigCstr = this->Parent->GetOption("CPACK_BUILD_CONFIG");
   if (buildConfigCstr) {
-    root["buildConfig"] = buildConfigCstr;
+    root["buildConfig"] = *buildConfigCstr;
   }
 
-  const char* defaultDirectoryPermissions =
+  cmValue defaultDirectoryPermissions =
     this->Parent->GetOption("CPACK_INSTALL_DEFAULT_DIRECTORY_PERMISSIONS");
-  if (defaultDirectoryPermissions && *defaultDirectoryPermissions) {
-    root["defaultDirectoryPermissions"] = defaultDirectoryPermissions;
+  if (cmNonempty(defaultDirectoryPermissions)) {
+    root["defaultDirectoryPermissions"] = *defaultDirectoryPermissions;
   }
   if (cmIsInternallyOn(this->Parent->GetOption("CPACK_SET_DESTDIR"))) {
     root["setDestdir"] = true;
     root["packagingInstallPrefix"] =
-      this->Parent->GetOption("CPACK_PACKAGING_INSTALL_PREFIX");
+      *this->Parent->GetOption("CPACK_PACKAGING_INSTALL_PREFIX");
   } else {
     root["setDestdir"] = false;
   }

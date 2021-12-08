@@ -395,6 +395,10 @@ target_include_directories(systemlib
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 )
 
+add_library(testMod1 MODULE empty.cpp)
+add_library(testMod2 MODULE empty.cpp)
+set_property(TARGET testMod2 PROPERTY BUNDLE 1)
+
 install(TARGETS testLibRequired
         EXPORT RequiredExp DESTINATION lib
         INCLUDES DESTINATION
@@ -523,6 +527,7 @@ install(
   testLibDeprecation
   testLibCycleA testLibCycleB
   testLibNoSONAME
+  testMod1 testMod2
   cmp0022NEW cmp0022OLD
   TopDirLib SubDirLinkA
   systemlib
@@ -595,6 +600,7 @@ export(TARGETS testExe2 testLib4 testLib5 testLib6 testLib7 testExe3 testExe4 te
   testLib4lib testLib4libdbg testLib4libopt
   testLibCycleA testLibCycleB
   testLibNoSONAME
+  testMod1 testMod2
   testLibPerConfigDest
   NAMESPACE bld_
   APPEND FILE ExportBuildTree.cmake
@@ -669,3 +675,20 @@ endif()
 # IMPORTED_LINK_INTERFACE_LANGUAGES entries should not be targets.
 add_library(C INTERFACE)
 add_library(CXX INTERFACE)
+
+#------------------------------------------------------------------------------
+# test export of targets built from sources named using $<CONFIG> generator-expression
+# FIXME: Enable test on Xcode generator when it supports per-config sources.
+if(NOT XCODE)
+  file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Generated_$<CONFIG>.cpp" CONTENT "// content")
+  add_library(testStaticFromGeneratedSource STATIC)
+  target_sources(testStaticFromGeneratedSource PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/Generated_$<CONFIG>.cpp")
+
+  add_library(testLibFromGeneratedSource SHARED empty.cpp)
+  target_link_libraries(testLibFromGeneratedSource PRIVATE testStaticFromGeneratedSource)
+
+  install(TARGETS testLibFromGeneratedSource EXPORT testLibFromGeneratedSource_Export)
+  install(EXPORT testLibFromGeneratedSource_Export DESTINATION lib)
+endif()
+
+add_subdirectory(install-RUNTIME_DEPENDENCY_SET)

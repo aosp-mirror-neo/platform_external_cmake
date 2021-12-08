@@ -2,21 +2,26 @@
 
 set -e
 
-readonly version="3.17.2"
+readonly version="3.21.0"
 
-case "$( uname -s )" in
-    Linux)
+case "$(uname -s)-$(uname -m)" in
+    Linux-x86_64)
         shatool="sha256sum"
-        sha256sum="dc57f3cc448ca67fc8776b4ad4c22b087b9c6a8e459938b9622b8c7f4ef6b21e"
-        platform="Linux"
+        sha256sum="d54ef6909f519740bc85cec07ff54574cd1e061f9f17357d9ace69f61c6291ce"
+        platform="linux-x86_64"
         ;;
-    Darwin)
+    Linux-aarch64)
+        shatool="sha256sum"
+        sha256sum="b1e46825bf370f45f8f47c3a497b1122759ee41fbd60187e525f517a4b0934eb"
+        platform="linux-aarch64"
+        ;;
+    Darwin-*)
         shatool="shasum -a 256"
-        sha256sum="139500e20b080444fcafe57f24f57248c691c5187cce6695bee2b9aad6792c7d"
-        platform="Darwin"
+        sha256sum="c1c6f19dfc9c658a48b5aed22806595b2337bb3aedb71ab826552f74f568719f"
+        platform="macos-universal"
         ;;
     *)
-        echo "Unrecognized platform $( uname -s )"
+        echo "Unrecognized platform $(uname -s)-$(uname -m)"
         exit 1
         ;;
 esac
@@ -24,7 +29,7 @@ readonly shatool
 readonly sha256sum
 readonly platform
 
-readonly filename="cmake-$version-$platform-x86_64"
+readonly filename="cmake-$version-$platform"
 readonly tarball="$filename.tar.gz"
 
 cd .gitlab

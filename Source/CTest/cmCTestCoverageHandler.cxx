@@ -107,7 +107,7 @@ public:
     this->PipeState = cmsysProcess_WaitForExit(this->Process, timeout);
     return this->PipeState;
   }
-  int GetProcessState() { return this->PipeState; }
+  int GetProcessState() const { return this->PipeState; }
 
 private:
   int PipeState;
@@ -289,6 +289,13 @@ int cmCTestCoverageHandler::ProcessHandler()
     this->CTest->GetCTestConfiguration("SourceDirectory");
   std::string binaryDir = this->CTest->GetCTestConfiguration("BuildDirectory");
 
+  if (binaryDir.empty()) {
+    cmCTestLog(this->CTest, ERROR_MESSAGE,
+               "Binary directory is not set.  "
+               "No coverage checking will be performed."
+                 << std::endl);
+    return 0;
+  }
   this->LoadLabels();
 
   cmGeneratedFileStream ofs;
@@ -469,8 +476,8 @@ int cmCTestCoverageHandler::ProcessHandler()
     }
 
     const std::string fileName = cmSystemTools::GetFilenameName(fullFileName);
-    std::string shortFileName =
-      this->CTest->GetShortPathToFile(fullFileName.c_str());
+    const std::string shortFileName =
+      this->CTest->GetShortPathToFile(fullFileName);
     const cmCTestCoverageHandlerContainer::SingleFileCoverageVector& fcov =
       file.second;
     covLogXML.StartElement("File");
@@ -538,7 +545,7 @@ int cmCTestCoverageHandler::ProcessHandler()
     covSumXML.StartElement("File");
     covSumXML.Attribute("Name", fileName);
     covSumXML.Attribute("FullPath",
-                        this->CTest->GetShortPathToFile(fullFileName.c_str()));
+                        this->CTest->GetShortPathToFile(fullFileName));
     covSumXML.Attribute("Covered", tested + untested > 0 ? "true" : "false");
     covSumXML.Element("LOCTested", tested);
     covSumXML.Element("LOCUnTested", untested);
@@ -778,16 +785,16 @@ struct cmCTestCoverageHandlerLocale
   {
     std::string l;
     if (cmSystemTools::GetEnv("LC_ALL", l)) {
-      lc_all = l;
+      this->lc_all = l;
     }
-    if (lc_all != "C") {
+    if (this->lc_all != "C") {
       cmSystemTools::PutEnv("LC_ALL=C");
     }
   }
   ~cmCTestCoverageHandlerLocale()
   {
-    if (!lc_all.empty()) {
-      cmSystemTools::PutEnv("LC_ALL=" + lc_all);
+    if (!this->lc_all.empty()) {
+      cmSystemTools::PutEnv("LC_ALL=" + this->lc_all);
     } else {
       cmSystemTools::UnsetEnv("LC_ALL");
     }
@@ -1887,8 +1894,8 @@ int cmCTestCoverageHandler::RunBullseyeCoverageBranch(
         // start the file output
         covLogXML.StartElement("File");
         covLogXML.Attribute("Name", i->first);
-        covLogXML.Attribute(
-          "FullPath", this->CTest->GetShortPathToFile(i->second.c_str()));
+        covLogXML.Attribute("FullPath",
+                            this->CTest->GetShortPathToFile(i->second));
         covLogXML.StartElement("Report");
         // write the bullseye header
         line = 0;
@@ -2064,8 +2071,7 @@ int cmCTestCoverageHandler::RunBullseyeSourceSummary(
       total_untested += (totalFunctions - functionsCalled);
 
       std::string fileName = cmSystemTools::GetFilenameName(file);
-      std::string shortFileName =
-        this->CTest->GetShortPathToFile(file.c_str());
+      std::string shortFileName = this->CTest->GetShortPathToFile(file);
 
       float cper = static_cast<float>(percentBranch + percentFunction);
       if (totalBranches > 0) {
@@ -2266,7 +2272,7 @@ void cmCTestCoverageHandler::LoadLabels(const char* dir)
       // is the end of the target-wide labels.
       inTarget = false;
 
-      source = this->CTest->GetShortPathToFile(line.c_str());
+      source = this->CTest->GetShortPathToFile(line);
 
       // Label the source with the target labels.
       LabelSet& labelSet = this->SourceLabels[source];
@@ -2320,7 +2326,7 @@ bool cmCTestCoverageHandler::IsFilteredOut(std::string const& source)
 
   // The source is filtered out if it does not have any labels in
   // common with the filter set.
-  std::string shortSrc = this->CTest->GetShortPathToFile(source.c_str());
+  std::string shortSrc = this->CTest->GetShortPathToFile(source);
   auto li = this->SourceLabels.find(shortSrc);
   if (li != this->SourceLabels.end()) {
     return !this->IntersectsFilter(li->second);
@@ -2342,14 +2348,14 @@ std::set<std::string> cmCTestCoverageHandler::FindUncoveredFiles(
     std::vector<std::string> files = gl.GetFiles();
     for (std::string const& f : files) {
       if (this->ShouldIDoCoverage(f, cont->SourceDir, cont->BinaryDir)) {
-        extraMatches.insert(this->CTest->GetShortPathToFile(f.c_str()));
+        extraMatches.insert(this->CTest->GetShortPathToFile(f));
       }
     }
   }
 
   if (!extraMatches.empty()) {
     for (auto const& i : cont->TotalCoverage) {
-      std::string shortPath = this->CTest->GetShortPathToFile(i.first.c_str());
+      std::string shortPath = this->CTest->GetShortPathToFile(i.first);
       extraMatches.erase(shortPath);
     }
   }

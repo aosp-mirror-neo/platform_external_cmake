@@ -34,10 +34,12 @@
             - build/Tests/CMake*/PseudoMemcheck/purify
             - build/Tests/CMake*/PseudoMemcheck/memcheck_fail
             - build/Tests/CMake*/PseudoMemcheck/BC
+            - build/Tests/CMake*/PseudoMemcheck/cuda-memcheck
             - build/Tests/CMake*/PseudoMemcheck/valgrind.exe
             - build/Tests/CMake*/PseudoMemcheck/purify.exe
             - build/Tests/CMake*/PseudoMemcheck/memcheck_fail.exe
             - build/Tests/CMake*/PseudoMemcheck/BC.exe
+            - build/Tests/CMake*/PseudoMemcheck/cuda-memcheck.exe
             - build/Tests/CMake*/PseudoMemcheck/NoLog
             - build/Tests/CMake*Lib/*LibTests
             - build/Tests/CMake*Lib/*LibTests.exe
@@ -54,10 +56,12 @@
             # Test directories.
             - build/Tests/CTest*
             - build/Tests/Find*
-            - build/Tests/Qt5*
+            - build/Tests/Qt*
             - build/Tests/RunCMake/
             - build/Tests/CMakeOnly/
             - build/Tests/CMakeTests/
+            - build/Tests/CMakeGUI/
+            - build/Tests/FortranC/
 
             # CTest/CDash information.
             - build/Testing/
@@ -67,13 +71,49 @@
 .cmake_release_artifacts:
     artifacts:
         expire_in: 5d
+        # Release artifacts are of interest even for failed jobs.
+        when: always
         paths:
             # Any packages made.
-            - build/cmake-*-Linux-x86_64.*
+            - build/cmake-*-linux-x86_64.*
+            - build/cmake-*-linux-aarch64.*
+            - build/cmake-*-macos*-universal.*
+            # Any source packages made.
+            - build/cmake-*.tar.gz
+            - build/cmake-*.zip
+
+.cmake_junit_artifacts:
+    artifacts:
+        expire_in: 1d
+        when: always
+        reports:
+            junit:
+                - build/junit.xml
 
 .cmake_test_artifacts:
     artifacts:
         expire_in: 1d
+        # External testing can be useful even if test jobs fail.
+        when: always
+        reports:
+            junit:
+                - build/junit.xml
         paths:
             # Take the install tree.
             - build/install/
+
+.cmake_doc_artifacts:
+    artifacts:
+        expire_in: 1d
+        paths:
+            # Take the install tree.
+            - build/install-doc/
+
+.cmake_org_help_artifacts:
+    artifacts:
+        expire_in: 1d
+        paths:
+            - build/html
+        exclude:
+            - build/html/.buildinfo
+            - build/html/objects.inv

@@ -13,8 +13,8 @@ endif()
 
 # Support for NVIDIA Nsight Tegra Visual Studio Edition was previously
 # implemented in the CMake VS IDE generators.  Avoid interfering with
-# that functionality for now.  Later we may try to integrate this.
-if(CMAKE_GENERATOR MATCHES "Visual Studio")
+# that functionality for now.
+if(CMAKE_GENERATOR_PLATFORM STREQUAL "Tegra-Android")
   return()
 endif()
 
@@ -32,6 +32,65 @@ endif()
 
 cmake_policy(PUSH)
 cmake_policy(SET CMP0057 NEW) # if IN_LIST
+
+# If using Android tools for Visual Studio, compile a sample project to get the
+# sysroot.
+if(CMAKE_GENERATOR MATCHES "Visual Studio")
+  if(NOT CMAKE_SYSROOT)
+    set(vcx_platform ${CMAKE_GENERATOR_PLATFORM})
+    if(CMAKE_GENERATOR MATCHES "Visual Studio 1[45]")
+      set(vcx_sysroot_var "Sysroot")
+    else()
+      set(vcx_sysroot_var "SysrootLink")
+    endif()
+    if(CMAKE_GENERATOR MATCHES "Visual Studio 14")
+      set(vcx_revision "2.0")
+    elseif(CMAKE_GENERATOR MATCHES "Visual Studio 1[56]")
+      set(vcx_revision "3.0")
+    else()
+      set(vcx_revision "")
+    endif()
+    configure_file(${CMAKE_ROOT}/Modules/Platform/Android/VCXProjInspect.vcxproj.in
+      ${CMAKE_PLATFORM_INFO_DIR}/VCXProjInspect.vcxproj @ONLY)
+    cmake_host_system_information(RESULT _msbuild QUERY VS_MSBUILD_COMMAND) # undocumented query
+    execute_process(
+      COMMAND "${_msbuild}" "VCXProjInspect.vcxproj"
+        "/p:Configuration=Debug" "/p:Platform=${vcx_platform}"
+      WORKING_DIRECTORY ${CMAKE_PLATFORM_INFO_DIR}
+      OUTPUT_VARIABLE VCXPROJ_INSPECT_OUTPUT
+      ERROR_VARIABLE VCXPROJ_INSPECT_OUTPUT
+      RESULT_VARIABLE VCXPROJ_INSPECT_RESULT
+      )
+    unset(_msbuild)
+    if(NOT CMAKE_SYSROOT AND VCXPROJ_INSPECT_OUTPUT MATCHES "CMAKE_SYSROOT=([^%\r\n]+)[\r\n]")
+      # Strip VS diagnostic output from the end of the line.
+      string(REGEX REPLACE " \\(TaskId:[0-9]*\\)$" "" _sysroot "${CMAKE_MATCH_1}")
+      if(EXISTS "${_sysroot}")
+        file(TO_CMAKE_PATH "${_sysroot}" CMAKE_SYSROOT)
+      endif()
+    endif()
+    if(VCXPROJ_INSPECT_RESULT)
+      file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
+        "Determining the sysroot for the Android NDK failed.
+The output was:
+${VCXPROJ_INSPECT_RESULT}
+${VCXPROJ_INSPECT_OUTPUT}
+
+")
+    else()
+      file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
+        "Determining the sysroot for the Android NDK succeeded.
+The output was:
+${VCXPROJ_INSPECT_RESULT}
+${VCXPROJ_INSPECT_OUTPUT}
+
+")
+    endif()
+  endif()
+  if(NOT CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION)
+    set(CMAKE_ANDROID_NDK_TOOLCHAIN_VERSION "clang")
+  endif()
+endif()
 
 # If the user provided CMAKE_SYSROOT for us, extract information from it.
 set(_ANDROID_SYSROOT_NDK "")
@@ -169,10 +228,48 @@ if(CMAKE_ANDROID_NDK)
   include("${CMAKE_ANDROID_NDK}/build/cmake/abis.cmake" OPTIONAL RESULT_VARIABLE _INCLUDED_ABIS)
 endif()
 
+if(CMAKE_ANDROID_NDK AND EXISTS "${CMAKE_ANDROID_NDK}/source.properties")
+  # Android NDK revision
+  # Possible formats:
+  # * r16, build 1234: 16.0.1234
+  # * r16b, build 1234: 16.1.1234
+  # * r16 beta 1, build 1234: 16.0.1234-beta1
+  #
+  # Canary builds are not specially marked.
+  file(READ "${CMAKE_ANDROID_NDK}/source.properties" _ANDROID_NDK_SOURCE_PROPERTIES)
+
+  set(_ANDROID_NDK_REVISION_REGEX
+    "^Pkg\\.Desc = Android NDK\nPkg\\.Revision = ([0-9]+)\\.([0-9]+)\\.([0-9]+)(-beta([0-9]+))?")
+  if(NOT _ANDROID_NDK_SOURCE_PROPERTIES MATCHES "${_ANDROID_NDK_REVISION_REGEX}")
+    string(REPLACE "\n" "\n  " _ANDROID_NDK_SOURCE_PROPERTIES "${_ANDROID_NDK_SOURCE_PROPERTIES}")
+    message(FATAL_ERROR
+      "Android: Failed to parse NDK revision from:\n"
+      " ${CMAKE_ANDROID_NDK}/source.properties\n"
+      "with content:\n"
+      "  ${_ANDROID_NDK_SOURCE_PROPERTIES}")
+  endif()
+
+  set(_ANDROID_NDK_MAJOR "${CMAKE_MATCH_1}")
+  set(_ANDROID_NDK_MINOR "${CMAKE_MATCH_2}")
+  set(_ANDROID_NDK_BUILD "${CMAKE_MATCH_3}")
+  set(_ANDROID_NDK_BETA "${CMAKE_MATCH_5}")
+  if(_ANDROID_NDK_BETA STREQUAL "")
+    set(_ANDROID_NDK_BETA "0")
+  endif()
+  set(CMAKE_ANDROID_NDK_VERSION "${_ANDROID_NDK_MAJOR}.${_ANDROID_NDK_MINOR}")
+
+  unset(_ANDROID_NDK_SOURCE_PROPERTIES)
+  unset(_ANDROID_NDK_REVISION_REGEX)
+  unset(_ANDROID_NDK_MAJOR)
+  unset(_ANDROID_NDK_MINOR)
+  unset(_ANDROID_NDK_BUILD)
+  unset(_ANDROID_NDK_BETA)
+endif()
+
 if(CMAKE_ANDROID_NDK)
   # Identify the host platform.
   if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Darwin")
-    if(CMAKE_HOST_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "64")
       set(CMAKE_ANDROID_NDK_TOOLCHAIN_HOST_TAG "darwin-x86_64")
     else()
       set(CMAKE_ANDROID_NDK_TOOLCHAIN_HOST_TAG "darwin-x86")
@@ -466,6 +563,7 @@ if(CMAKE_ANDROID_NDK)
   string(APPEND CMAKE_SYSTEM_CUSTOM_CODE
     "set(CMAKE_ANDROID_ARCH_TRIPLE \"${CMAKE_ANDROID_ARCH_TRIPLE}\")\n"
     "set(CMAKE_ANDROID_ARCH_LLVM_TRIPLE \"${CMAKE_ANDROID_ARCH_LLVM_TRIPLE}\")\n"
+    "set(CMAKE_ANDROID_NDK_VERSION \"${CMAKE_ANDROID_NDK_VERSION}\")\n"
     "set(CMAKE_ANDROID_NDK_DEPRECATED_HEADERS \"${CMAKE_ANDROID_NDK_DEPRECATED_HEADERS}\")\n"
     "set(CMAKE_ANDROID_NDK_TOOLCHAIN_HOST_TAG \"${CMAKE_ANDROID_NDK_TOOLCHAIN_HOST_TAG}\")\n"
     "set(CMAKE_ANDROID_NDK_TOOLCHAIN_UNIFIED \"${CMAKE_ANDROID_NDK_TOOLCHAIN_UNIFIED}\")\n"

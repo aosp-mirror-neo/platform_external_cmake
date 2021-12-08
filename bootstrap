@@ -84,6 +84,7 @@ cmake_sphinx_info=""
 cmake_sphinx_man=""
 cmake_sphinx_html=""
 cmake_sphinx_qthelp=""
+cmake_sphinx_latexpdf=""
 cmake_sphinx_build=""
 cmake_sphinx_flags=""
 
@@ -96,8 +97,17 @@ else
   cmake_system_cygwin=false
 fi
 
+# Determine whether this is a MSYS environment.
+if echo "${cmake_system}" | grep MSYS >/dev/null 2>&1; then
+  cmake_system_msys=true
+  cmake_doc_dir_keyword="MSYS"
+  cmake_man_dir_keyword="MSYS"
+else
+  cmake_system_msys=false
+fi
+
 # Determine whether this is a MinGW environment.
-if echo "${cmake_system}" | grep 'MINGW\|MSYS' >/dev/null 2>&1; then
+if echo "${cmake_system}" | grep 'MINGW' >/dev/null 2>&1; then
   cmake_system_mingw=true
 else
   cmake_system_mingw=false
@@ -235,7 +245,8 @@ cmake_xdgdata_dir_default="`cmake_install_dest_default XDGDATA ${cmake_xdgdata_d
 
 CMAKE_KNOWN_C_COMPILERS="cc gcc clang xlc icc tcc"
 CMAKE_KNOWN_CXX_COMPILERS="aCC xlC CC g++ clang++ c++ icc como "
-CMAKE_KNOWN_MAKE_PROCESSORS="gmake make"
+CMAKE_KNOWN_MAKE_PROCESSORS="gmake make smake"
+CMAKE_KNOWN_NINJA_PROCESSORS="ninja-build ninja samu"
 
 CMAKE_PROBLEMATIC_FILES="\
   CMakeCache.txt \
@@ -286,11 +297,13 @@ CMAKE_CXX_SOURCES="\
   cmBinUtilsWindowsPEObjdumpGetRuntimeDependenciesTool \
   cmBreakCommand \
   cmBuildCommand \
+  cmCMakeLanguageCommand \
   cmCMakeMinimumRequired \
+  cmCMakePath \
+  cmCMakePathCommand \
   cmCMakePolicyCommand \
   cmCPackPropertiesGenerator \
   cmCacheManager \
-  cmCheckCustomOutputs \
   cmCommand \
   cmCommandArgumentParserHelper \
   cmCommands \
@@ -299,19 +312,20 @@ CMAKE_CXX_SOURCES="\
   cmComputeLinkDepends \
   cmComputeLinkInformation \
   cmComputeTargetDepends \
+  cmConsoleBuf \
   cmConditionEvaluator \
   cmConfigureFileCommand \
   cmContinueCommand \
   cmCoreTryCompile \
   cmCreateTestSourceList \
+  cmCryptoHash \
   cmCustomCommand \
   cmCustomCommandGenerator \
   cmCustomCommandLines \
   cmDefinePropertyCommand \
   cmDefinitions \
-  cmDepends \
-  cmDependsC \
   cmDocumentationFormatter \
+  cmELF \
   cmEnableLanguageCommand \
   cmEnableTestingCommand \
   cmExecProgramCommand \
@@ -361,7 +375,6 @@ CMAKE_CXX_SOURCES="\
   cmGetTestPropertyCommand \
   cmGlobalCommonGenerator \
   cmGlobalGenerator \
-  cmGlobalUnixMakefileGenerator3 \
   cmGlobVerificationManager \
   cmHexFileConverter \
   cmIfCommand \
@@ -376,6 +389,10 @@ CMAKE_CXX_SOURCES="\
   cmInstallFilesCommand \
   cmInstallFilesGenerator \
   cmInstallGenerator \
+  cmInstallGetRuntimeDependenciesGenerator \
+  cmInstallImportedRuntimeArtifactsGenerator \
+  cmInstallRuntimeDependencySet \
+  cmInstallRuntimeDependencySetGenerator \
   cmInstallScriptGenerator \
   cmInstallSubdirectoryGenerator \
   cmInstallTargetGenerator \
@@ -392,15 +409,10 @@ CMAKE_CXX_SOURCES="\
   cmListFileCache \
   cmLocalCommonGenerator \
   cmLocalGenerator \
-  cmLocalUnixMakefileGenerator3 \
   cmMSVC60LinkLineComputer \
   cmMacroCommand \
   cmMakeDirectoryCommand \
   cmMakefile \
-  cmMakefileExecutableTargetGenerator \
-  cmMakefileLibraryTargetGenerator \
-  cmMakefileTargetGenerator \
-  cmMakefileUtilityTargetGenerator \
   cmMarkAsAdvancedCommand \
   cmMathCommand \
   cmMessageCommand \
@@ -415,8 +427,11 @@ CMAKE_CXX_SOURCES="\
   cmPolicies \
   cmProcessOutput \
   cmProjectCommand \
+  cmValue \
   cmPropertyDefinition \
   cmPropertyMap \
+  cmGccDepfileLexerHelper \
+  cmGccDepfileReader \
   cmReturnCommand \
   cmRulePlaceholderExpander \
   cmRuntimeDependencyArchive \
@@ -432,6 +447,7 @@ CMAKE_CXX_SOURCES="\
   cmSiteNameCommand \
   cmSourceFile \
   cmSourceFileLocation \
+  cmStandardLevelResolver \
   cmState \
   cmStateDirectory \
   cmStateSnapshot \
@@ -456,6 +472,7 @@ CMAKE_CXX_SOURCES="\
   cmTest \
   cmTestGenerator \
   cmTimestamp \
+  cmTransformDepfile \
   cmTryCompileCommand \
   cmTryRunCommand \
   cmUnsetCommand \
@@ -478,6 +495,7 @@ if ${cmake_system_mingw}; then
 fi
 
 CMAKE_STD_CXX_HEADERS="\
+  filesystem \
   memory \
   optional \
   shared_mutex \
@@ -485,6 +503,7 @@ CMAKE_STD_CXX_HEADERS="\
   utility \
 "
 CMAKE_STD_CXX_SOURCES="\
+  fs_path \
   string_view \
 "
 
@@ -493,6 +512,7 @@ LexerParser_CXX_SOURCES="\
   cmCommandArgumentParser \
   cmExprLexer \
   cmExprParser \
+  cmGccDepfileLexer \
 "
 
 LexerParser_C_SOURCES="\
@@ -521,6 +541,7 @@ KWSYS_CXX_SOURCES="\
   FStream \
   Glob \
   RegularExpression \
+  Status \
   SystemTools"
 
 KWSYS_FILES="\
@@ -531,11 +552,24 @@ KWSYS_FILES="\
   Glob.hxx \
   Process.h \
   RegularExpression.hxx \
+  Status.hxx \
   String.h \
   String.hxx \
   System.h \
   SystemTools.hxx \
   Terminal.h"
+
+LIBRHASH_C_SOURCES="\
+  librhash/algorithms.c \
+  librhash/byte_order.c \
+  librhash/hex.c \
+  librhash/md5.c \
+  librhash/rhash.c \
+  librhash/sha1.c \
+  librhash/sha256.c \
+  librhash/sha3.c \
+  librhash/sha512.c \
+  "
 
 if ${cmake_system_mingw}; then
   LIBUV_C_SOURCES="\
@@ -604,6 +638,8 @@ Configuration:
   --verbose               display more information
   --parallel=n            bootstrap cmake in parallel, where n is
                           number of nodes [1]
+  --generator=<generator> generator to use (MSYS Makefiles, Unix Makefiles,
+                          or Ninja)
   --enable-ccache         Enable ccache when building cmake
   --init=FILE             load FILE as script to populate cache
   --system-libs           use all system-installed third-party libraries
@@ -633,6 +669,10 @@ Configuration:
   --system-libuv          use system-installed libuv library
   --no-system-libuv       use cmake-provided libuv library (default)
 
+  --bootstrap-system-libuv use system-installed libuv library for bootstrap
+  --bootstrap-system-jsoncpp use system-installed jsoncpp library for bootstrap
+  --bootstrap-system-librhash use system-installed librhash library for bootstrap
+
   --qt-gui                build the Qt-based GUI (requires Qt >= 4.2)
   --no-qt-gui             do not build the Qt-based GUI (default)
   --qt-qmake=<qmake>      use <qmake> as the qmake executable to find Qt
@@ -641,6 +681,7 @@ Configuration:
   --sphinx-man            build man pages with Sphinx
   --sphinx-html           build html help with Sphinx
   --sphinx-qthelp         build qch help with Sphinx
+  --sphinx-latexpdf       build PDF with Sphinx using LaTeX
   --sphinx-build=<sb>     use <sb> as the sphinx-build executable
   --sphinx-flags=<flags>  pass <flags> to sphinx-build executable
 
@@ -684,16 +725,23 @@ cmake_error()
   exit ${res}
 }
 
+cmake_generate_file_tmp ()
+{
+  OUTFILE="$1"
+  TMPFILE="$2"
+  if "${_diff}" "$TMPFILE" "$OUTFILE" > /dev/null 2> /dev/null ; then
+    rm -f "$TMPFILE"
+  else
+    mv -f "$TMPFILE" "$OUTFILE"
+  fi
+}
+
 cmake_generate_file ()
 {
   OUTFILE="$1"
   CONTENT="$2"
   echo "$CONTENT" > "$OUTFILE.tmp"
-  if "${_diff}" "$OUTFILE.tmp" "$OUTFILE" > /dev/null 2> /dev/null ; then
-    rm -f "$OUTFILE.tmp"
-  else
-    mv -f "$OUTFILE.tmp" "$OUTFILE"
-  fi
+  cmake_generate_file_tmp "$OUTFILE" "$OUTFILE.tmp"
 }
 
 # Replace KWSYS_NAMESPACE with cmsys
@@ -755,8 +803,18 @@ cmake_report ()
   echo "$*" >> ${FILE}
 }
 
-# Escape spaces in strings
-cmake_escape ()
+# Escape spaces in strings for artifacts
+cmake_escape_artifact ()
+{
+  if test "${cmake_bootstrap_generator}" = "Ninja"; then
+    echo $1 | sed "s/ /$ /g"
+  else
+    echo $1 | sed "s/ /\\\\ /g"
+  fi
+}
+
+# Escape spaces in strings for shell
+cmake_escape_shell ()
 {
   echo $1 | sed "s/ /\\\\ /g"
 }
@@ -855,11 +913,15 @@ cmake_verbose=
 cmake_parallel_make=
 cmake_ccache_enabled=
 cmake_prefix_dir="${cmake_default_prefix}"
+bootstrap_system_libuv=
+bootstrap_system_jsoncpp=
+bootstrap_system_librhash=
 while test $# != 0; do
   case "$1" in
   --prefix=*) dir=`cmake_arg "$1"`
               cmake_prefix_dir=`cmake_fix_slashes "$dir"` ;;
   --parallel=*) cmake_parallel_make=`cmake_arg "$1"` ;;
+  --generator=*) cmake_bootstrap_generator=`cmake_arg "$1"` ;;
   --bindir=*) cmake_bin_dir=`cmake_arg "$1"` ;;
   --datadir=*) cmake_data_dir=`cmake_arg "$1"` ;;
   --docdir=*) cmake_doc_dir=`cmake_arg "$1"` ;;
@@ -874,6 +936,9 @@ while test $# != 0; do
   --no-system-bzip2|--no-system-curl|--no-system-expat|--no-system-jsoncpp|--no-system-libarchive|--no-system-librhash|--no-system-zlib|--no-system-liblzma|--no-system-nghttp2|--no-system-zstd|--no-system-libuv)
     lib=`cmake_arg "$1" "--no-system-"`
     cmake_bootstrap_system_libs="${cmake_bootstrap_system_libs} -DCMAKE_USE_SYSTEM_LIBRARY_`cmake_toupper $lib`=0" ;;
+  --bootstrap-system-libuv) bootstrap_system_libuv="1" ;;
+  --bootstrap-system-jsoncpp) bootstrap_system_jsoncpp="1" ;;
+  --bootstrap-system-librhash) bootstrap_system_librhash="1" ;;
   --qt-gui) cmake_bootstrap_qt_gui="1" ;;
   --no-qt-gui) cmake_bootstrap_qt_gui="0" ;;
   --qt-qmake=*) cmake_bootstrap_qt_qmake=`cmake_arg "$1"` ;;
@@ -881,6 +946,7 @@ while test $# != 0; do
   --sphinx-man) cmake_sphinx_man="1" ;;
   --sphinx-html) cmake_sphinx_html="1" ;;
   --sphinx-qthelp) cmake_sphinx_qthelp="1" ;;
+  --sphinx-latexpdf) cmake_sphinx_latexpdf="1" ;;
   --sphinx-build=*) cmake_sphinx_build=`cmake_arg "$1"` ;;
   --sphinx-flags=*) cmake_sphinx_flags=`cmake_arg "$1"` ;;
   --help) cmake_usage ;;
@@ -898,6 +964,12 @@ while test $# != 0; do
   shift
 done
 
+# Make sure the generator is valid
+case "${cmake_bootstrap_generator}" in
+  'MSYS Makefiles'|'Unix Makefiles'|'Ninja') ;;
+  *) cmake_error 10 "Invalid generator: ${cmake_bootstrap_generator}"
+esac
+
 # If verbose, display some information about bootstrap
 if test -n "${cmake_verbose}"; then
   echo "---------------------------------------------"
@@ -905,6 +977,7 @@ if test -n "${cmake_verbose}"; then
   echo "Binary directory: ${cmake_binary_dir}"
   echo "Prefix directory: ${cmake_prefix_dir}"
   echo "System:           ${cmake_system}"
+  echo "Generator:        ${cmake_bootstrap_generator}"
   if test "x${cmake_parallel_make}" != "x"; then
     echo "Doing parallel make: ${cmake_parallel_make}"
   fi
@@ -973,8 +1046,48 @@ cmake_c_flags=${CFLAGS}
 cmake_cxx_flags=${CXXFLAGS}
 cmake_ld_flags=${LDFLAGS}
 
+# Add generator-specific files
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  CMAKE_CXX_SOURCES="${CMAKE_CXX_SOURCES} \
+    cmFortranParserImpl \
+    cmGlobalNinjaGenerator \
+    cmLocalNinjaGenerator \
+    cmNinjaLinkLineComputer \
+    cmNinjaLinkLineDeviceComputer \
+    cmNinjaNormalTargetGenerator \
+    cmNinjaTargetGenerator \
+    cmNinjaUtilityTargetGenerator \
+    "
+
+  LexerParser_CXX_SOURCES="${LexerParser_CXX_SOURCES} \
+    cmFortranLexer \
+    cmFortranParser \
+    "
+
+  JSONCPP_CXX_SOURCES="\
+    src/lib_json/json_reader.cpp \
+    src/lib_json/json_value.cpp \
+    src/lib_json/json_writer.cpp \
+    "
+else
+  CMAKE_CXX_SOURCES="${CMAKE_CXX_SOURCES} \
+    cmDepends \
+    cmDependsC \
+    cmDependsCompiler \
+    cmGlobalUnixMakefileGenerator3 \
+    cmLocalUnixMakefileGenerator3 \
+    cmMakefileExecutableTargetGenerator \
+    cmMakefileLibraryTargetGenerator \
+    cmMakefileTargetGenerator \
+    cmMakefileUtilityTargetGenerator \
+    cmProcessTools \
+    "
+
+  JSONCPP_CXX_SOURCES=
+fi
+
 # Add Cygwin-specific flags
-if ${cmake_system_cygwin}; then
+if ${cmake_system_cygwin} || ${cmake_system_msys}; then
   cmake_ld_flags="${LDFLAGS} -Wl,--enable-auto-import"
 fi
 
@@ -999,6 +1112,7 @@ cmake_toolchains=''
 case "${cmake_system}" in
   *AIX*)   cmake_toolchains='XL GNU' ;;
   *CYGWIN*) cmake_toolchains='GNU' ;;
+  *MSYS*) cmake_toolchains='GNU' ;;
   *Darwin*) cmake_toolchains='Clang GNU' ;;
   *Linux*) cmake_toolchains='GNU Clang XL PGI PathScale' ;;
   *MINGW*) cmake_toolchains='GNU' ;;
@@ -1103,8 +1217,8 @@ for std in 11 99 90; do
   for compiler in ${cmake_c_compilers}; do
     for std_flag in '' $std_flags; do
       for thread_flag in '' $thread_flags; do
-        echo "Checking whether '${compiler} ${cmake_c_flags} ${std_flag} ${thread_flag}' works." >> cmake_bootstrap.log 2>&1
-        if cmake_try_run "${compiler}" "${cmake_c_flags} ${std_flag} ${thread_flag}" \
+        echo "Checking whether '${compiler} ${cmake_c_flags} ${cmake_ld_flags} ${std_flag} ${thread_flag}' works." >> cmake_bootstrap.log 2>&1
+        if cmake_try_run "${compiler}" "${cmake_c_flags} ${cmake_ld_flags} ${std_flag} ${thread_flag}" \
           "${TMPFILE}.c" >> cmake_bootstrap.log 2>&1; then
           cmake_c_compiler="${compiler}"
           cmake_c_flags="${cmake_c_flags} ${std_flag} ${thread_flag}"
@@ -1224,8 +1338,8 @@ for std in 17 14 11; do
   for compiler in ${cmake_cxx_compilers}; do
     for std_flag in '' $std_flags; do
       for thread_flag in '' $thread_flags; do
-        echo "Checking whether '${compiler} ${cmake_cxx_flags} ${std_flag} ${thread_flag}' works." >> cmake_bootstrap.log 2>&1
-        if cmake_try_run "${compiler}" "${cmake_cxx_flags} ${std_flag} ${thread_flag}" \
+        echo "Checking whether '${compiler} ${cmake_cxx_flags} ${cmake_ld_flags} ${std_flag} ${thread_flag}' works." >> cmake_bootstrap.log 2>&1
+        if cmake_try_run "${compiler}" "${cmake_cxx_flags} ${cmake_ld_flags} ${std_flag} ${thread_flag}" \
           "${TMPFILE}.cxx" >> cmake_bootstrap.log 2>&1; then
           cmake_cxx_compiler="${compiler}"
           cmake_cxx_flags="${cmake_cxx_flags} ${std_flag} ${thread_flag} "
@@ -1249,12 +1363,12 @@ echo "C++ compiler on this system is: ${cmake_cxx_compiler} ${cmake_cxx_flags}"
 #-----------------------------------------------------------------------------
 # Test CXX features
 
-cmake_cxx_features="make_unique"
+cmake_cxx_features="make_unique filesystem"
 
 for feature in ${cmake_cxx_features}; do
   eval "cmake_have_cxx_${feature}=0"
-  echo "Checking whether '${cmake_cxx_compiler} ${cmake_cxx_flags}' supports '${feature}'." >> cmake_bootstrap.log 2>&1
-  if cmake_try_run "${cmake_cxx_compiler}" "${cmake_cxx_flags}" \
+  echo "Checking whether '${cmake_cxx_compiler} ${cmake_cxx_flags} ${cmake_ld_flags}' supports '${feature}'." >> cmake_bootstrap.log 2>&1
+  if cmake_try_run "${cmake_cxx_compiler}" "${cmake_cxx_flags} ${cmake_ld_flags}" \
                    "${cmake_source_dir}/Source/Checks/cm_cxx_${feature}.cxx" >> cmake_bootstrap.log 2>&1; then
     eval "cmake_have_cxx_${feature}=1"
   fi
@@ -1269,6 +1383,9 @@ for feature in ${cmake_cxx_features}; do
   fi
 done
 
+cmake_generate_file "${cmake_bootstrap_dir}/cmSTL.hxx" ""
+
+
 #-----------------------------------------------------------------------------
 # Test Make
 
@@ -1278,6 +1395,8 @@ cmake_make_flags=
 # If MAKE is set, use that for make processor, otherwise use list of known make
 if test -n "${MAKE}"; then
   cmake_make_processors="${MAKE}"
+elif test "${cmake_bootstrap_generator}" = "Ninja"; then
+  cmake_make_processors="${CMAKE_KNOWN_NINJA_PROCESSORS}"
 else
   cmake_make_processors="${CMAKE_KNOWN_MAKE_PROCESSORS}"
 fi
@@ -1286,10 +1405,18 @@ TMPFILE="`cmake_tmp_file`_dir"
 rm -rf "${cmake_bootstrap_dir}/${TMPFILE}"
 mkdir "${cmake_bootstrap_dir}/${TMPFILE}"
 cd "${cmake_bootstrap_dir}/${TMPFILE}"
-echo '
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  echo '
+rule cc
+  command = "'"${cmake_c_compiler}"'" '"${cmake_ld_flags} ${cmake_c_flags}"' -o $out $in
+build test: cc test.c
+'>"build.ninja"
+else
+  echo '
 test: test.c
 	"'"${cmake_c_compiler}"'" '"${cmake_ld_flags} ${cmake_c_flags}"' -o test test.c
 '>"Makefile"
+fi
 echo '
 #include <stdio.h>
 int main(){ printf("1%c", (char)0x0a); return 0; }
@@ -1316,15 +1443,20 @@ if test "x${cmake_original_make_flags}" != "x${cmake_make_flags}"; then
 fi
 cd "${cmake_bootstrap_dir}"
 
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  mf_str=Ninja
+else
+  mf_str=Makefile
+fi
 if test -z "${cmake_make_processor}"; then
-  cmake_error 8 "Cannot find appropriate Makefile processor on this system.
+  cmake_error 8 "Cannot find appropriate ${mf_str} processor on this system.
 Please specify one using environment variable MAKE."
 fi
 rm -rf "${cmake_bootstrap_dir}/${TMPFILE}"
-echo "Makefile processor on this system is: ${cmake_make_processor}"
+echo "${mf_str} processor on this system is: ${cmake_make_processor}"
 if test "x${cmake_full_make_flags}" != "x${cmake_make_flags}"; then
   echo "---------------------------------------------"
-  echo "Makefile processor ${cmake_make_processor} does not support parallel build"
+  echo "${mf_str} processor ${cmake_make_processor} does not support parallel build"
   echo "---------------------------------------------"
 fi
 
@@ -1343,7 +1475,7 @@ KWSYS_CXX_HAS_UTIMES=0
 KWSYS_SYSTEMTOOLS_USE_TRANSLATION_MAP=1
 
 if cmake_try_run "${cmake_cxx_compiler}" \
-  "${cmake_cxx_flags} -DTEST_KWSYS_CXX_HAS_SETENV" \
+  "${cmake_cxx_flags} ${cmake_ld_flags} -DTEST_KWSYS_CXX_HAS_SETENV" \
   "${cmake_source_dir}/Source/kwsys/kwsysPlatformTestsCXX.cxx" >> cmake_bootstrap.log 2>&1; then
   KWSYS_CXX_HAS_SETENV=1
   echo "${cmake_cxx_compiler} has setenv"
@@ -1352,7 +1484,7 @@ else
 fi
 
 if cmake_try_run "${cmake_cxx_compiler}" \
-  "${cmake_cxx_flags} -DTEST_KWSYS_CXX_HAS_UNSETENV" \
+  "${cmake_cxx_flags} ${cmake_ld_flags} -DTEST_KWSYS_CXX_HAS_UNSETENV" \
   "${cmake_source_dir}/Source/kwsys/kwsysPlatformTestsCXX.cxx" >> cmake_bootstrap.log 2>&1; then
   KWSYS_CXX_HAS_UNSETENV=1
   echo "${cmake_cxx_compiler} has unsetenv"
@@ -1361,7 +1493,7 @@ else
 fi
 
 if cmake_try_run "${cmake_cxx_compiler}" \
-  "${cmake_cxx_flags} -DTEST_KWSYS_CXX_HAS_ENVIRON_IN_STDLIB_H" \
+  "${cmake_cxx_flags} ${cmake_ld_flags} -DTEST_KWSYS_CXX_HAS_ENVIRON_IN_STDLIB_H" \
   "${cmake_source_dir}/Source/kwsys/kwsysPlatformTestsCXX.cxx" >> cmake_bootstrap.log 2>&1; then
   KWSYS_CXX_HAS_ENVIRON_IN_STDLIB_H=1
   echo "${cmake_cxx_compiler} has environ in stdlib.h"
@@ -1370,7 +1502,7 @@ else
 fi
 
 if cmake_try_run "${cmake_cxx_compiler}" \
-  "${cmake_cxx_flags} -DTEST_KWSYS_STL_HAS_WSTRING" \
+  "${cmake_cxx_flags} ${cmake_ld_flags} -DTEST_KWSYS_STL_HAS_WSTRING" \
   "${cmake_source_dir}/Source/kwsys/kwsysPlatformTestsCXX.cxx" >> cmake_bootstrap.log 2>&1; then
   KWSYS_STL_HAS_WSTRING=1
   echo "${cmake_cxx_compiler} has stl wstring"
@@ -1379,7 +1511,7 @@ else
 fi
 
 if cmake_try_run "${cmake_cxx_compiler}" \
-  "${cmake_cxx_flags} -DTEST_KWSYS_CXX_HAS_EXT_STDIO_FILEBUF_H" \
+  "${cmake_cxx_flags} ${cmake_ld_flags} -DTEST_KWSYS_CXX_HAS_EXT_STDIO_FILEBUF_H" \
   "${cmake_source_dir}/Source/kwsys/kwsysPlatformTestsCXX.cxx" >> cmake_bootstrap.log 2>&1; then
   KWSYS_CXX_HAS_EXT_STDIO_FILEBUF_H=1
   echo "${cmake_cxx_compiler} has <ext/stdio_filebuf.h>"
@@ -1421,6 +1553,10 @@ cmake_compiler_settings_comment="/*
  * ${KWSYS_CXX_SOURCES} ${KWSYS_C_SOURCES}
  * libuv Sources:
  * ${LIBUV_C_SOURCES}
+ * jsoncpp Sources:
+ * ${JSONCPP_CXX_SOURCES}
+ * librhash Sources:
+ * ${LIBRHASH_C_SOURCES}
  */
 "
 
@@ -1448,6 +1584,12 @@ cmake_report cmConfigure.h${_tmp} "#define CMAKE_BIN_DIR \"/bootstrap-not-insall
 cmake_report cmConfigure.h${_tmp} "#define CMAKE_DATA_DIR \"/bootstrap-not-insalled\""
 cmake_report cmConfigure.h${_tmp} "#define CM_FALLTHROUGH"
 
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  cmake_report cmConfigure.h${_tmp} "#define CMAKE_BOOTSTRAP_NINJA"
+else
+  cmake_report cmConfigure.h${_tmp} "#define CMAKE_BOOTSTRAP_MAKEFILES"
+fi
+
 if ${cmake_system_mingw}; then
   cmake_report cmConfigure.h${_tmp} "#if defined(_WIN32) && !defined(NOMINMAX)"
   cmake_report cmConfigure.h${_tmp} "#  define NOMINMAX"
@@ -1464,6 +1606,7 @@ for h in Configure VersionConfig; do
 done
 
 # Prepare KWSYS
+cmsys_header_files="cmsys/Configure.h cmsys/Configure.hxx"
 cmake_kwsys_config_replace_string \
   "${cmake_source_dir}/Source/kwsys/Configure.hxx.in" \
   "${cmake_bootstrap_dir}/cmsys/Configure.hxx" \
@@ -1476,22 +1619,53 @@ cmake_kwsys_config_replace_string \
 for a in ${KWSYS_FILES}; do
   cmake_replace_string "${cmake_source_dir}/Source/kwsys/${a}.in" \
      "${cmake_bootstrap_dir}/cmsys/${a}" KWSYS_NAMESPACE cmsys
+  cmsys_header_files="${cmsys_header_files} cmsys/${a}"
 done
 
-cmake_generate_file "${cmake_bootstrap_dir}/cmThirdParty.h" ""
+echo "#pragma once" > "${cmake_bootstrap_dir}/cmThirdParty.h.tmp"
+if test "x${bootstrap_system_libuv}" != "x"; then
+  echo "#define CMAKE_USE_SYSTEM_LIBUV" >> "${cmake_bootstrap_dir}/cmThirdParty.h.tmp"
+fi
+if test "x${bootstrap_system_jsoncpp}" != "x"; then
+  echo "#define CMAKE_USE_SYSTEM_JSONCPP" >> "${cmake_bootstrap_dir}/cmThirdParty.h.tmp"
+fi
+if test "x${bootstrap_system_librhash}" != "x"; then
+  echo "#define CMAKE_USE_SYSTEM_LIBRHASH" >> "${cmake_bootstrap_dir}/cmThirdParty.h.tmp"
+fi
+cmake_generate_file_tmp "${cmake_bootstrap_dir}/cmThirdParty.h" "${cmake_bootstrap_dir}/cmThirdParty.h.tmp"
 
 # Generate Makefile
-dep="cmConfigure.h cmsys/*.hxx cmsys/*.h `cmake_escape \"${cmake_source_dir}\"`/Source/*.hxx `cmake_escape \"${cmake_source_dir}\"`/Source/*.h"
+dep="cmConfigure.h ${cmsys_header_files}"
+for h in "${cmake_source_dir}"/Source/*.hxx; do
+  dep="${dep} `cmake_escape_artifact \"${h}\"`"
+done
+for h in "${cmake_source_dir}"/Source/*.h; do
+  dep="${dep} `cmake_escape_artifact \"${h}\"`"
+done
 for h in ${CMAKE_STD_CXX_HEADERS}; do
-  dep="${dep} `cmake_escape \"${cmake_source_dir}\"`/Utilities/std/cm/${h}"
+  dep="${dep} `cmake_escape_artifact \"${cmake_source_dir}\"`/Utilities/std/cm/${h}"
 done
 objs=""
 for a in ${CMAKE_CXX_SOURCES} ${CMAKE_C_SOURCES} ${CMAKE_STD_CXX_SOURCES} ${LexerParser_CXX_SOURCES} ${LexerParser_C_SOURCES} ${KWSYS_CXX_SOURCES} ${KWSYS_C_SOURCES}; do
   objs="${objs} ${a}.o"
 done
-for a in ${LIBUV_C_SOURCES}; do
-  objs="${objs} uv-`cmake_obj ${a}`"
-done
+if test "x${bootstrap_system_libuv}" = "x"; then
+  for a in ${LIBUV_C_SOURCES}; do
+    objs="${objs} uv-`cmake_obj ${a}`"
+  done
+fi
+if test "x${bootstrap_system_librhash}" = "x"; then
+  for a in ${LIBRHASH_C_SOURCES}; do
+    objs="${objs} rhash-`cmake_obj ${a}`"
+  done
+fi
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  if test "x${bootstrap_system_jsoncpp}" = "x"; then
+    for a in ${JSONCPP_CXX_SOURCES}; do
+      objs="${objs} jsoncpp-`cmake_obj ${a}`"
+    done
+  fi
+fi
 
 libs=""
 
@@ -1527,18 +1701,63 @@ else
       uv_c_flags="${uv_c_flags} -D__EXTENSIONS__ -D_XOPEN_SOURCE=600"
       libs="${libs} -lkstat -lnsl -lsendfile -lsocket -lrt"
       ;;
+    *QNX*)
+      uv_c_flags="${uv_c_flags} -D_XOPEN_SOURCE=700"
+      libs="${libs} -lsocket"
+      ;;
   esac
 fi
-uv_c_flags="${uv_c_flags} `cmake_escape "-I${cmake_source_dir}/Utilities/cmlibuv/include"`"
-if ${cmake_system_mingw}; then
-  uv_c_flags="${uv_c_flags} `cmake_escape "-I${cmake_source_dir}/Utilities/cmlibuv/src/win"`"
+if test "x${bootstrap_system_libuv}" = "x"; then
+  uv_c_flags="${uv_c_flags} `cmake_escape_shell "-I${cmake_source_dir}/Utilities/cmlibuv/include"`"
+  if ${cmake_system_mingw}; then
+    uv_c_flags="${uv_c_flags} `cmake_escape_shell "-I${cmake_source_dir}/Utilities/cmlibuv/src/win"`"
+  else
+    uv_c_flags="${uv_c_flags} `cmake_escape_shell "-I${cmake_source_dir}/Utilities/cmlibuv/src/unix"`"
+  fi
+  uv_c_flags="${uv_c_flags} `cmake_escape_shell "-I${cmake_source_dir}/Utilities/cmlibuv/src"`"
 else
-  uv_c_flags="${uv_c_flags} `cmake_escape "-I${cmake_source_dir}/Utilities/cmlibuv/src/unix"`"
+  if test `which pkg-config`; then
+    use_uv_flags="`pkg-config --cflags libuv`"
+    cmake_c_flags="${cmake_c_flags} ${use_uv_flags}"
+    cmake_cxx_flags="${cmake_cxx_flags} ${use_uv_flags}"
+  fi
+  libs="${libs} -luv"
 fi
-uv_c_flags="${uv_c_flags} `cmake_escape "-I${cmake_source_dir}/Utilities/cmlibuv/src"`"
+
+if test "x${bootstrap_system_librhash}" != "x"; then
+  if test `which pkg-config`; then
+    use_librhash_flags="`pkg-config --cflags librhash`"
+    cmake_c_flags="${cmake_c_flags} ${use_librhash_flags}"
+    cmake_cxx_flags="${cmake_cxx_flags} ${use_librhash_flags}"
+  fi
+  libs="${libs} -lrhash"
+fi
+
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  jsoncpp_cxx_flags=
+  if test "x${bootstrap_system_jsoncpp}" = "x"; then
+    jsoncpp_cxx_flags="${jsoncpp_cxx_flags} `cmake_escape_shell "-I${cmake_source_dir}/Utilities/cmjsoncpp/include"`"
+  else
+    if test `which pkg-config`; then
+      use_jsoncpp_flags="`pkg-config --cflags jsoncpp`"
+      cmake_cxx_flags="${cmake_cxx_flags} ${use_jsoncpp_flags}"
+    fi
+    libs="${libs} -ljsoncpp"
+  fi
+fi
 
 if test "x${cmake_ansi_cxx_flags}" != "x"; then
   cmake_cxx_flags="${cmake_ansi_cxx_flags} ${cmake_cxx_flags}"
+fi
+
+system_flags=''
+case "${cmake_system}" in
+  # Ensure filesystem access uses 64-bit offsets even on 32-bit hosts.
+  *Linux*) system_flags='-D_FILE_OFFSET_BITS=64' ;;
+esac
+if test "x${system_flags}" != "x"; then
+  cmake_c_flags="${cmake_c_flags} ${system_flags}"
+  cmake_cxx_flags="${cmake_cxx_flags} ${system_flags}"
 fi
 
 if test "x${cmake_c_flags}" != "x"; then
@@ -1548,6 +1767,31 @@ fi
 if test "x${cmake_cxx_flags}" != "x"; then
   cmake_cxx_flags="${cmake_cxx_flags} "
 fi
+
+write_source_rule() {
+  lang="$1"
+  obj="$2"
+  src="$3"
+  src_flags="$4"
+
+  if test "${lang}" = "c"; then
+    ninja_rule=cc
+    compiler="${cmake_c_compiler}"
+    flags="${cmake_c_flags}"
+  elif test "${lang}" = "cxx"; then
+    ninja_rule=cxx
+    compiler="${cmake_cxx_compiler}"
+    flags="${cmake_cxx_flags}"
+  fi
+
+  if test "${cmake_bootstrap_generator}" = "Ninja"; then
+    echo "build ${obj} : ${ninja_rule} ${src} | ${dep}" >> "${cmake_bootstrap_dir}/build.ninja"
+    echo "  srcflags = ${src_flags}" >> "${cmake_bootstrap_dir}/build.ninja"
+  else
+    echo "${obj} : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
+    echo "	${compiler} ${flags} ${src_flags} -c ${src} -o ${obj}" >> "${cmake_bootstrap_dir}/Makefile"
+  fi
+}
 
 cmake_c_flags_String="-DKWSYS_STRING_C"
 if ${cmake_system_mingw}; then
@@ -1564,69 +1808,102 @@ cmake_cxx_flags_SystemTools="
 "
 cmake_c_flags="${cmake_c_flags} \
   -DCMAKE_BOOTSTRAP \
-  -I`cmake_escape \"${cmake_bootstrap_dir}\"` \
-  -I`cmake_escape \"${cmake_source_dir}/Source\"` \
-  -I`cmake_escape \"${cmake_source_dir}/Source/LexerParser\"` \
-  -I`cmake_escape \"${cmake_source_dir}/Utilities\"`"
+  -I`cmake_escape_shell \"${cmake_bootstrap_dir}\"` \
+  -I`cmake_escape_shell \"${cmake_source_dir}/Source\"` \
+  -I`cmake_escape_shell \"${cmake_source_dir}/Source/LexerParser\"` \
+  -I`cmake_escape_shell \"${cmake_source_dir}/Utilities\"`"
 cmake_cxx_flags="${cmake_cxx_flags} \
   -DCMAKE_BOOTSTRAP \
   ${cmake_have_cxx_features} \
-  -I`cmake_escape \"${cmake_bootstrap_dir}\"` \
-  -I`cmake_escape \"${cmake_source_dir}/Source\"` \
-  -I`cmake_escape \"${cmake_source_dir}/Source/LexerParser\"` \
-  -I`cmake_escape \"${cmake_source_dir}/Utilities/std\"` \
-  -I`cmake_escape \"${cmake_source_dir}/Utilities\"`"
-echo "cmake: ${objs}" > "${cmake_bootstrap_dir}/Makefile"
-echo "	${cmake_cxx_compiler} ${cmake_ld_flags} ${cmake_cxx_flags} ${objs} ${libs} -o cmake" >> "${cmake_bootstrap_dir}/Makefile"
+  -I`cmake_escape_shell \"${cmake_bootstrap_dir}\"` \
+  -I`cmake_escape_shell \"${cmake_source_dir}/Source\"` \
+  -I`cmake_escape_shell \"${cmake_source_dir}/Source/LexerParser\"` \
+  -I`cmake_escape_shell \"${cmake_source_dir}/Utilities/std\"` \
+  -I`cmake_escape_shell \"${cmake_source_dir}/Utilities\"`"
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  echo "cc = ${cmake_c_compiler}" > "${cmake_bootstrap_dir}/build.ninja"
+  echo "cxx = ${cmake_cxx_compiler}" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "cflags = ${cmake_c_flags}" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "cxxflags = ${cmake_cxx_flags}" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "ldflags = ${cmake_ld_flags}" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "rule cc" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "  command = \$cc \$cflags \$srcflags -c \$in -o \$out" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "rule cxx" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "  command = \$cxx \$cxxflags \$srcflags -c \$in -o \$out" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "rule link" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "  command = \$cxx \$ldflags \$cxxflags \$in \$libs -o \$out" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "build cmake: link ${objs}" >> "${cmake_bootstrap_dir}/build.ninja"
+  echo "  libs = ${libs}" >> "${cmake_bootstrap_dir}/build.ninja"
+else
+  echo "cmake: ${objs}" > "${cmake_bootstrap_dir}/Makefile"
+  echo "	${cmake_cxx_compiler} ${cmake_ld_flags} ${cmake_cxx_flags} ${objs} ${libs} -o cmake" >> "${cmake_bootstrap_dir}/Makefile"
+fi
 for a in ${CMAKE_CXX_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Source/${a}.cxx"`
+  src=`cmake_escape_artifact "${cmake_source_dir}/Source/${a}.cxx"`
   src_flags=`eval echo \\${cmake_cxx_flags_\${a}}`
-  echo "${a}.o : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_cxx_compiler} ${cmake_cxx_flags} ${src_flags} -c ${src} -o ${a}.o" >> "${cmake_bootstrap_dir}/Makefile"
+  write_source_rule "cxx" "${a}.o" "${src}" "${src_flags}"
 done
 for a in ${CMAKE_C_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Source/${a}.c"`
-  echo "${a}.o : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_c_compiler} ${cmake_c_flags} -c ${src} -o ${a}.o" >> "${cmake_bootstrap_dir}/Makefile"
+  src=`cmake_escape_artifact "${cmake_source_dir}/Source/${a}.c"`
+  write_source_rule "c" "${a}.o" "${src}" ""
 done
 for a in ${CMAKE_STD_CXX_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Utilities/std/cm/bits/${a}.cxx"`
+  src=`cmake_escape_artifact "${cmake_source_dir}/Utilities/std/cm/bits/${a}.cxx"`
   src_flags=`eval echo \\${cmake_cxx_flags_\${a}}`
-  echo "${a}.o : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_cxx_compiler} ${cmake_cxx_flags} ${src_flags} -c ${src} -o ${a}.o" >> "${cmake_bootstrap_dir}/Makefile"
+  write_source_rule "cxx" "${a}.o" "${src}" "${src_flags}"
 done
 for a in ${LexerParser_CXX_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Source/LexerParser/${a}.cxx"`
+  src=`cmake_escape_artifact "${cmake_source_dir}/Source/LexerParser/${a}.cxx"`
   src_flags=`eval echo \\${cmake_cxx_flags_\${a}}`
-  echo "${a}.o : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_cxx_compiler} ${cmake_cxx_flags} ${src_flags} -c ${src} -o ${a}.o" >> "${cmake_bootstrap_dir}/Makefile"
+  write_source_rule "cxx" "${a}.o" "${src}" "${src_flags}"
 done
 for a in ${LexerParser_C_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Source/LexerParser/${a}.c"`
-  echo "${a}.o : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_c_compiler} ${cmake_c_flags} -c ${src} -o ${a}.o" >> "${cmake_bootstrap_dir}/Makefile"
+  src=`cmake_escape_artifact "${cmake_source_dir}/Source/LexerParser/${a}.c"`
+  write_source_rule "c" "${a}.o" "${src}" ""
 done
 for a in ${KWSYS_C_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Source/kwsys/${a}.c"`
-  src_flags=`eval echo \\${cmake_c_flags_\${a}}`
-  echo "${a}.o : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_c_compiler} ${cmake_c_flags} -DKWSYS_NAMESPACE=cmsys ${src_flags} -c ${src} -o ${a}.o" >> "${cmake_bootstrap_dir}/Makefile"
+  src=`cmake_escape_artifact "${cmake_source_dir}/Source/kwsys/${a}.c"`
+  src_flags="`eval echo \\${cmake_c_flags_\${a}}` -DKWSYS_NAMESPACE=cmsys"
+  write_source_rule "c" "${a}.o" "${src}" "${src_flags}"
 done
 for a in ${KWSYS_CXX_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Source/kwsys/${a}.cxx"`
-  src_flags=`eval echo \\${cmake_cxx_flags_\${a}}`
-  echo "${a}.o : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_cxx_compiler} ${cmake_cxx_flags} -DKWSYS_NAMESPACE=cmsys ${src_flags} -c ${src} -o ${a}.o" >> "${cmake_bootstrap_dir}/Makefile"
+  src=`cmake_escape_artifact "${cmake_source_dir}/Source/kwsys/${a}.cxx"`
+  src_flags="`eval echo \\${cmake_cxx_flags_\${a}}` -DKWSYS_NAMESPACE=cmsys"
+  write_source_rule "cxx" "${a}.o" "${src}" "${src_flags}"
 done
-for a in ${LIBUV_C_SOURCES}; do
-  src=`cmake_escape "${cmake_source_dir}/Utilities/cmlibuv/${a}"`
-  echo "uv-`cmake_obj ${a}` : ${src} ${dep}" >> "${cmake_bootstrap_dir}/Makefile"
-  echo "	${cmake_c_compiler} ${cmake_c_flags} ${uv_c_flags} -c ${src} -o uv-`cmake_obj ${a}`" >> "${cmake_bootstrap_dir}/Makefile"
-done
-echo '
+if test "x${bootstrap_system_libuv}" = "x"; then
+  for a in ${LIBUV_C_SOURCES}; do
+    src=`cmake_escape_artifact "${cmake_source_dir}/Utilities/cmlibuv/${a}"`
+    write_source_rule "c" "uv-`cmake_obj ${a}`" "${src}" "${uv_c_flags}"
+  done
+fi
+if test "x${bootstrap_system_librhash}" = "x"; then
+  for a in ${LIBRHASH_C_SOURCES}; do
+    src=`cmake_escape_artifact "${cmake_source_dir}/Utilities/cmlibrhash/${a}"`
+    write_source_rule "c" "rhash-`cmake_obj ${a}`" "${src}" ""
+  done
+fi
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  if test "x${bootstrap_system_jsoncpp}" = "x"; then
+    for a in ${JSONCPP_CXX_SOURCES}; do
+      src=`cmake_escape_artifact "${cmake_source_dir}/Utilities/cmjsoncpp/${a}"`
+      write_source_rule "cxx" "jsoncpp-`cmake_obj ${a}`" "${src}" "${jsoncpp_cxx_flags}"
+    done
+  fi
+fi
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  echo "
+rule rebuild_cache
+  command = cd \"${cmake_binary_dir}\" && \"${cmake_source_dir}/bootstrap\" --generator=\"${cmake_bootstrap_generator}\"
+  generator = 1
+build build.ninja : rebuild_cache
+" >> "${cmake_bootstrap_dir}/build.ninja"
+else
+  echo "
 rebuild_cache:
-	cd "${cmake_binary_dir}" && "${cmake_source_dir}/bootstrap"
-' >> "${cmake_bootstrap_dir}/Makefile"
+	cd \"${cmake_binary_dir}\" && \"${cmake_source_dir}/bootstrap\" --generator=\"${cmake_bootstrap_generator}\"
+" >> "${cmake_bootstrap_dir}/Makefile"
+fi
 
 # Write our default settings to Bootstrap${_cmk}/InitialCacheFlags.cmake.
 echo '
@@ -1672,6 +1949,11 @@ if test "x${cmake_sphinx_qthelp}" != "x"; then
 set (SPHINX_QTHELP "'"${cmake_sphinx_qthelp}"'" CACHE BOOL "Build qch help with Sphinx" FORCE)
 ' >> "${cmake_bootstrap_dir}/InitialCacheFlags.cmake"
 fi
+if test "x${cmake_sphinx_latexpdf}" != "x"; then
+  echo '
+set (SPHINX_LATEXPDF "'"${cmake_sphinx_latexpdf}"'" CACHE BOOL "Build PDF help with Sphinx using LaTeX" FORCE)
+' >> "${cmake_bootstrap_dir}/InitialCacheFlags.cmake"
+fi
 if test "x${cmake_sphinx_build}" != "x"; then
   echo '
 set (SPHINX_EXECUTABLE "'"${cmake_sphinx_build}"'" CACHE FILEPATH "Location of Qt sphinx-build" FORCE)
@@ -1695,10 +1977,15 @@ fi
 echo "---------------------------------------------"
 
 # Run make to build bootstrap cmake
-if test "x${cmake_parallel_make}" != "x"; then
-  ${cmake_make_processor} ${cmake_make_flags}
+if test "${cmake_bootstrap_generator}" = "Ninja"; then
+  ninja_v=-v
 else
-  ${cmake_make_processor}
+  ninja_v=
+fi
+if test "x${cmake_parallel_make}" != "x"; then
+  ${cmake_make_processor} ${cmake_make_flags} ${ninja_v}
+else
+  ${cmake_make_processor} ${ninja_v}
 fi
 RES=$?
 if test "${RES}" -ne "0"; then

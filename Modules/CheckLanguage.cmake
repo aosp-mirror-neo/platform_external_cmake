@@ -20,7 +20,7 @@ test project.  The result is cached in :variable:`CMAKE_<LANG>_COMPILER`
 as the compiler that was found, or ``NOTFOUND`` if the language cannot be
 enabled. For CUDA which can have an explicit host compiler, the cache
 :variable:`CMAKE_CUDA_HOST_COMPILER` variable will be set if it was required
-for compilation.
+for compilation (and cleared if it was not).
 
 Example:
 
@@ -36,6 +36,9 @@ Example:
 
 include_guard(GLOBAL)
 
+cmake_policy(PUSH)
+cmake_policy(SET CMP0126 NEW)
+
 macro(check_language lang)
   if(NOT DEFINED CMAKE_${lang}_COMPILER)
     set(_desc "Looking for a ${lang} compiler")
@@ -43,7 +46,7 @@ macro(check_language lang)
     file(REMOVE_RECURSE ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/Check${lang})
 
     set(extra_compiler_variables)
-    if(${lang} STREQUAL CUDA)
+    if(${lang} STREQUAL CUDA AND NOT CMAKE_GENERATOR MATCHES "Visual Studio")
       set(extra_compiler_variables "set(CMAKE_CUDA_HOST_COMPILER \\\"\${CMAKE_CUDA_HOST_COMPILER}\\\")")
     endif()
 
@@ -68,6 +71,11 @@ file(WRITE \"\${CMAKE_CURRENT_BINARY_DIR}/result.cmake\"
     else()
       set(_D_CMAKE_MAKE_PROGRAM "-DCMAKE_MAKE_PROGRAM:FILEPATH=${CMAKE_MAKE_PROGRAM}")
     endif()
+    if(CMAKE_TOOLCHAIN_FILE)
+      set(_D_CMAKE_TOOLCHAIN_FILE "-DCMAKE_TOOLCHAIN_FILE:FILEPATH=${CMAKE_TOOLCHAIN_FILE}")
+    else()
+      set(_D_CMAKE_TOOLCHAIN_FILE "")
+    endif()
     execute_process(
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/Check${lang}
       COMMAND ${CMAKE_COMMAND} . -G ${CMAKE_GENERATOR}
@@ -75,6 +83,7 @@ file(WRITE \"\${CMAKE_CURRENT_BINARY_DIR}/result.cmake\"
                                  -T "${CMAKE_GENERATOR_TOOLSET}"
                                  ${_D_CMAKE_GENERATOR_INSTANCE}
                                  ${_D_CMAKE_MAKE_PROGRAM}
+                                 ${_D_CMAKE_TOOLCHAIN_FILE}
       OUTPUT_VARIABLE _cl_output
       ERROR_VARIABLE _cl_output
       RESULT_VARIABLE _cl_result
@@ -104,3 +113,5 @@ file(WRITE \"\${CMAKE_CURRENT_BINARY_DIR}/result.cmake\"
 
   endif()
 endmacro()
+
+cmake_policy(POP)

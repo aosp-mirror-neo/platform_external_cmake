@@ -447,6 +447,8 @@ public:
     Motorola,
     HP,
     Hygon,
+    Zhaoxin,
+    Apple,
     UnknownManufacturer
   };
 
@@ -863,7 +865,7 @@ void SystemInformation::RunMemoryCheck()
 // Hide implementation details in an anonymous namespace.
 namespace {
 // *****************************************************************************
-#if defined(__linux) || defined(__APPLE__)
+#if defined(__linux) || defined(__APPLE__) || defined(__CYGWIN__)
 int LoadLines(FILE* file, std::vector<std::string>& lines)
 {
   // Load each line in the given file into a the vector.
@@ -893,7 +895,7 @@ int LoadLines(FILE* file, std::vector<std::string>& lines)
   return nRead;
 }
 
-#  if defined(__linux)
+#  if defined(__linux) || defined(__CYGWIN__)
 // *****************************************************************************
 int LoadLines(const char* fileName, std::vector<std::string>& lines)
 {
@@ -926,7 +928,7 @@ int NameValue(std::vector<std::string> const& lines, std::string const& name,
 }
 #endif
 
-#if defined(__linux)
+#if defined(__linux) || defined(__CYGWIN__)
 // ****************************************************************************
 template <typename T>
 int GetFieldsFromFile(const char* fileName, const char** fieldNames, T* values)
@@ -1354,14 +1356,12 @@ std::string SymbolProperties::Demangle(const char* symbol) const
   std::string result = safes(symbol);
 #  if defined(KWSYS_SYSTEMINFORMATION_HAS_CPP_DEMANGLE)
   int status = 0;
-  size_t bufferLen = 1024;
-  char* buffer = (char*)malloc(1024);
   char* demangledSymbol =
-    abi::__cxa_demangle(symbol, buffer, &bufferLen, &status);
+    abi::__cxa_demangle(symbol, nullptr, nullptr, &status);
   if (!status) {
     result = demangledSymbol;
   }
-  free(buffer);
+  free(demangledSymbol);
 #  else
   (void)symbol;
 #  endif
@@ -1381,7 +1381,7 @@ void SymbolProperties::Initialize(void* address)
   }
 #  else
 // second fallback use builtin backtrace_symbols
-// to decode the bactrace.
+// to decode the backtrace.
 #  endif
 }
 #endif // don't define this class if we're not using it
@@ -1731,7 +1731,8 @@ const char* SystemInformationImplementation::GetVendorID()
     case NexGen:
       return "NexGen Inc., Advanced Micro Devices";
     case IDT:
-      return "IDT\\Centaur, Via Inc.";
+      return "IDT\\Centaur, Via Inc., Shanghai Zhaoxin Semiconductor Co., "
+             "Ltd.";
     case UMC:
       return "United Microelectronics Corp.";
     case Rise:
@@ -1748,6 +1749,10 @@ const char* SystemInformationImplementation::GetVendorID()
       return "Hewlett-Packard";
     case Hygon:
       return "Chengdu Haiguang IC Design Co., Ltd.";
+    case Zhaoxin:
+      return "Shanghai Zhaoxin Semiconductor Co., Ltd.";
+    case Apple:
+      return "Apple";
     case UnknownManufacturer:
     default:
       return "Unknown Manufacturer";
@@ -2109,7 +2114,10 @@ void SystemInformationImplementation::FindManufacturer(
   else if (this->ChipID.Vendor == "NexGenDriven")
     this->ChipManufacturer = NexGen; // NexGen Inc. (now AMD)
   else if (this->ChipID.Vendor == "CentaurHauls")
-    this->ChipManufacturer = IDT; // IDT/Centaur (now VIA)
+    this->ChipManufacturer = IDT; // original IDT/Centaur/VIA (now Zhaoxin)
+  else if (this->ChipID.Vendor == "  Shanghai  ")
+    this->ChipManufacturer =
+      Zhaoxin; // Shanghai Zhaoxin Semiconductor Co., Ltd.
   else if (this->ChipID.Vendor == "RiseRiseRise")
     this->ChipManufacturer = Rise; // Rise
   else if (this->ChipID.Vendor == "GenuineTMx86")
@@ -2128,6 +2136,8 @@ void SystemInformationImplementation::FindManufacturer(
     this->ChipManufacturer = Motorola; // Motorola Microelectronics
   else if (family.compare(0, 7, "PA-RISC") == 0)
     this->ChipManufacturer = HP; // Hewlett-Packard
+  else if (this->ChipID.Vendor == "Apple")
+    this->ChipManufacturer = Apple; // Apple
   else
     this->ChipManufacturer = UnknownManufacturer; // Unknown manufacturer
 }
@@ -3223,7 +3233,8 @@ bool SystemInformationImplementation::RetrieveClassicalCPUIdentity()
               this->ChipID.ProcessorName = "C3";
               break;
             default:
-              this->ChipID.ProcessorName = "Unknown IDT\\Centaur family";
+              this->ChipID.ProcessorName =
+                "Unknown IDT\\Centaur\\VIA\\Zhaoxin family";
               return false;
           }
           break;
@@ -3232,13 +3243,63 @@ bool SystemInformationImplementation::RetrieveClassicalCPUIdentity()
             case 6:
               this->ChipID.ProcessorName = "VIA Cyrix III - Samuel";
               break;
+            case 0xf:
+              this->ChipID.ProcessorName = "Zhaoxin zxc";
+              break;
             default:
-              this->ChipID.ProcessorName = "Unknown IDT\\Centaur family";
+              this->ChipID.ProcessorName =
+                "Unknown IDT\\Centaur\\VIA\\Zhaoxin family";
+              return false;
+          }
+          break;
+        case 7:
+          switch (this->ChipID.Model) {
+            case 0x1b:
+              this->ChipID.ProcessorName = "Zhaoxin kx5000";
+              break;
+            case 0x3b:
+              this->ChipID.ProcessorName = "Zhaoxin kx6000";
+              break;
+            default:
+              this->ChipID.ProcessorName =
+                "Unknown IDT\\Centaur\\VIA\\Zhaoxin family";
               return false;
           }
           break;
         default:
-          this->ChipID.ProcessorName = "Unknown IDT\\Centaur family";
+          this->ChipID.ProcessorName =
+            "Unknown IDT\\Centaur\\VIA\\Zhaoxin family";
+          return false;
+      }
+      break;
+
+    case Zhaoxin:
+      switch (this->ChipID.Family) {
+        case 6:
+          switch (this->ChipID.Model) {
+            case 0x19:
+              this->ChipID.ProcessorName = "Zhaoxin zxc";
+              break;
+            default:
+              this->ChipID.ProcessorName = "Unknown Zhaoxin family";
+              return false;
+          }
+          break;
+        case 7:
+          switch (this->ChipID.Model) {
+            case 0x1b:
+              this->ChipID.ProcessorName = "Zhaoxin kx5000";
+              break;
+            case 0x3b:
+              this->ChipID.ProcessorName = "Zhaoxin kx6000";
+              break;
+            default:
+              this->ChipID.ProcessorName = "Unknown Zhaoxin family";
+              return false;
+          }
+          break;
+        default:
+          this->ChipID.ProcessorName = "Unknown Zhaoxin family";
           return false;
       }
       break;
@@ -3393,7 +3454,7 @@ bool SystemInformationImplementation::RetreiveInformationFromCpuInfoFile()
     pos = buffer.find("processor\t", pos + 1);
   }
 
-#ifdef __linux
+#if defined(__linux) || defined(__CYGWIN__)
   // Count sockets.
   std::set<int> PhysicalIDs;
   std::string idc = this->ExtractValueFromCpuInfoFile(buffer, "physical id");
@@ -3409,13 +3470,17 @@ bool SystemInformationImplementation::RetreiveInformationFromCpuInfoFile()
   // We want to record the total number of cores in this->NumberOfPhysicalCPU
   // (checking only the first proc)
   std::string Cores = this->ExtractValueFromCpuInfoFile(buffer, "cpu cores");
+  if (Cores.empty()) {
+    // Linux Sparc is different
+    Cores = this->ExtractValueFromCpuInfoFile(buffer, "ncpus probed");
+  }
   auto NumberOfCoresPerSocket = (unsigned int)atoi(Cores.c_str());
   NumberOfCoresPerSocket = std::max(NumberOfCoresPerSocket, 1u);
   this->NumberOfPhysicalCPU =
     NumberOfCoresPerSocket * (unsigned int)NumberOfSockets;
 
-#else // __CYGWIN__
-  // does not have "physical id" entries, neither "cpu cores"
+#else
+  // For systems which do not have "physical id" entries, neither "cpu cores"
   // this has to be fixed for hyper-threading.
   std::string cpucount =
     this->ExtractValueFromCpuInfoFile(buffer, "cpu count");
@@ -3426,6 +3491,9 @@ bool SystemInformationImplementation::RetreiveInformationFromCpuInfoFile()
   // better to have a bad answer than a crash
   if (this->NumberOfPhysicalCPU <= 0) {
     this->NumberOfPhysicalCPU = 1;
+  }
+  if (this->NumberOfLogicalCPU == 0) {
+    this->NumberOfLogicalCPU = this->NumberOfPhysicalCPU;
   }
   // LogicalProcessorsPerPhysical>1 => SMT.
   this->Features.ExtendedFeatures.LogicalProcessorsPerPhysical =
@@ -3440,8 +3508,18 @@ bool SystemInformationImplementation::RetreiveInformationFromCpuInfoFile()
   else {
     // Linux Sparc: CPU speed is in Hz and encoded in hexadecimal
     CPUSpeed = this->ExtractValueFromCpuInfoFile(buffer, "Cpu0ClkTck");
-    this->CPUSpeedInMHz =
-      static_cast<float>(strtoull(CPUSpeed.c_str(), nullptr, 16)) / 1000000.0f;
+    if (!CPUSpeed.empty()) {
+      this->CPUSpeedInMHz =
+        static_cast<float>(strtoull(CPUSpeed.c_str(), nullptr, 16)) /
+        1000000.0f;
+    } else {
+      // if the kernel is build as Sparc32 it's in decimal, note the different
+      // case
+      CPUSpeed = this->ExtractValueFromCpuInfoFile(buffer, "CPU0ClkTck");
+      this->CPUSpeedInMHz =
+        static_cast<float>(strtoull(CPUSpeed.c_str(), nullptr, 10)) /
+        1000000.0f;
+    }
   }
 #endif
 
@@ -3597,7 +3675,7 @@ long long SystemInformationImplementation::GetHostMemoryTotal()
   GlobalMemoryStatusEx(&statex);
   return statex.ullTotalPhys / 1024;
 #  endif
-#elif defined(__linux)
+#elif defined(__linux) || defined(__CYGWIN__)
   long long memTotal = 0;
   int ierr = GetFieldFromFile("/proc/meminfo", "MemTotal:", memTotal);
   if (ierr) {
@@ -3712,6 +3790,16 @@ long long SystemInformationImplementation::GetHostMemoryUsed()
   GlobalMemoryStatusEx(&statex);
   return (statex.ullTotalPhys - statex.ullAvailPhys) / 1024;
 #  endif
+#elif defined(__CYGWIN__)
+  const char* names[3] = { "MemTotal:", "MemFree:", nullptr };
+  long long values[2] = { 0 };
+  int ierr = GetFieldsFromFile("/proc/meminfo", names, values);
+  if (ierr) {
+    return ierr;
+  }
+  long long& memTotal = values[0];
+  long long& memFree = values[1];
+  return memTotal - memFree;
 #elif defined(__linux)
   // First try to use MemAvailable, but it only works on newer kernels
   const char* names2[3] = { "MemTotal:", "MemAvailable:", nullptr };
@@ -3773,7 +3861,7 @@ long long SystemInformationImplementation::GetProcMemoryUsed()
     return -2;
   }
   return pmc.WorkingSetSize / 1024;
-#elif defined(__linux)
+#elif defined(__linux) || defined(__CYGWIN__)
   long long memUsed = 0;
   int ierr = GetFieldFromFile("/proc/self/status", "VmRSS:", memUsed);
   if (ierr) {
@@ -3850,7 +3938,8 @@ long long SystemInformationImplementation::GetProcessId()
 #if defined(_WIN32)
   return GetCurrentProcessId();
 #elif defined(__linux) || defined(__APPLE__) || defined(__OpenBSD__) ||       \
-  defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
+  defined(__FreeBSD__) || defined(__NetBSD__) || defined(__DragonFly__) ||    \
+  defined(__CYGWIN__)
   return getpid();
 #else
   return -1;
@@ -4434,33 +4523,62 @@ unsigned int SystemInformationImplementation::GetNumberOfPhysicalCPU() const
   return this->NumberOfPhysicalCPU;
 }
 
-/** For Mac use sysctlbyname calls to find system info */
+#if defined(__APPLE__)
+static int kw_sysctlbyname_int32(const char* name, int32_t* value)
+{
+  size_t len = sizeof(int32_t);
+  int err = sysctlbyname(name, value, &len, nullptr, 0);
+  if (err == 0) {
+    assert(len == sizeof(int32_t));
+  }
+  return err;
+}
+
+static int kw_sysctlbyname_int64(const char* name, int64_t* value)
+{
+  size_t len = sizeof(int64_t);
+  int err = sysctlbyname(name, value, &len, nullptr, 0);
+  if (err == 0) {
+    assert(len == sizeof(int64_t));
+  }
+  return err;
+}
+#endif
+
+/** For Apple use sysctlbyname calls to find system info */
 bool SystemInformationImplementation::ParseSysCtl()
 {
 #if defined(__APPLE__)
-  char retBuf[128];
+  char tempBuff[128];
+  int32_t tempInt32 = 0;
+  int64_t tempInt64 = 0;
   int err = 0;
-  uint64_t value = 0;
-  size_t len = sizeof(value);
-  sysctlbyname("hw.memsize", &value, &len, nullptr, 0);
-  this->TotalPhysicalMemory = static_cast<size_t>(value / 1048576);
+  size_t len;
 
-  // Parse values for Mac
+  this->TotalPhysicalMemory = 0;
+  err = kw_sysctlbyname_int64("hw.memsize", &tempInt64);
+  if (err == 0) {
+    this->TotalPhysicalMemory = static_cast<size_t>(tempInt64 / 1024 / 1024);
+  }
+
   this->AvailablePhysicalMemory = 0;
   vm_statistics_data_t vmstat;
   mach_msg_type_number_t count = HOST_VM_INFO_COUNT;
   if (host_statistics(mach_host_self(), HOST_VM_INFO, (host_info_t)&vmstat,
                       &count) == KERN_SUCCESS) {
-    len = sizeof(value);
-    err = sysctlbyname("hw.pagesize", &value, &len, nullptr, 0);
-    int64_t available_memory =
-      (vmstat.free_count + vmstat.inactive_count) * value;
-    this->AvailablePhysicalMemory =
-      static_cast<size_t>(available_memory / 1048576);
+    err = kw_sysctlbyname_int64("hw.pagesize", &tempInt64);
+    if (err == 0) {
+      int64_t available_memory =
+        (vmstat.free_count + vmstat.inactive_count) * tempInt64;
+      this->AvailablePhysicalMemory =
+        static_cast<size_t>(available_memory / 1024 / 1024);
+    }
   }
 
-#  ifdef VM_SWAPUSAGE
   // Virtual memory.
+  this->AvailableVirtualMemory = 0;
+  this->TotalVirtualMemory = 0;
+#  ifdef VM_SWAPUSAGE
   int mib[2] = { CTL_VM, VM_SWAPUSAGE };
   unsigned int miblen =
     static_cast<unsigned int>(sizeof(mib) / sizeof(mib[0]));
@@ -4469,78 +4587,98 @@ bool SystemInformationImplementation::ParseSysCtl()
   err = sysctl(mib, miblen, &swap, &len, nullptr, 0);
   if (err == 0) {
     this->AvailableVirtualMemory =
-      static_cast<size_t>(swap.xsu_avail / 1048576);
-    this->TotalVirtualMemory = static_cast<size_t>(swap.xsu_total / 1048576);
+      static_cast<size_t>(swap.xsu_avail / 1024 / 1024);
+    this->TotalVirtualMemory =
+      static_cast<size_t>(swap.xsu_total / 1024 / 1024);
   }
-#  else
-  this->AvailableVirtualMemory = 0;
-  this->TotalVirtualMemory = 0;
 #  endif
 
   // CPU Info
-  len = sizeof(this->NumberOfPhysicalCPU);
-  sysctlbyname("hw.physicalcpu", &this->NumberOfPhysicalCPU, &len, nullptr, 0);
-  len = sizeof(this->NumberOfLogicalCPU);
-  sysctlbyname("hw.logicalcpu", &this->NumberOfLogicalCPU, &len, nullptr, 0);
+  this->NumberOfPhysicalCPU = 1;
+  err = kw_sysctlbyname_int32("hw.physicalcpu", &tempInt32);
+  if (err == 0) {
+    this->NumberOfPhysicalCPU = tempInt32;
+  }
 
-  int cores_per_package = 0;
-  len = sizeof(cores_per_package);
-  err = sysctlbyname("machdep.cpu.cores_per_package", &cores_per_package, &len,
-                     nullptr, 0);
-  // That name was not found, default to 1
-  this->Features.ExtendedFeatures.LogicalProcessorsPerPhysical =
-    err != 0 ? 1 : static_cast<unsigned char>(cores_per_package);
+  this->NumberOfLogicalCPU = 1;
+  err = kw_sysctlbyname_int32("hw.logicalcpu", &tempInt32);
+  if (err == 0) {
+    this->NumberOfLogicalCPU = tempInt32;
+  }
 
-  len = sizeof(value);
-  sysctlbyname("hw.cpufrequency", &value, &len, nullptr, 0);
-  this->CPUSpeedInMHz = static_cast<float>(value) / 1000000;
+  this->Features.ExtendedFeatures.LogicalProcessorsPerPhysical = 1;
+  err = kw_sysctlbyname_int32("machdep.cpu.cores_per_package", &tempInt32);
+  if (err == 0) {
+    this->Features.ExtendedFeatures.LogicalProcessorsPerPhysical = tempInt32;
+  }
+
+  this->CPUSpeedInMHz = 0;
+  err = kw_sysctlbyname_int64("hw.cpufrequency", &tempInt64);
+  if (err == 0) {
+    this->CPUSpeedInMHz = static_cast<float>(tempInt64) / 1000000.0f;
+  }
 
   // Chip family
-  len = sizeof(this->ChipID.Family);
-  // Seems only the intel chips will have this name so if this fails it is
-  // probably a PPC machine
-  err =
-    sysctlbyname("machdep.cpu.family", &this->ChipID.Family, &len, nullptr, 0);
+  // Seems only the Intel chips will have this name so if this fails it is
+  // a PowerPC or ARM, or something unknown
+  this->ChipID.Vendor = "";
+  this->ChipID.Family = 0;
+  this->ChipID.Model = 0;
+  this->ChipID.Revision = 0;
+  err = kw_sysctlbyname_int32("machdep.cpu.family", &tempInt32);
   if (err != 0) // Go back to names we know but are less descriptive
   {
-    this->ChipID.Family = 0;
-    ::memset(retBuf, 0, 128);
-    len = 32;
-    err = sysctlbyname("hw.machine", &retBuf, &len, nullptr, 0);
-    std::string machineBuf(retBuf);
-    if (machineBuf.find_first_of("Power") != std::string::npos) {
-      this->ChipID.Vendor = "IBM";
-      len = sizeof(this->ChipID.Family);
-      err = sysctlbyname("hw.cputype", &this->ChipID.Family, &len, nullptr, 0);
-      len = sizeof(this->ChipID.Model);
-      err =
-        sysctlbyname("hw.cpusubtype", &this->ChipID.Model, &len, nullptr, 0);
-      this->FindManufacturer();
-    }
-  } else // Should be an Intel Chip.
-  {
-    len = sizeof(this->ChipID.Family);
-    err = sysctlbyname("machdep.cpu.family", &this->ChipID.Family, &len,
-                       nullptr, 0);
+    ::memset(tempBuff, 0, sizeof(tempBuff));
+    len = sizeof(tempBuff) - 1; // leave a byte for null termination
+    err = sysctlbyname("hw.machine", &tempBuff, &len, nullptr, 0);
+    if (err == 0) {
+      std::string machineBuf(tempBuff);
+      if (machineBuf.find_first_of("Power") != std::string::npos) {
+        this->ChipID.Vendor = "IBM";
 
-    ::memset(retBuf, 0, 128);
-    len = 128;
-    err = sysctlbyname("machdep.cpu.vendor", retBuf, &len, nullptr, 0);
+        err = kw_sysctlbyname_int32("hw.cputype", &tempInt32);
+        if (err == 0) {
+          this->ChipID.Family = tempInt32;
+        }
+
+        err = kw_sysctlbyname_int32("hw.cpusubtype", &tempInt32);
+        if (err == 0) {
+          this->ChipID.Model = tempInt32;
+        }
+
+        this->FindManufacturer();
+      } else if (machineBuf.find_first_of("arm64") != std::string::npos) {
+        this->ChipID.Vendor = "Apple";
+
+        this->FindManufacturer();
+      }
+    }
+  } else {
+    // Should be an Intel Chip.
+    err = kw_sysctlbyname_int32("machdep.cpu.family", &tempInt32);
+    if (err == 0) {
+      this->ChipID.Family = tempInt32;
+    }
+
     // Chip Vendor
-    this->ChipID.Vendor = retBuf;
+    ::memset(tempBuff, 0, sizeof(tempBuff));
+    len = sizeof(tempBuff) - 1; // leave a byte for null termination
+    err = sysctlbyname("machdep.cpu.vendor", tempBuff, &len, nullptr, 0);
+    if (err == 0) {
+      this->ChipID.Vendor = tempBuff;
+    }
     this->FindManufacturer();
 
     // Chip Model
-    len = sizeof(value);
-    err = sysctlbyname("machdep.cpu.model", &value, &len, nullptr, 0);
-    this->ChipID.Model = static_cast<int>(value);
+    err = kw_sysctlbyname_int32("machdep.cpu.model", &tempInt32);
+    if (err == 0) {
+      this->ChipID.Model = tempInt32;
+    }
 
     // Chip Stepping
-    len = sizeof(value);
-    value = 0;
-    err = sysctlbyname("machdep.cpu.stepping", &value, &len, nullptr, 0);
-    if (!err) {
-      this->ChipID.Revision = static_cast<int>(value);
+    err = kw_sysctlbyname_int32("machdep.cpu.stepping", &tempInt32);
+    if (err == 0) {
+      this->ChipID.Revision = tempInt32;
     }
 
     // feature string
@@ -4563,36 +4701,36 @@ bool SystemInformationImplementation::ParseSysCtl()
       len = allocSize - 2; // keep space for leading and trailing space
       err = sysctlbyname("machdep.cpu.features", buf + 1, &len, nullptr, 0);
     }
-    if (!err && buf && len) {
+    if (err == 0 && buf && len) {
       // now we can match every flags as space + flag + space
       buf[len + 1] = ' ';
       std::string cpuflags(buf, len + 2);
 
-      if ((cpuflags.find(" FPU ") != std::string::npos)) {
+      if (cpuflags.find(" FPU ") != std::string::npos) {
         this->Features.HasFPU = true;
       }
-      if ((cpuflags.find(" TSC ") != std::string::npos)) {
+      if (cpuflags.find(" TSC ") != std::string::npos) {
         this->Features.HasTSC = true;
       }
-      if ((cpuflags.find(" MMX ") != std::string::npos)) {
+      if (cpuflags.find(" MMX ") != std::string::npos) {
         this->Features.HasMMX = true;
       }
-      if ((cpuflags.find(" SSE ") != std::string::npos)) {
+      if (cpuflags.find(" SSE ") != std::string::npos) {
         this->Features.HasSSE = true;
       }
-      if ((cpuflags.find(" SSE2 ") != std::string::npos)) {
+      if (cpuflags.find(" SSE2 ") != std::string::npos) {
         this->Features.HasSSE2 = true;
       }
-      if ((cpuflags.find(" APIC ") != std::string::npos)) {
+      if (cpuflags.find(" APIC ") != std::string::npos) {
         this->Features.HasAPIC = true;
       }
-      if ((cpuflags.find(" CMOV ") != std::string::npos)) {
+      if (cpuflags.find(" CMOV ") != std::string::npos) {
         this->Features.HasCMOV = true;
       }
-      if ((cpuflags.find(" MTRR ") != std::string::npos)) {
+      if (cpuflags.find(" MTRR ") != std::string::npos) {
         this->Features.HasMTRR = true;
       }
-      if ((cpuflags.find(" ACPI ") != std::string::npos)) {
+      if (cpuflags.find(" ACPI ") != std::string::npos) {
         this->Features.HasACPI = true;
       }
     }
@@ -4600,21 +4738,29 @@ bool SystemInformationImplementation::ParseSysCtl()
   }
 
   // brand string
-  ::memset(retBuf, 0, sizeof(retBuf));
-  len = sizeof(retBuf);
-  err = sysctlbyname("machdep.cpu.brand_string", retBuf, &len, nullptr, 0);
-  if (!err) {
-    this->ChipID.ProcessorName = retBuf;
-    this->ChipID.ModelName = retBuf;
+  this->ChipID.ProcessorName = "";
+  this->ChipID.ModelName = "";
+  ::memset(tempBuff, 0, sizeof(tempBuff));
+  len = sizeof(tempBuff) - 1; // leave a byte for null termination
+  err = sysctlbyname("machdep.cpu.brand_string", tempBuff, &len, nullptr, 0);
+  if (err == 0) {
+    this->ChipID.ProcessorName = tempBuff;
+    this->ChipID.ModelName = tempBuff;
   }
 
-  // Cache size
-  len = sizeof(value);
-  err = sysctlbyname("hw.l1icachesize", &value, &len, nullptr, 0);
-  this->Features.L1CacheSize = static_cast<int>(value);
-  len = sizeof(value);
-  err = sysctlbyname("hw.l2cachesize", &value, &len, nullptr, 0);
-  this->Features.L2CacheSize = static_cast<int>(value);
+  // L1 Cache size
+  this->Features.L1CacheSize = 0;
+  err = kw_sysctlbyname_int64("hw.l1icachesize", &tempInt64);
+  if (err == 0) {
+    this->Features.L1CacheSize = static_cast<int>(tempInt64);
+  }
+
+  // L2 Cache size
+  this->Features.L2CacheSize = 0;
+  err = kw_sysctlbyname_int64("hw.l2cachesize", &tempInt64);
+  if (err == 0) {
+    this->Features.L2CacheSize = static_cast<int>(tempInt64);
+  }
 
   return true;
 #else

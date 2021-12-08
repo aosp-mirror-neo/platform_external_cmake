@@ -10,12 +10,16 @@ Find the XML processing library (libxml2).
 IMPORTED Targets
 ^^^^^^^^^^^^^^^^
 
+.. versionadded:: 3.12
+
 The following :prop_tgt:`IMPORTED` targets may be defined:
 
 ``LibXml2::LibXml2``
-  If the libxml2 library has been found
+  libxml2 library.
 ``LibXml2::xmllint``
-  If the xmllint command-line executable has been found
+  .. versionadded:: 3.17
+
+  xmllint command-line executable.
 
 Result variables
 ^^^^^^^^^^^^^^^^
@@ -67,7 +71,7 @@ if(DEFINED LIBXML2_LIBRARIES AND NOT DEFINED LIBXML2_LIBRARY)
   set(LIBXML2_LIBRARY ${LIBXML2_LIBRARIES})
 endif()
 
-find_library(LIBXML2_LIBRARY NAMES xml2 libxml2
+find_library(LIBXML2_LIBRARY NAMES xml2 libxml2 libxml2_a
    HINTS
    ${PC_LIBXML_LIBDIR}
    ${PC_LIBXML_LIBRARY_DIRS}

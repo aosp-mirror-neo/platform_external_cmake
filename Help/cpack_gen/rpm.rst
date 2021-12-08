@@ -20,7 +20,7 @@ a component GROUP name. Usually those variables correspond to RPM spec file
 entities. One may find information about spec files here
 http://www.rpm.org/wiki/Docs
 
-.. note::
+.. versionchanged:: 3.6
 
  `<COMPONENT>` part of variables is preferred to be in upper case (e.g. if
  component is named ``foo`` then use ``CPACK_RPM_FOO_XXXX`` variable name format)
@@ -59,6 +59,9 @@ List of CPack RPM generator specific variables:
  * Mandatory : YES
  * Default   : :variable:`CPACK_PACKAGE_DESCRIPTION_SUMMARY`
 
+ .. versionadded:: 3.2
+  Per-component ``CPACK_RPM_<component>_PACKAGE_SUMMARY`` variables.
+
 .. variable:: CPACK_RPM_PACKAGE_NAME
               CPACK_RPM_<component>_PACKAGE_NAME
 
@@ -67,8 +70,13 @@ List of CPack RPM generator specific variables:
  * Mandatory : YES
  * Default   : :variable:`CPACK_PACKAGE_NAME`
 
+ .. versionadded:: 3.5
+  Per-component ``CPACK_RPM_<component>_PACKAGE_NAME`` variables.
+
 .. variable:: CPACK_RPM_FILE_NAME
               CPACK_RPM_<component>_FILE_NAME
+
+ .. versionadded:: 3.6
 
  Package file name.
 
@@ -93,6 +101,8 @@ List of CPack RPM generator specific variables:
 
 .. variable:: CPACK_RPM_MAIN_COMPONENT
 
+ .. versionadded:: 3.8
+
  Main component that is packaged without component suffix.
 
  * Mandatory : NO
@@ -103,6 +113,8 @@ List of CPack RPM generator specific variables:
  package name.
 
 .. variable:: CPACK_RPM_PACKAGE_EPOCH
+
+ .. versionadded:: 3.10
 
  The RPM package epoch
 
@@ -129,6 +141,9 @@ List of CPack RPM generator specific variables:
 
  This may be set to ``noarch`` if you know you are building a ``noarch`` package.
 
+ .. versionadded:: 3.3
+  Per-component ``CPACK_RPM_<component>_PACKAGE_ARCHITECTURE`` variables.
+
 .. variable:: CPACK_RPM_PACKAGE_RELEASE
 
  The RPM package release.
@@ -149,6 +164,8 @@ List of CPack RPM generator specific variables:
  ``%{?dist}`` part can be added by setting :variable:`CPACK_RPM_PACKAGE_RELEASE_DIST`.
 
 .. variable:: CPACK_RPM_PACKAGE_RELEASE_DIST
+
+ .. versionadded:: 3.6
 
  The dist tag that is added  RPM ``Release:`` field.
 
@@ -174,6 +191,9 @@ List of CPack RPM generator specific variables:
  * Mandatory : YES
  * Default   : "unknown"
 
+ .. versionadded:: 3.5
+  Per-component ``CPACK_RPM_<component>_PACKAGE_GROUP`` variables.
+
 .. variable:: CPACK_RPM_PACKAGE_VENDOR
 
  The RPM package vendor.
@@ -189,6 +209,9 @@ List of CPack RPM generator specific variables:
  * Mandatory : NO
  * Default   : :variable:`CMAKE_PROJECT_HOMEPAGE_URL`
 
+ .. versionadded:: 3.12
+  The ``CMAKE_PROJECT_HOMEPAGE_URL`` variable.
+
 .. variable:: CPACK_RPM_PACKAGE_DESCRIPTION
               CPACK_RPM_<component>_PACKAGE_DESCRIPTION
 
@@ -198,6 +221,9 @@ List of CPack RPM generator specific variables:
  * Default : :variable:`CPACK_COMPONENT_<compName>_DESCRIPTION` (component
    based installers only) if set, :variable:`CPACK_PACKAGE_DESCRIPTION_FILE`
    if set or "no package description available"
+
+ .. versionadded:: 3.2
+  Per-component ``CPACK_RPM_<component>_PACKAGE_DESCRIPTION`` variables.
 
 .. variable:: CPACK_RPM_COMPRESSION_TYPE
 
@@ -302,6 +328,8 @@ List of CPack RPM generator specific variables:
 .. variable:: CPACK_RPM_PACKAGE_REQUIRES_PRE
               CPACK_RPM_<component>_PACKAGE_REQUIRES_PRE
 
+ .. versionadded:: 3.2
+
  RPM spec requires(pre) field.
 
  * Mandatory : NO
@@ -314,6 +342,8 @@ List of CPack RPM generator specific variables:
 
 .. variable:: CPACK_RPM_PACKAGE_REQUIRES_POST
               CPACK_RPM_<component>_PACKAGE_REQUIRES_POST
+
+ .. versionadded:: 3.2
 
  RPM spec requires(post) field.
 
@@ -328,6 +358,8 @@ List of CPack RPM generator specific variables:
 .. variable:: CPACK_RPM_PACKAGE_REQUIRES_POSTUN
               CPACK_RPM_<component>_PACKAGE_REQUIRES_POSTUN
 
+ .. versionadded:: 3.2
+
  RPM spec requires(postun) field.
 
  * Mandatory : NO
@@ -341,6 +373,8 @@ List of CPack RPM generator specific variables:
 
 .. variable:: CPACK_RPM_PACKAGE_REQUIRES_PREUN
               CPACK_RPM_<component>_PACKAGE_REQUIRES_PREUN
+
+ .. versionadded:: 3.2
 
  RPM spec requires(preun) field.
 
@@ -360,8 +394,10 @@ List of CPack RPM generator specific variables:
  * Mandatory : NO
  * Default   : -
 
- May be used to set weak RPM dependencies (suggests). Note that you must
- enclose the complete requires string between quotes.
+ May be used to set weak RPM dependencies (suggests). If ``rpmbuild`` doesn't
+ support the ``Suggests`` tag, CPack will emit a warning and ignore this
+ variable. Note that you must enclose the complete requires string between
+ quotes.
 
 .. variable:: CPACK_RPM_PACKAGE_PROVIDES
               CPACK_RPM_<component>_PACKAGE_PROVIDES
@@ -492,6 +528,9 @@ List of CPack RPM generator specific variables:
 
   rpm -qp --scripts  package.rpm
 
+ .. versionadded:: 3.18
+  The ``CPACK_RPM_PRE_TRANS_SCRIPT_FILE`` variable.
+
 .. variable:: CPACK_RPM_POST_INSTALL_SCRIPT_FILE
               CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE
               CPACK_RPM_POST_TRANS_SCRIPT_FILE
@@ -513,6 +552,9 @@ List of CPack RPM generator specific variables:
 
   rpm -qp --scripts  package.rpm
 
+ .. versionadded:: 3.18
+  The ``CPACK_RPM_POST_TRANS_SCRIPT_FILE`` variable.
+
 .. variable:: CPACK_RPM_USER_FILELIST
               CPACK_RPM_<COMPONENT>_USER_FILELIST
 
@@ -521,12 +563,15 @@ List of CPack RPM generator specific variables:
 
  May be used to explicitly specify ``%(<directive>)`` file line
  in the spec file. Like ``%config(noreplace)`` or any other directive
- that be found in the ``%files`` section. You can have multiple directives
- per line, as in ``%attr(600,root,root) %config(noreplace)``. Since
+ that be found in the ``%files`` section. Since
  the CPack RPM generator is generating the list of files (and directories) the
  user specified files of the ``CPACK_RPM_<COMPONENT>_USER_FILELIST`` list will
  be removed from the generated list. If referring to directories do
  not add a trailing slash.
+
+ .. versionadded:: 3.8
+  You can have multiple directives per line, as in
+  ``%attr(600,root,root) %config(noreplace)``.
 
 .. variable:: CPACK_RPM_CHANGELOG_FILE
 
@@ -555,6 +600,9 @@ List of CPack RPM generator specific variables:
  the default path. If you want to add some path to the default list then you
  can use :variable:`CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION` variable.
 
+ .. versionadded:: 3.10
+  Added ``/usr/share/aclocal`` to the default list of excludes.
+
 .. variable:: CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
 
  additional list of path to be excluded.
@@ -567,6 +615,8 @@ List of CPack RPM generator specific variables:
  :variable:`CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST`.
 
 .. variable:: CPACK_RPM_RELOCATION_PATHS
+
+ .. versionadded:: 3.2
 
  Packages relocation paths list.
 
@@ -591,6 +641,8 @@ List of CPack RPM generator specific variables:
 
 .. variable:: CPACK_RPM_<COMPONENT>_PACKAGE_PREFIX
 
+ .. versionadded:: 3.2
+
  Per component relocation path install prefix.
 
  * Mandatory : NO
@@ -602,6 +654,8 @@ List of CPack RPM generator specific variables:
 .. variable:: CPACK_RPM_NO_INSTALL_PREFIX_RELOCATION
               CPACK_RPM_NO_<COMPONENT>_INSTALL_PREFIX_RELOCATION
 
+ .. versionadded:: 3.3
+
  Removal of default install prefix from relocation paths list.
 
  * Mandatory : NO
@@ -612,6 +666,8 @@ List of CPack RPM generator specific variables:
  from relocatable RPM prefix paths.
 
 .. variable:: CPACK_RPM_ADDITIONAL_MAN_DIRS
+
+ .. versionadded:: 3.3
 
  * Mandatory : NO
  * Default   : -
@@ -641,6 +697,8 @@ List of CPack RPM generator specific variables:
 .. variable:: CPACK_RPM_DEFAULT_USER
               CPACK_RPM_<compName>_DEFAULT_USER
 
+ .. versionadded:: 3.6
+
  default user ownership of RPM content
 
  * Mandatory : NO
@@ -652,6 +710,8 @@ List of CPack RPM generator specific variables:
 .. variable:: CPACK_RPM_DEFAULT_GROUP
               CPACK_RPM_<compName>_DEFAULT_GROUP
 
+ .. versionadded:: 3.6
+
  default group ownership of RPM content
 
  * Mandatory : NO
@@ -662,6 +722,8 @@ List of CPack RPM generator specific variables:
 
 .. variable:: CPACK_RPM_DEFAULT_FILE_PERMISSIONS
               CPACK_RPM_<compName>_DEFAULT_FILE_PERMISSIONS
+
+ .. versionadded:: 3.6
 
  default permissions used for packaged files
 
@@ -686,6 +748,8 @@ List of CPack RPM generator specific variables:
 .. variable:: CPACK_RPM_DEFAULT_DIR_PERMISSIONS
               CPACK_RPM_<compName>_DEFAULT_DIR_PERMISSIONS
 
+ .. versionadded:: 3.6
+
  default permissions used for packaged directories
 
  * Mandatory : NO
@@ -696,6 +760,8 @@ List of CPack RPM generator specific variables:
  Note that <compName> must be in upper-case.
 
 .. variable:: CPACK_RPM_INSTALL_WITH_EXEC
+
+ .. versionadded:: 3.11
 
  force execute permissions on programs and shared libraries
 
@@ -714,6 +780,8 @@ List of CPack RPM generator specific variables:
 Packaging of Symbolic Links
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. versionadded:: 3.3
+
 The CPack RPM generator supports packaging of symbolic links::
 
   execute_process(COMMAND ${CMAKE_COMMAND}
@@ -731,8 +799,10 @@ those locations will be treated as if they were a part of the package
 while determining if symlink should be either created or present in a
 post install script - depending on relocation paths.
 
-Symbolic links that point to locations outside packaging path produce a
-warning and are treated as non relocatable permanent symbolic links.
+.. versionchanged:: 3.6
+ Symbolic links that point to locations outside packaging path produce a
+ warning and are treated as non relocatable permanent symbolic links.
+ Previous versions of CMake produced an error in this case.
 
 Currently there are a few limitations though:
 
@@ -749,6 +819,8 @@ Currently there are a few limitations though:
 
 Packaging of debug information
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 3.7
 
 Debuginfo packages contain debug symbols and sources for debugging packaged
 binaries.
@@ -767,6 +839,10 @@ Debuginfo RPM packaging has its own set of variables:
 
  Binaries must contain debug symbols before packaging so use either ``Debug``
  or ``RelWithDebInfo`` for :variable:`CMAKE_BUILD_TYPE` variable value.
+
+ Additionally, if :variable:`CPACK_STRIP_FILES` is set, the files will be stripped before
+ they get to the RPM generator, so will not contain debug symbols and
+ a debuginfo package will not get built. Do not use with :variable:`CPACK_STRIP_FILES`.
 
 .. note::
 
@@ -832,6 +908,8 @@ Debuginfo RPM packaging has its own set of variables:
 
 .. variable:: CPACK_RPM_DEBUGINFO_SINGLE_PACKAGE
 
+ .. versionadded:: 3.8
+
  Create a single debuginfo package even if components packaging is set.
 
  * Mandatory : NO
@@ -852,6 +930,8 @@ Debuginfo RPM packaging has its own set of variables:
 
 .. variable:: CPACK_RPM_DEBUGINFO_FILE_NAME
               CPACK_RPM_<component>_DEBUGINFO_FILE_NAME
+
+ .. versionadded:: 3.9
 
  Debuginfo package file name.
 
@@ -876,6 +956,8 @@ Debuginfo RPM packaging has its own set of variables:
 
 Packaging of sources (SRPM)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. versionadded:: 3.7
 
 SRPM packaging is enabled by setting :variable:`CPACK_RPM_PACKAGE_SOURCES`
 variable while usually using :variable:`CPACK_INSTALLED_DIRECTORIES` variable
@@ -945,7 +1027,7 @@ Source RPM packaging has its own set of variables:
  * Mandatory : YES
  * Default   : "/"
 
-.. VARIABLE:: CPACK_RPM_BUILDREQUIRES
+.. variable:: CPACK_RPM_BUILDREQUIRES
 
  List of source rpm build dependencies.
 
@@ -957,3 +1039,16 @@ Source RPM packaging has its own set of variables:
  example::
 
   set(CPACK_RPM_BUILDREQUIRES "python >= 2.5.0, cmake >= 2.8")
+
+.. variable:: CPACK_RPM_REQUIRES_EXCLUDE_FROM
+
+ .. versionadded:: 3.22
+
+ * Mandatory : NO
+ * Default   : -
+
+ May be used to keep the dependency generator from scanning specific files
+ or directories for dependencies.  Note that you can use a regular
+ expression that matches all of the directories or files, for example::
+
+  set(CPACK_RPM_REQUIRES_EXCLUDE_FROM "bin/libqsqloci.*\\.so.*")

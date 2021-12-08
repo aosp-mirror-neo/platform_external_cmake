@@ -14,9 +14,10 @@
 #include "cmSystemTools.h"
 
 cmInstallSubdirectoryGenerator::cmInstallSubdirectoryGenerator(
-  cmMakefile* makefile, std::string binaryDirectory, bool excludeFromAll)
+  cmMakefile* makefile, std::string binaryDirectory,
+  cmListFileBacktrace backtrace)
   : cmInstallGenerator("", std::vector<std::string>(), "", MessageDefault,
-                       excludeFromAll)
+                       false, false, std::move(backtrace))
   , Makefile(makefile)
   , BinaryDirectory(std::move(binaryDirectory))
 {
@@ -51,11 +52,12 @@ bool cmInstallSubdirectoryGenerator::Compute(cmLocalGenerator* lg)
 
 void cmInstallSubdirectoryGenerator::GenerateScript(std::ostream& os)
 {
-  if (!this->ExcludeFromAll) {
+  if (!this->Makefile->GetPropertyAsBool("EXCLUDE_FROM_ALL")) {
     cmPolicies::PolicyStatus status =
       this->LocalGenerator->GetPolicyStatus(cmPolicies::CMP0082);
     switch (status) {
       case cmPolicies::WARN:
+        CM_FALLTHROUGH;
       case cmPolicies::OLD:
         // OLD behavior is handled in cmLocalGenerator::GenerateInstallRules()
         break;

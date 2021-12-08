@@ -2,10 +2,14 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 
 #include <csignal>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include <unistd.h>
 
 #include "cmsys/Encoding.hxx"
 
@@ -15,6 +19,7 @@
 #include "cmCursesStandardIncludes.h"
 #include "cmDocumentation.h"
 #include "cmDocumentationEntry.h" // IWYU pragma: keep
+#include "cmMessageMetadata.h"
 #include "cmState.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
@@ -54,7 +59,12 @@ void onsig(int /*unused*/)
 {
   if (cmCursesForm::CurrentForm) {
     endwin();
-    initscr();            /* Initialization */
+    if (initscr() == nullptr) {
+      static const char errmsg[] = "Error: ncurses initialization failed\n";
+      auto r = write(STDERR_FILENO, errmsg, sizeof(errmsg) - 1);
+      static_cast<void>(r);
+      exit(1);
+    }
     noecho();             /* Echo off */
     cbreak();             /* nl- or cr not needed */
     keypad(stdscr, true); /* Use key symbols as KEY_DOWN */
@@ -124,7 +134,10 @@ int main(int argc, char const* const* argv)
     cmCursesForm::DebugStart();
   }
 
-  initscr();            /* Initialization */
+  if (initscr() == nullptr) {
+    fprintf(stderr, "Error: ncurses initialization failed\n");
+    exit(1);
+  }
   noecho();             /* Echo off */
   cbreak();             /* nl- or cr not needed */
   keypad(stdscr, true); /* Use key symbols as KEY_DOWN */
@@ -169,8 +182,8 @@ int main(int argc, char const* const* argv)
     return msg;
   };
   cmSystemTools::SetMessageCallback(
-    [&](const std::string& message, const char* title) {
-      myform->AddError(cleanMessage(message), title);
+    [&](const std::string& message, const cmMessageMetadata& md) {
+      myform->AddError(cleanMessage(message), md.title);
     });
   cmSystemTools::SetStderrCallback([&](const std::string& message) {
     myform->AddError(cleanMessage(message), "");

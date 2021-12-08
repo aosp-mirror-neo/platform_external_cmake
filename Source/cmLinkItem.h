@@ -1,13 +1,13 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmLinkItem_h
-#define cmLinkItem_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
 #include <map>
 #include <ostream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <cmext/algorithm>
@@ -51,6 +51,9 @@ struct cmLinkImplementationLibraries
   // Libraries linked directly in this configuration.
   std::vector<cmLinkImplItem> Libraries;
 
+  // Object files linked directly in this configuration.
+  std::vector<cmLinkItem> Objects;
+
   // Libraries linked directly in other configurations.
   // Needed only for OLD behavior of CMP0003.
   std::vector<cmLinkItem> WrongConfigLibraries;
@@ -64,6 +67,9 @@ struct cmLinkInterfaceLibraries
   // Libraries listed in the interface.
   std::vector<cmLinkItem> Libraries;
 
+  // Object files listed in the interface.
+  std::vector<cmLinkItem> Objects;
+
   // Whether the list depends on a genex referencing the head target.
   bool HadHeadSensitiveCondition = false;
 
@@ -75,6 +81,8 @@ struct cmLinkInterface : public cmLinkInterfaceLibraries
 {
   // Languages whose runtime libraries must be linked.
   std::vector<std::string> Languages;
+  std::unordered_map<std::string, std::vector<cmLinkItem>>
+    LanguageRuntimeLibraries;
 
   // Shared library dependencies needed for linking on some platforms.
   std::vector<cmLinkItem> SharedDeps;
@@ -110,6 +118,8 @@ struct cmLinkImplementation : public cmLinkImplementationLibraries
 {
   // Languages whose runtime libraries must be linked.
   std::vector<std::string> Languages;
+  std::unordered_map<std::string, std::vector<cmLinkImplItem>>
+    LanguageRuntimeLibraries;
 
   // Whether the list depends on a link language genex.
   bool HadLinkLanguageSensitiveCondition = false;
@@ -140,5 +150,3 @@ inline cmTargetLinkLibraryType CMP0003_ComputeLinkType(
   // The current configuration is not a debug configuration.
   return OPTIMIZED_LibraryType;
 }
-
-#endif

@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmQtAutoGenerator_h
-#define cmQtAutoGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -32,7 +31,7 @@ public:
   public:
     // -- Construction
     Logger();
-    ~Logger();
+    ~Logger() = default;
     // -- Verbosity
     unsigned int Verbosity() const { return this->Verbosity_; }
     void SetVerbosity(unsigned int value) { this->Verbosity_ = value; }
@@ -55,7 +54,6 @@ public:
   private:
     static std::string HeadLine(cm::string_view title);
 
-  private:
     mutable std::mutex Mutex_;
     unsigned int Verbosity_ = 0;
     bool ColorOutput_ = false;
@@ -80,7 +78,6 @@ public:
   static bool FileDiffers(std::string const& filename,
                           std::string const& content);
 
-public:
   // -- Constructors
   cmQtAutoGenerator(GenT genType);
   virtual ~cmQtAutoGenerator();
@@ -89,10 +86,10 @@ public:
   cmQtAutoGenerator& operator=(cmQtAutoGenerator const&) = delete;
 
   // -- Info options
-  std::string const& InfoFile() const { return InfoFile_; }
-  std::string const& InfoDir() const { return InfoDir_; }
-  cmFileTime const& InfoFileTime() const { return InfoFileTime_; }
-  std::string const& InfoConfig() const { return InfoConfig_; }
+  std::string const& InfoFile() const { return this->InfoFile_; }
+  std::string const& InfoDir() const { return this->InfoDir_; }
+  cmFileTime const& InfoFileTime() const { return this->InfoFileTime_; }
+  std::string const& InfoConfig() const { return this->InfoConfig_; }
 
   // -- Info file parsing
   /** Info file reader class. */
@@ -125,7 +122,7 @@ public:
 
     Json::Value const& GetValue(std::string const& key) const
     {
-      return Json_[key];
+      return this->Json_[key];
     }
 
     /** Returns true if strings were appended to the list.  */
@@ -141,7 +138,6 @@ public:
   private:
     std::string ConfigKey(cm::string_view key) const;
 
-  private:
     Json::Value Json_;
     cmQtAutoGenerator& Gen_;
   };
@@ -151,7 +147,7 @@ public:
                                   cm::string_view key);
 
   // -- Directories
-  ProjectDirsT const& ProjectDirs() const { return ProjectDirs_; }
+  ProjectDirsT const& ProjectDirs() const { return this->ProjectDirs_; }
   std::string MessagePath(cm::string_view path) const;
 
   // -- Run
@@ -162,7 +158,7 @@ protected:
   virtual bool InitFromInfo(InfoT const& info) = 0;
   virtual bool Process() = 0;
   // - Utility classes
-  Logger const& Log() const { return Logger_; }
+  Logger const& Log() const { return this->Logger_; }
 
 private:
   // -- Generator type
@@ -177,5 +173,3 @@ private:
   // -- Directories
   ProjectDirsT ProjectDirs_;
 };
-
-#endif

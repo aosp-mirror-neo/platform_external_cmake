@@ -15,11 +15,11 @@
 #include "cmExecutionStatus.h"
 #include "cmGeneratorExpression.h"
 #include "cmMakefile.h"
-#include "cmProperty.h"
 #include "cmSourceFile.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
+#include "cmValue.h"
 
 namespace {
 /** \class cmDependInformation
@@ -118,7 +118,7 @@ public:
     std::set<std::string> uniqueIncludes;
     std::vector<std::string> orderedAndUniqueIncludes;
     for (auto const& target : this->Makefile->GetTargets()) {
-      cmProp incDirProp = target.second.GetProperty("INCLUDE_DIRECTORIES");
+      cmValue incDirProp = target.second.GetProperty("INCLUDE_DIRECTORIES");
       if (!incDirProp) {
         continue;
       }
@@ -376,7 +376,7 @@ protected:
     }
     // Didn't find an instance.  Create a new one and save it.
     auto info = cm::make_unique<cmDependInformation>();
-    auto ptr = info.get();
+    auto* ptr = info.get();
     info->FullPath = fullPath;
     info->PathOnly = cmSystemTools::GetFilenamePath(fullPath);
     info->IncludeName = file;

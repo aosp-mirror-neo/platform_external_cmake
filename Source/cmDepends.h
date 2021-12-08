@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmDepends_h
-#define cmDepends_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -26,7 +25,6 @@ class cmDepends
 public:
   using DependencyMap = std::map<std::string, std::vector<std::string>>;
 
-public:
   /** Instances need to know the build directory name and the relative
       path from the build directory to the target file.  */
   cmDepends(cmLocalUnixMakefileGenerator3* lg = nullptr,
@@ -71,7 +69,7 @@ public:
              DependencyMap& validDeps);
 
   /** Clear dependencies for the target file so they will be regenerated.  */
-  void Clear(const std::string& file);
+  void Clear(const std::string& file) const;
 
   /** Set the file comparison object */
   void SetFileTimeCache(cmFileTimeCache* fc) { this->FileTimeCache = fc; }
@@ -112,5 +110,3 @@ protected:
 
   void SetIncludePathFromLanguage(const std::string& lang);
 };
-
-#endif

@@ -1,6 +1,8 @@
 # Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
 # file Copyright.txt or https://cmake.org/licensing for details.
 
+include_guard(GLOBAL)
+
 #[=======================================================================[.rst:
 ExternalProject
 ---------------
@@ -56,6 +58,8 @@ External Project Definition
       (see *Logging Options* below).
 
     ``LOG_DIR <dir>``
+      .. versionadded:: 3.14
+
       Directory in which to store the logs of each step.
 
     ``DOWNLOAD_DIR <dir>``
@@ -144,6 +148,9 @@ External Project Definition
         is determined by inspecting the actual content rather than using logic
         based on the file extension.
 
+        .. versionchanged:: 3.7
+          Multiple URLs are allowed.
+
       ``URL_HASH <algo>=<hashValue>``
         Hash of the archive file to be downloaded. The argument should be of
         the form ``<algo>=<hashValue>`` where ``algo`` can be any of the hashing
@@ -164,6 +171,8 @@ External Project Definition
         of code internal to the ``ExternalProject`` module.
 
       ``DOWNLOAD_NO_EXTRACT <bool>``
+        .. versionadded:: 3.6
+
         Allows the extraction part of the download step to be disabled by
         passing a boolean true value for this option. If this option is not
         given, the downloaded contents will be unpacked automatically if
@@ -179,34 +188,50 @@ External Project Definition
       ``TIMEOUT <seconds>``
         Maximum time allowed for file download operations.
 
+      ``INACTIVITY_TIMEOUT <seconds>``
+        .. versionadded:: 3.19
+
+        Terminate the operation after a period of inactivity.
+
       ``HTTP_USERNAME <username>``
+        .. versionadded:: 3.7
+
         Username for the download operation if authentication is required.
 
       ``HTTP_PASSWORD <password>``
+        .. versionadded:: 3.7
+
         Password for the download operation if authentication is required.
 
       ``HTTP_HEADER <header1> [<header2>...]``
+        .. versionadded:: 3.7
+
         Provides an arbitrary list of HTTP headers for the download operation.
         This can be useful for accessing content in systems like AWS, etc.
 
       ``TLS_VERIFY <bool>``
         Specifies whether certificate verification should be performed for
         https URLs. If this option is not provided, the default behavior is
-        determined by the ``CMAKE_TLS_VERIFY`` variable (see
+        determined by the :variable:`CMAKE_TLS_VERIFY` variable (see
         :command:`file(DOWNLOAD)`). If that is also not set, certificate
         verification will not be performed. In situations where ``URL_HASH``
         cannot be provided, this option can be an alternative verification
         measure.
 
+        .. versionchanged:: 3.6
+          This option also applies to ``git clone`` invocations.
+
       ``TLS_CAINFO <file>``
         Specify a custom certificate authority file to use if ``TLS_VERIFY``
         is enabled. If this option is not specified, the value of the
-        ``CMAKE_TLS_CAINFO`` variable will be used instead (see
+        :variable:`CMAKE_TLS_CAINFO` variable will be used instead (see
         :command:`file(DOWNLOAD)`)
 
       ``NETRC <level>``
+        .. versionadded:: 3.11
+
         Specify whether the ``.netrc`` file is to be used for operation.
-        If this option is not specified, the value of the ``CMAKE_NETRC``
+        If this option is not specified, the value of the :variable:`CMAKE_NETRC`
         variable will be used instead (see :command:`file(DOWNLOAD)`)
         Valid levels are:
 
@@ -222,10 +247,15 @@ External Project Definition
           is ignored.
 
       ``NETRC_FILE <file>``
+        .. versionadded:: 3.11
+
         Specify an alternative ``.netrc`` file to the one in your home directory
         if the ``NETRC`` level is ``OPTIONAL`` or ``REQUIRED``. If this option
-        is not specified, the value of the ``CMAKE_NETRC_FILE`` variable will
-        be used instead (see :command:`file(DOWNLOAD)`)
+        is not specified, the value of the :variable:`CMAKE_NETRC_FILE` variable
+        will be used instead (see :command:`file(DOWNLOAD)`)
+
+      .. versionadded:: 3.1
+        Added support for `tbz2`, `.tar.xz`, `.txz`, and `.7z` extensions.
 
     *Git*
       NOTE: A git version of 1.6.5 or later is required if this download method
@@ -264,22 +294,30 @@ External Project Definition
 
       ``GIT_SUBMODULES <module>...``
         Specific git submodules that should also be updated. If this option is
-        not provided, all git submodules will be updated. When :policy:`CMP0097`
-        is set to ``NEW`` if this value is set to an empty string then no submodules
-        are initialized or updated.
+        not provided, all git submodules will be updated.
+
+        .. versionchanged:: 3.16
+          When :policy:`CMP0097` is set to ``NEW``, if this value is set
+          to an empty string then no submodules are initialized or updated.
 
       ``GIT_SUBMODULES_RECURSE <bool>``
+        .. versionadded:: 3.17
+
         Specify whether git submodules (if any) should update recursively by
         passing the ``--recursive`` flag to ``git submodule update``.
         If not specified, the default is on.
 
       ``GIT_SHALLOW <bool>``
+        .. versionadded:: 3.6
+
         When this option is enabled, the ``git clone`` operation will be given
         the ``--depth 1`` option. This performs a shallow clone, which avoids
         downloading the whole history and instead retrieves just the commit
         denoted by the ``GIT_TAG`` option.
 
       ``GIT_PROGRESS <bool>``
+        .. versionadded:: 3.8
+
         When enabled, this option instructs the ``git clone`` operation to
         report its progress by passing it the ``--progress`` option. Without
         this option, the clone step for large projects may appear to make the
@@ -289,12 +327,16 @@ External Project Definition
         overly noisy if lots of external projects are used.
 
       ``GIT_CONFIG <option1> [<option2>...]``
+        .. versionadded:: 3.8
+
         Specify a list of config options to pass to ``git clone``. Each option
         listed will be transformed into its own ``--config <option>`` on the
         ``git clone`` command line, with each option required to be in the
         form ``key=value``.
 
       ``GIT_REMOTE_UPDATE_STRATEGY <strategy>``
+        .. versionadded:: 3.18
+
         When ``GIT_TAG`` refers to a remote branch, this option can be used to
         specify how the update step behaves.  The ``<strategy>`` must be one of
         the following:
@@ -376,6 +418,8 @@ External Project Definition
       :manual:`generator expressions <cmake-generator-expressions(7)>`.
 
     ``UPDATE_DISCONNECTED <bool>``
+      .. versionadded:: 3.2
+
       When enabled, this option causes the update step to be skipped. It does
       not, however, prevent the download step. The update step can still be
       added as a step target (see :command:`ExternalProject_Add_StepTargets`)
@@ -395,6 +439,9 @@ External Project Definition
       project also provides a cache variable or some other convenient method
       for setting the directory property).
 
+      This may cause a step target to be created automatically for the
+      ``download`` step.  See policy :policy:`CMP0114`.
+
     ``PATCH_COMMAND <cmd>...``
       Specifies a custom command to patch the sources after an update. By
       default, no patch command is defined. Note that it can be quite difficult
@@ -409,9 +456,16 @@ External Project Definition
     overridden if required.
 
     ``CONFIGURE_COMMAND <cmd>...``
-      The default configure command runs CMake with options based on the main
-      project. For non-CMake external projects, the ``CONFIGURE_COMMAND``
-      option must be used to override this behavior
+      The default configure command runs CMake with a few options based on
+      the main project.  The options added are typically only those needed to
+      use the same generator as the main project, but the ``CMAKE_GENERATOR``
+      option can be given to override this.  The project is responsible for
+      adding any toolchain details, flags or other settings it wants to
+      re-use from the main project or otherwise specify (see ``CMAKE_ARGS``,
+      ``CMAKE_CACHE_ARGS`` and ``CMAKE_CACHE_DEFAULT_ARGS`` below).
+
+      For non-CMake external projects, the ``CONFIGURE_COMMAND`` option must
+      be used to override the default configure command
       (:manual:`generator expressions <cmake-generator-expressions(7)>` are
       supported). For projects that require no configure step, specify this
       option with an empty string as the command to execute.
@@ -430,6 +484,8 @@ External Project Definition
       ``CONFIGURE_COMMAND`` option.
 
     ``CMAKE_GENERATOR_PLATFORM <platform>``
+      .. versionadded:: 3.1
+
       Pass a generator-specific platform name to the CMake command (see
       :variable:`CMAKE_GENERATOR_PLATFORM`). It is an error to provide this
       option without the ``CMAKE_GENERATOR`` option.
@@ -440,6 +496,8 @@ External Project Definition
       option without the ``CMAKE_GENERATOR`` option.
 
     ``CMAKE_GENERATOR_INSTANCE <instance>``
+      .. versionadded:: 3.11
+
       Pass a generator-specific instance selection to the CMake command (see
       :variable:`CMAKE_GENERATOR_INSTANCE`). It is an error to provide this
       option without the ``CMAKE_GENERATOR`` option.
@@ -448,8 +506,10 @@ External Project Definition
       The specified arguments are passed to the ``cmake`` command line. They
       can be any argument the ``cmake`` command understands, not just cache
       values defined by ``-D...`` arguments (see also
-      :manual:`CMake Options <cmake(1)>`). In addition, arguments may use
-      :manual:`generator expressions <cmake-generator-expressions(7)>`.
+      :manual:`CMake Options <cmake(1)>`).
+
+      .. versionadded:: 3.3
+        Arguments may use :manual:`generator expressions <cmake-generator-expressions(7)>`.
 
     ``CMAKE_CACHE_ARGS <arg>...``
       This is an alternate way of specifying cache variables where command line
@@ -457,10 +517,14 @@ External Project Definition
       the form ``-Dvar:STRING=value``, which are then transformed into
       CMake :command:`set` commands with the ``FORCE`` option used. These
       ``set()`` commands are written to a pre-load script which is then applied
-      using the :manual:`cmake -C <cmake(1)>` command line option. Arguments
-      may use :manual:`generator expressions <cmake-generator-expressions(7)>`.
+      using the :manual:`cmake -C <cmake(1)>` command line option.
+
+      .. versionadded:: 3.3
+        Arguments may use :manual:`generator expressions <cmake-generator-expressions(7)>`.
 
     ``CMAKE_CACHE_DEFAULT_ARGS <arg>...``
+      .. versionadded:: 3.2
+
       This is the same as the ``CMAKE_CACHE_ARGS`` option except the ``set()``
       commands do not include the ``FORCE`` keyword. This means the values act
       as initial defaults only and will not override any variables already set
@@ -468,20 +532,37 @@ External Project Definition
       different behavior depending on whether the build starts from a fresh
       build directory or re-uses previous build contents.
 
-      If the CMake generator is the ``Green Hills MULTI`` and not overridden then
-      the original project's settings for the GHS toolset and target system
-      customization cache variables are propagated into the external project.
+      .. versionadded:: 3.15
+        If the CMake generator is the ``Green Hills MULTI`` and not overridden then
+        the original project's settings for the GHS toolset and target system
+        customization cache variables are propagated into the external project.
 
     ``SOURCE_SUBDIR <dir>``
+      .. versionadded:: 3.7
+
       When no ``CONFIGURE_COMMAND`` option is specified, the configure step
       assumes the external project has a ``CMakeLists.txt`` file at the top of
       its source tree (i.e. in ``SOURCE_DIR``). The ``SOURCE_SUBDIR`` option
       can be used to point to an alternative directory within the source tree
       to use as the top of the CMake source tree instead. This must be a
       relative path and it will be interpreted as being relative to
-      ``SOURCE_DIR``.  When ``BUILD_IN_SOURCE 1`` is specified, the
-      ``BUILD_COMMAND`` is used to point to an alternative directory within the
-      source tree.
+      ``SOURCE_DIR``.
+
+      .. versionadded:: 3.14
+        When ``BUILD_IN_SOURCE`` option is enabled, the ``BUILD_COMMAND``
+        is used to point to an alternative directory within the source tree.
+
+    ``CONFIGURE_HANDLED_BY_BUILD <bool>``
+      .. versionadded:: 3.20
+
+      Enabling this option relaxes the dependencies of the configure step on
+      other external projects to order-only. This means the configure step will
+      be executed after its external project dependencies are built but it will
+      not be marked dirty when one of its external project dependencies is
+      rebuilt. This option can be enabled when the build step is smart enough
+      to figure out if the configure step needs to be rerun. CMake and Meson are
+      examples of build systems whose build step is smart enough to know if the
+      configure step needs to be rerun.
 
   **Build Step Options:**
     If the configure step assumed the external project uses CMake as its build
@@ -489,6 +570,16 @@ External Project Definition
     Makefile-based build and simply run ``make`` with no arguments as the
     default build step. This can be overridden with custom build commands if
     required.
+
+    If both the main project and the external project use make as their build
+    tool, the build step of the external project is invoked as a recursive
+    make using ``$(MAKE)``.  This will communicate some build tool settings
+    from the main project to the external project.  If either the main project
+    or external project is not using make, no build tool settings will be
+    passed to the external project other than those established by the
+    configure step (i.e. running ``ninja -v`` in the main project will not
+    pass ``-v`` to the external project's build step, even if it also uses
+    ``ninja`` as its build tool).
 
     ``BUILD_COMMAND <cmd>...``
       Overrides the default build command
@@ -518,6 +609,8 @@ External Project Definition
       developers might modify the sources in ``SOURCE_DIR``).
 
     ``BUILD_BYPRODUCTS <file>...``
+      .. versionadded:: 3.2
+
       Specifies files that will be generated by the build command but which
       might or might not have their modification time updated by subsequent
       builds. These ultimately get passed through as ``BYPRODUCTS`` to the
@@ -543,6 +636,22 @@ External Project Definition
       (:manual:`generator expressions <cmake-generator-expressions(7)>` are
       supported). Passing an empty string as the ``<cmd>`` makes the install
       step do nothing.
+
+    .. note::
+      If the :envvar:`CMAKE_INSTALL_MODE` environment variable is set when the
+      main project is built, it will only have an effect if the following
+      conditions are met:
+
+      * The main project's configure step assumed the external project uses
+        CMake as its build system.
+      * The external project's install command actually runs. Note that due
+        to the way ``ExternalProject`` may use timestamps internally, if
+        nothing the install step depends on needs to be re-executed, the
+        install command might also not need to run.
+
+      Note also that ``ExternalProject`` does not check whether the
+      :envvar:`CMAKE_INSTALL_MODE` environment variable changes from one run
+      to another.
 
   **Test Step Options:**
     The test step is only defined if at least one of the following ``TEST_...``
@@ -572,9 +681,13 @@ External Project Definition
       ``TEST_AFTER_INSTALL`` are enabled, the latter is silently ignored.
 
     ``TEST_EXCLUDE_FROM_MAIN <bool>``
+      .. versionadded:: 3.2
+
       If enabled, the main build's default ALL target will not depend on the
       test step. This can be a useful way of ensuring the test step is defined
       but only gets invoked when manually requested.
+      This may cause a step target to be created automatically for either
+      the ``install`` or ``build`` step.  See policy :policy:`CMP0114`.
 
   **Output Logging Options:**
     Each of the following ``LOG_...`` options can be used to wrap the relevant
@@ -589,6 +702,8 @@ External Project Definition
       When enabled, the output of the update step is logged to files.
 
     ``LOG_PATCH <bool>``
+      .. versionadded:: 3.14
+
       When enabled, the output of the patch step is logged to files.
 
     ``LOG_CONFIGURE <bool>``
@@ -604,10 +719,14 @@ External Project Definition
       When enabled, the output of the test step is logged to files.
 
     ``LOG_MERGED_STDOUTERR <bool>``
+      .. versionadded:: 3.14
+
       When enabled, stdout and stderr will be merged for any step whose
       output is being logged to files.
 
     ``LOG_OUTPUT_ON_FAILURE <bool>``
+      .. versionadded:: 3.14
+
       This option only has an effect if at least one of the other ``LOG_<step>``
       options is enabled.  If an error occurs for a step which has logging to
       file enabled, that step's output will be printed to the console if
@@ -616,6 +735,8 @@ External Project Definition
       console.
 
   **Terminal Access Options:**
+    .. versionadded:: 3.4
+
     Steps can be given direct access to the terminal in some cases. Giving a
     step access to the terminal may allow it to receive terminal input if
     required, such as for authentication details not provided by other options.
@@ -661,19 +782,22 @@ External Project Definition
       steps need to be triggered manually or if they need to be used as
       dependencies of other targets. If this option is not specified, the
       default value is taken from the ``EP_STEP_TARGETS`` directory property.
-      See :command:`ExternalProject_Add_Step` below for further discussion of
-      the effects of this option.
+      See :command:`ExternalProject_Add_StepTargets` below for further
+      discussion of the effects of this option.
 
     ``INDEPENDENT_STEP_TARGETS <step-target>...``
-      Generate custom targets for the specified steps and prevent these targets
+      .. deprecated:: 3.19
+        This is allowed only if policy :policy:`CMP0114` is not set to ``NEW``.
+
+      Generates custom targets for the specified steps and prevent these targets
       from having the usual dependencies applied to them. If this option is not
       specified, the default value is taken from the
       ``EP_INDEPENDENT_STEP_TARGETS`` directory property. This option is mostly
       useful for allowing individual steps to be driven independently, such as
       for a CDash setup where each step should be initiated and reported
       individually rather than as one whole build. See
-      :command:`ExternalProject_Add_Step` below for further discussion of the
-      effects of this option.
+      :command:`ExternalProject_Add_StepTargets` below for further discussion
+      of the effects of this option.
 
   **Miscellaneous Options:**
     ``LIST_SEPARATOR <sep>``
@@ -747,7 +871,7 @@ control needed to implement such step-level capabilities.
 
   ``<name>`` is the same as the name passed to the original call to
   :command:`ExternalProject_Add`. The specified ``<step>`` must not be one of
-  the pre-defined steps (``mkdir``, ``download``, ``update``, ``skip-update``,
+  the pre-defined steps (``mkdir``, ``download``, ``update``,
   ``patch``, ``configure``, ``build``, ``install`` or ``test``). The supported
   options are:
 
@@ -769,7 +893,26 @@ control needed to implement such step-level capabilities.
   ``DEPENDS <file>...``
     Files on which this custom step depends.
 
+  ``INDEPENDENT <bool>``
+    .. versionadded:: 3.19
+
+    Specifies whether this step is independent of the external dependencies
+    specified by the :command:`ExternalProject_Add`'s ``DEPENDS`` option.
+    The default is ``FALSE``.  Steps marked as independent may depend only
+    on other steps marked independent.  See policy :policy:`CMP0114`.
+
+    Note that this use of the term "independent" refers only to independence
+    from external targets specified by the ``DEPENDS`` option and is
+    orthogonal to a step's dependencies on other steps.
+
+    If a step target is created for an independent step by the
+    :command:`ExternalProject_Add` ``STEP_TARGETS`` option or by the
+    :command:`ExternalProject_Add_StepTargets` function, it will not depend
+    on the external targets, but may depend on targets for other steps.
+
   ``BYPRODUCTS <file>...``
+    .. versionadded:: 3.2
+
     Files that will be generated by this custom step but which might or might
     not have their modification time updated by subsequent builds. This list of
     files will ultimately be passed through as the ``BYPRODUCTS`` option to the
@@ -782,6 +925,8 @@ control needed to implement such step-level capabilities.
   ``EXCLUDE_FROM_MAIN <bool>``
     When enabled, this option specifies that the external project's main target
     does not depend on the custom step.
+    This may cause step targets to be created automatically for the steps on
+    which this step depends.  See policy :policy:`CMP0114`.
 
   ``WORKING_DIRECTORY <dir>``
     Specifies the working directory to set before running the custom step's
@@ -804,6 +949,12 @@ control needed to implement such step-level capabilities.
   corresponding property values defined in the original call to
   :command:`ExternalProject_Add`.
 
+  .. versionadded:: 3.3
+    Token replacement is extended to byproducts.
+
+  .. versionadded:: 3.11
+    The ``<DOWNLOAD_DIR>`` substitution token.
+
 .. command:: ExternalProject_Add_StepTargets
 
   The ``ExternalProject_Add_StepTargets()`` function generates targets for the
@@ -812,7 +963,7 @@ control needed to implement such step-level capabilities.
 
   .. code-block:: cmake
 
-    ExternalProject_Add_StepTargets(<name> [NO_DEPENDS] <step1> [<step2>...])
+    ExternalProject_Add_StepTargets(<name> <step1> [<step2>...])
 
   Creating a target for a step allows it to be used as a dependency of another
   target or to be triggered manually. Having targets for specific steps also
@@ -824,39 +975,58 @@ control needed to implement such step-level capabilities.
   through the step dependency chain, then all the previous steps will also run
   to ensure everything is up to date.
 
-  If the ``NO_DEPENDS`` option is specified, the step target will not depend on
-  the dependencies of the external project (i.e. on any dependencies of the
-  ``<name>`` custom target created by :command:`ExternalProject_Add`). This is
-  usually safe for the ``download``, ``update`` and ``patch`` steps, since they
-  do not typically require that the dependencies are updated and built. Using
-  ``NO_DEPENDS`` for any of the other pre-defined steps, however, may break
-  parallel builds. Only use ``NO_DEPENDS`` where it is certain that the named
-  steps genuinely do not have dependencies. For custom steps, consider whether
-  or not the custom commands require the dependencies to be configured, built
-  and installed.
-
   Internally, :command:`ExternalProject_Add` calls
   :command:`ExternalProject_Add_Step` to create each step. If any
-  ``STEP_TARGETS`` or ``INDEPENDENT_STEP_TARGETS`` were specified, then
-  ``ExternalProject_Add_StepTargets()`` will also be called after
-  :command:`ExternalProject_Add_Step`. ``INDEPENDENT_STEP_TARGETS`` have the
-  ``NO_DEPENDS`` option set, whereas ``STEP_TARGETS`` do not. Other than that,
-  the two options result in ``ExternalProject_Add_StepTargets()`` being called
-  in the same way. Even if a step is not mentioned in either of those two
-  options, ``ExternalProject_Add_StepTargets()`` can still be called later to
-  manually define a target for the step.
+  ``STEP_TARGETS`` were specified, then ``ExternalProject_Add_StepTargets()``
+  will also be called after :command:`ExternalProject_Add_Step`.  Even if a
+  step is not mentioned in the ``STEP_TARGETS`` option,
+  ``ExternalProject_Add_StepTargets()`` can still be called later to manually
+  define a target for the step.
 
-  The ``STEP_TARGETS`` and ``INDEPENDENT_STEP_TARGETS`` options for
-  :command:`ExternalProject_Add` are generally the easiest way to ensure
-  targets are created for specific steps of interest. For custom steps,
-  ``ExternalProject_Add_StepTargets()`` must be called explicitly if a target
-  should also be created for that custom step. An alternative to these two
-  options is to populate the ``EP_STEP_TARGETS`` and
-  ``EP_INDEPENDENT_STEP_TARGETS`` directory properties. These act as defaults
-  for the step target options and can save having to repeatedly specify the
-  same set of step targets when multiple external projects are being defined.
+  The ``STEP_TARGETS`` option for :command:`ExternalProject_Add` is generally
+  the easiest way to ensure targets are created for specific steps of interest.
+  For custom steps, ``ExternalProject_Add_StepTargets()`` must be called
+  explicitly if a target should also be created for that custom step.
+  An alternative to these two options is to populate the ``EP_STEP_TARGETS``
+  directory property.  It acts as a default for the step target options and
+  can save having to repeatedly specify the same set of step targets when
+  multiple external projects are being defined.
+
+  .. versionadded:: 3.19
+    If :policy:`CMP0114` is set to ``NEW``, step targets are fully responsible
+    for holding the custom commands implementing their steps.  The primary target
+    created by ``ExternalProject_Add`` depends on the step targets, and the
+    step targets depend on each other.  The target-level dependencies match
+    the file-level dependencies used by the custom commands for each step.
+    The targets for steps created with :command:`ExternalProject_Add_Step`'s
+    ``INDEPENDENT`` option do not depend on the external targets specified
+    by :command:`ExternalProject_Add`'s ``DEPENDS`` option.  The predefined
+    steps ``mkdir``, ``download``, ``update``, and ``patch`` are independent.
+
+  If :policy:`CMP0114` is not ``NEW``, the following deprecated behavior
+  is available:
+
+  * A deprecated ``NO_DEPENDS`` option may be specified immediately after the
+    ``<name>`` and before the first step.
+    If the ``NO_DEPENDS`` option is specified, the step target will not depend on
+    the dependencies of the external project (i.e. on any dependencies of the
+    ``<name>`` custom target created by :command:`ExternalProject_Add`). This is
+    usually safe for the ``download``, ``update`` and ``patch`` steps, since they
+    do not typically require that the dependencies are updated and built. Using
+    ``NO_DEPENDS`` for any of the other pre-defined steps, however, may break
+    parallel builds. Only use ``NO_DEPENDS`` where it is certain that the named
+    steps genuinely do not have dependencies. For custom steps, consider whether
+    or not the custom commands require the dependencies to be configured, built
+    and installed.
+
+  * The ``INDEPENDENT_STEP_TARGETS`` option for :command:`ExternalProject_Add`,
+    or the ``EP_INDEPENDENT_STEP_TARGETS`` directory property, tells the
+    function to call ``ExternalProject_Add_StepTargets()`` internally
+    using the ``NO_DEPENDS`` option for the specified steps.
 
 .. command:: ExternalProject_Add_StepDependencies
+
+  .. versionadded:: 3.2
 
   The ``ExternalProject_Add_StepDependencies()`` function can be used to add
   dependencies to a step. The dependencies added must be targets CMake already
@@ -976,59 +1146,36 @@ cmake_policy(PUSH)
 cmake_policy(SET CMP0054 NEW) # if() quoted variables not dereferenced
 cmake_policy(SET CMP0057 NEW) # if() supports IN_LIST
 
-# Pre-compute a regex to match documented keywords for each command.
-math(EXPR _ep_documentation_line_count "${CMAKE_CURRENT_LIST_LINE} - 4")
-file(STRINGS "${CMAKE_CURRENT_LIST_FILE}" lines
-     LIMIT_COUNT ${_ep_documentation_line_count}
-     REGEX "^\\.\\. command:: [A-Za-z0-9_]+|^ +``[A-Z0-9_]+ [^`]*``$")
-foreach(line IN LISTS lines)
-  if("${line}" MATCHES "^\\.\\. command:: ([A-Za-z0-9_]+)")
-    if(_ep_func)
-      string(APPEND _ep_keywords_${_ep_func} ")$")
-    endif()
-    set(_ep_func "${CMAKE_MATCH_1}")
-    #message("function [${_ep_func}]")
-    set(_ep_keywords_${_ep_func} "^(")
-    set(_ep_keyword_sep)
-  elseif("${line}" MATCHES "^ +``([A-Z0-9_]+) [^`]*``$")
-    set(_ep_key "${CMAKE_MATCH_1}")
-    # COMMAND should never be included as a keyword,
-    # for ExternalProject_Add(), as it is treated as a
-    # special case by argument parsing as an extension
-    # of a previous ..._COMMAND
-    if("x${_ep_key}x" STREQUAL "xCOMMANDx" AND
-       "x${_ep_func}x" STREQUAL "xExternalProject_Addx")
-      continue()
-    endif()
-    #message("  keyword [${_ep_key}]")
-    string(APPEND _ep_keywords_${_ep_func}
-      "${_ep_keyword_sep}${_ep_key}")
-    set(_ep_keyword_sep "|")
-  endif()
-endforeach()
-if(_ep_func)
-  string(APPEND _ep_keywords_${_ep_func} ")$")
-endif()
+macro(_ep_get_hash_algos out_var)
+  set(${out_var}
+    MD5
+    SHA1
+    SHA224
+    SHA256
+    SHA384
+    SHA512
+    SHA3_224
+    SHA3_256
+    SHA3_384
+    SHA3_512
+  )
+endmacro()
 
-# Save regex matching supported hash algorithm names.
-set(_ep_hash_algos "MD5|SHA1|SHA224|SHA256|SHA384|SHA512|SHA3_224|SHA3_256|SHA3_384|SHA3_512")
-set(_ep_hash_regex "^(${_ep_hash_algos})=([0-9A-Fa-f]+)$")
+macro(_ep_get_hash_regex out_var)
+  _ep_get_hash_algos(${out_var})
+  list(JOIN ${out_var} "|" ${out_var})
+  set(${out_var} "^(${${out_var}})=([0-9A-Fa-f]+)$")
+endmacro()
 
-set(_ExternalProject_SELF "${CMAKE_CURRENT_LIST_FILE}")
-get_filename_component(_ExternalProject_SELF_DIR "${_ExternalProject_SELF}" PATH)
-
-function(_ep_parse_arguments f name ns args)
+function(_ep_parse_arguments f keywords name ns args)
   # Transfer the arguments to this function into target properties for the
   # new custom target we just added so that we can set up all the build steps
   # correctly based on target properties.
   #
-  # We loop through ARGN and consider the namespace starting with an
+  # Because some keywords can be repeated, we can't use cmake_parse_arguments().
+  # Instead, we loop through ARGN and consider the namespace starting with an
   # upper-case letter followed by at least two more upper-case letters,
   # numbers or underscores to be keywords.
-
-  if(NOT DEFINED _ExternalProject_SELF)
-    message(FATAL_ERROR "error: ExternalProject module must be explicitly included before using ${f} function")
-  endif()
 
   set(key)
 
@@ -1038,7 +1185,7 @@ function(_ep_parse_arguments f name ns args)
     if(arg MATCHES "^[A-Z][A-Z0-9_][A-Z0-9_]+$" AND
         NOT (("x${arg}x" STREQUAL "x${key}x") AND ("x${key}x" STREQUAL "xCOMMANDx")) AND
         NOT arg MATCHES "^(TRUE|FALSE)$")
-      if(_ep_keywords_${f} AND arg MATCHES "${_ep_keywords_${f}}")
+      if(arg IN_LIST keywords)
         set(is_value 0)
       endif()
     endif()
@@ -1063,9 +1210,6 @@ function(_ep_parse_arguments f name ns args)
       endif()
     else()
       set(key "${arg}")
-      if(key MATCHES GIT)
-       get_property(have_key TARGET ${name} PROPERTY ${ns}${key} SET)
-      endif()
     endif()
   endforeach()
 endfunction()
@@ -1287,20 +1431,23 @@ function(_ep_write_gitupdate_script script_filename git_EXECUTABLE git_tag git_r
   if("${git_tag}" STREQUAL "")
     message(FATAL_ERROR "Tag for git checkout should not be empty.")
   endif()
-  if(NOT GIT_VERSION_STRING VERSION_LESS 1.7.6)
-    set(git_stash_save_options --all --quiet)
-  else()
-    set(git_stash_save_options --quiet)
+  set(git_stash_save_options --quiet)
+  if(GIT_VERSION_STRING VERSION_GREATER_EQUAL 1.7.7)
+    # This avoids stashing files covered by .gitignore
+    list(APPEND git_stash_save_options --include-untracked)
+  elseif(GIT_VERSION_STRING VERSION_GREATER_EQUAL 1.7.6)
+    # Untracked files, but also ignored files, so potentially slower
+    list(APPEND git_stash_save_options --all)
   endif()
 
   configure_file(
-      "${_ExternalProject_SELF_DIR}/ExternalProject-gitupdate.cmake.in"
+      "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ExternalProject-gitupdate.cmake.in"
       "${script_filename}"
       @ONLY
   )
 endfunction()
 
-function(_ep_write_downloadfile_script script_filename REMOTE LOCAL timeout no_progress hash tls_verify tls_cainfo userpwd http_headers netrc netrc_file)
+function(_ep_write_downloadfile_script script_filename REMOTE LOCAL timeout inactivity_timeout no_progress hash tls_verify tls_cainfo userpwd http_headers netrc netrc_file)
   if(timeout)
     set(TIMEOUT_ARGS TIMEOUT ${timeout})
     set(TIMEOUT_MSG "${timeout} seconds")
@@ -1308,6 +1455,14 @@ function(_ep_write_downloadfile_script script_filename REMOTE LOCAL timeout no_p
     set(TIMEOUT_ARGS "# no TIMEOUT")
     set(TIMEOUT_MSG "none")
   endif()
+  if(inactivity_timeout)
+    set(INACTIVITY_TIMEOUT_ARGS INACTIVITY_TIMEOUT ${inactivity_timeout})
+    set(INACTIVITY_TIMEOUT_MSG "${inactivity_timeout} seconds")
+  else()
+    set(INACTIVITY_TIMEOUT_ARGS "# no INACTIVITY_TIMEOUT")
+    set(INACTIVITY_TIMEOUT_MSG "none")
+  endif()
+
 
   if(no_progress)
     set(SHOW_PROGRESS "")
@@ -1315,6 +1470,7 @@ function(_ep_write_downloadfile_script script_filename REMOTE LOCAL timeout no_p
     set(SHOW_PROGRESS "SHOW_PROGRESS")
   endif()
 
+  _ep_get_hash_regex(_ep_hash_regex)
   if("${hash}" MATCHES "${_ep_hash_regex}")
     set(ALGO "${CMAKE_MATCH_1}")
     string(TOLOWER "${CMAKE_MATCH_2}" EXPECT_VALUE)
@@ -1395,13 +1551,14 @@ function(_ep_write_downloadfile_script script_filename REMOTE LOCAL timeout no_p
   # * USERPWD_ARGS
   # * HTTP_HEADERS_ARGS
   configure_file(
-      "${_ExternalProject_SELF_DIR}/ExternalProject-download.cmake.in"
+      "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ExternalProject-download.cmake.in"
       "${script_filename}"
       @ONLY
   )
 endfunction()
 
 function(_ep_write_verifyfile_script script_filename LOCAL hash)
+  _ep_get_hash_regex(_ep_hash_regex)
   if("${hash}" MATCHES "${_ep_hash_regex}")
     set(ALGO "${CMAKE_MATCH_1}")
     string(TOLOWER "${CMAKE_MATCH_2}" EXPECT_VALUE)
@@ -1415,7 +1572,7 @@ function(_ep_write_verifyfile_script script_filename LOCAL hash)
   # * EXPECT_VALUE
   # * LOCAL
   configure_file(
-      "${_ExternalProject_SELF_DIR}/ExternalProject-verify.cmake.in"
+      "${CMAKE_CURRENT_FUNCTION_LIST_DIR}/ExternalProject-verify.cmake.in"
       "${script_filename}"
       @ONLY
   )
@@ -1933,8 +2090,10 @@ if(result)
     message(FATAL_ERROR \"\${msg}\")
   endif()
 else()
-  set(msg \"${name} ${step} command succeeded.  See also ${logbase}-*.log\")
-  message(STATUS \"\${msg}\")
+  if(NOT \"${CMAKE_GENERATOR}\" MATCHES \"Ninja\")
+    set(msg \"${name} ${step} command succeeded.  See also ${logbase}-*.log\")
+    message(STATUS \"\${msg}\")
+  endif()
 endif()
 ")
   file(GENERATE OUTPUT "${script}" CONTENT "${code}")
@@ -1979,40 +2138,151 @@ function(_ep_get_complete_stampfile name stampfile_var)
 endfunction()
 
 
-function(ExternalProject_Add_StepTargets name)
-  set(steps ${ARGN})
-  if(ARGC GREATER 1 AND "${ARGV1}" STREQUAL "NO_DEPENDS")
-    set(no_deps 1)
-    list(REMOVE_AT steps 0)
+function(_ep_step_add_target name step no_deps)
+  if(TARGET ${name}-${step})
+    return()
   endif()
-  foreach(step ${steps})
-    if(no_deps  AND  "${step}" MATCHES "^(configure|build|install|test)$")
+  get_property(cmp0114 TARGET ${name} PROPERTY _EP_CMP0114)
+  _ep_get_step_stampfile(${name} ${step} stamp_file)
+  cmake_policy(PUSH)
+  if(cmp0114 STREQUAL "NEW")
+    # To implement CMP0114 NEW behavior with Makefile generators,
+    # we need CMP0113 NEW behavior.
+    cmake_policy(SET CMP0113 NEW)
+  endif()
+  add_custom_target(${name}-${step}
+    DEPENDS ${stamp_file})
+  cmake_policy(POP)
+  set_property(TARGET ${name}-${step} PROPERTY _EP_IS_EXTERNAL_PROJECT_STEP 1)
+  set_property(TARGET ${name}-${step} PROPERTY LABELS ${name})
+  set_property(TARGET ${name}-${step} PROPERTY FOLDER "ExternalProjectTargets/${name}")
+
+  if(cmp0114 STREQUAL "NEW")
+    # Add target-level dependencies for the step.
+    get_property(exclude_from_main TARGET ${name} PROPERTY _EP_${step}_EXCLUDE_FROM_MAIN)
+    if(NOT exclude_from_main)
+      add_dependencies(${name} ${name}-${step})
+    endif()
+    _ep_step_add_target_dependencies(${name} ${step} ${step})
+    _ep_step_add_target_dependents(${name} ${step} ${step})
+
+    get_property(independent TARGET ${name} PROPERTY _EP_${step}_INDEPENDENT)
+  else()
+    if(no_deps AND "${step}" MATCHES "^(configure|build|install|test)$")
       message(AUTHOR_WARNING "Using NO_DEPENDS for \"${step}\" step  might break parallel builds")
     endif()
-    _ep_get_step_stampfile(${name} ${step} stamp_file)
-    add_custom_target(${name}-${step}
-      DEPENDS ${stamp_file})
-    set_property(TARGET ${name}-${step} PROPERTY _EP_IS_EXTERNAL_PROJECT_STEP 1)
-    set_property(TARGET ${name}-${step} PROPERTY LABELS ${name})
-    set_property(TARGET ${name}-${step} PROPERTY FOLDER "ExternalProjectTargets/${name}")
+    set(independent ${no_deps})
+  endif()
 
-    # Depend on other external projects (target-level).
-    if(NOT no_deps)
-      get_property(deps TARGET ${name} PROPERTY _EP_DEPENDS)
-      foreach(arg IN LISTS deps)
-        add_dependencies(${name}-${step} ${arg})
-      endforeach()
+  # Depend on other external projects (target-level).
+  if(NOT independent)
+    get_property(deps TARGET ${name} PROPERTY _EP_DEPENDS)
+    foreach(arg IN LISTS deps)
+      add_dependencies(${name}-${step} ${arg})
+    endforeach()
+  endif()
+endfunction()
+
+
+function(_ep_step_add_target_dependencies name step node)
+  get_property(dependees TARGET ${name} PROPERTY _EP_${node}_INTERNAL_DEPENDEES)
+  list(REMOVE_DUPLICATES dependees)
+  foreach(dependee IN LISTS dependees)
+    get_property(exclude_from_main TARGET ${name} PROPERTY _EP_${step}_EXCLUDE_FROM_MAIN)
+    get_property(dependee_dependers TARGET ${name} PROPERTY _EP_${dependee}_INTERNAL_DEPENDERS)
+    if(exclude_from_main OR dependee_dependers MATCHES ";")
+      # The step on which our step target depends itself has
+      # dependents in multiple targes.  It needs a step target too
+      # so that there is a unique place for its custom command.
+      _ep_step_add_target("${name}" "${dependee}" "FALSE")
+    endif()
+
+    if(TARGET ${name}-${dependee})
+      add_dependencies(${name}-${step} ${name}-${dependee})
+    else()
+      _ep_step_add_target_dependencies(${name} ${step} ${dependee})
     endif()
   endforeach()
 endfunction()
 
 
+function(_ep_step_add_target_dependents name step node)
+  get_property(dependers TARGET ${name} PROPERTY _EP_${node}_INTERNAL_DEPENDERS)
+  list(REMOVE_DUPLICATES dependers)
+  foreach(depender IN LISTS dependers)
+    if(TARGET ${name}-${depender})
+      add_dependencies(${name}-${depender} ${name}-${step})
+    else()
+      _ep_step_add_target_dependents(${name} ${step} ${depender})
+    endif()
+  endforeach()
+endfunction()
+
+
+function(ExternalProject_Add_StepTargets name)
+  get_property(cmp0114 TARGET ${name} PROPERTY _EP_CMP0114)
+  set(steps ${ARGN})
+  if(ARGC GREATER 1 AND "${ARGV1}" STREQUAL "NO_DEPENDS")
+    set(no_deps 1)
+    list(REMOVE_AT steps 0)
+  else()
+    set(no_deps 0)
+  endif()
+  if(cmp0114 STREQUAL "NEW")
+    if(no_deps)
+      message(FATAL_ERROR
+        "The 'NO_DEPENDS' option is no longer allowed.  "
+        "It has been superseded by the per-step 'INDEPENDENT' option.  "
+        "See policy CMP0114."
+        )
+    endif()
+  elseif(cmp0114 STREQUAL "")
+    cmake_policy(GET_WARNING CMP0114 _cmp0114_warning)
+    string(APPEND _cmp0114_warning "\n"
+      "ExternalProject target '${name}' would depend on the targets for "
+      "step(s) '${steps}' under policy CMP0114, but this is being left out "
+      "for compatibility since the policy is not set."
+      )
+    if(no_deps)
+      string(APPEND _cmp0114_warning
+        "  Also, the NO_DEPENDS option is deprecated in favor of policy CMP0114."
+        )
+    endif()
+    message(AUTHOR_WARNING "${_cmp0114_warning}")
+  endif()
+  foreach(step ${steps})
+    _ep_step_add_target("${name}" "${step}" "${no_deps}")
+  endforeach()
+endfunction()
+
+
 function(ExternalProject_Add_Step name step)
+  get_property(cmp0114 TARGET ${name} PROPERTY _EP_CMP0114)
   _ep_get_complete_stampfile(${name} complete_stamp_file)
   _ep_get_step_stampfile(${name} ${step} stamp_file)
 
-  _ep_parse_arguments(ExternalProject_Add_Step
+  set(keywords
+    COMMAND
+    COMMENT
+    DEPENDEES
+    DEPENDERS
+    DEPENDS
+    INDEPENDENT
+    BYPRODUCTS
+    ALWAYS
+    EXCLUDE_FROM_MAIN
+    WORKING_DIRECTORY
+    LOG
+    USES_TERMINAL
+  )
+  _ep_parse_arguments(ExternalProject_Add_Step "${keywords}"
                       ${name} _EP_${step}_ "${ARGN}")
+
+  get_property(independent TARGET ${name} PROPERTY _EP_${step}_INDEPENDENT)
+  if(independent STREQUAL "")
+    set(independent FALSE)
+    set_property(TARGET ${name} PROPERTY _EP_${step}_INDEPENDENT "${independent}")
+  endif()
 
   get_property(exclude_from_main TARGET ${name} PROPERTY _EP_${step}_EXCLUDE_FROM_MAIN)
   if(NOT exclude_from_main)
@@ -2024,12 +2294,21 @@ function(ExternalProject_Add_Step name step)
 
   # Steps depending on this step.
   get_property(dependers TARGET ${name} PROPERTY _EP_${step}_DEPENDERS)
+  set_property(TARGET ${name} APPEND PROPERTY _EP_${step}_INTERNAL_DEPENDERS ${dependers})
   foreach(depender IN LISTS dependers)
+    set_property(TARGET ${name} APPEND PROPERTY _EP_${depender}_INTERNAL_DEPENDEES ${step})
     _ep_get_step_stampfile(${name} ${depender} depender_stamp_file)
     add_custom_command(APPEND
       OUTPUT ${depender_stamp_file}
       DEPENDS ${stamp_file}
       )
+    if(cmp0114 STREQUAL "NEW" AND NOT independent)
+      get_property(dep_independent TARGET ${name} PROPERTY _EP_${depender}_INDEPENDENT)
+      if(dep_independent)
+        message(FATAL_ERROR "ExternalProject '${name}' step '${depender}' is marked INDEPENDENT "
+          "but depends on step '${step}' that is not marked INDEPENDENT.")
+      endif()
+    endif()
   endforeach()
 
   # Dependencies on files.
@@ -2040,9 +2319,18 @@ function(ExternalProject_Add_Step name step)
 
   # Dependencies on steps.
   get_property(dependees TARGET ${name} PROPERTY _EP_${step}_DEPENDEES)
+  set_property(TARGET ${name} APPEND PROPERTY _EP_${step}_INTERNAL_DEPENDEES ${dependees})
   foreach(dependee IN LISTS dependees)
+    set_property(TARGET ${name} APPEND PROPERTY _EP_${dependee}_INTERNAL_DEPENDERS ${step})
     _ep_get_step_stampfile(${name} ${dependee} dependee_stamp_file)
     list(APPEND depends ${dependee_stamp_file})
+    if(cmp0114 STREQUAL "NEW" AND independent)
+      get_property(dep_independent TARGET ${name} PROPERTY _EP_${dependee}_INDEPENDENT)
+      if(NOT dep_independent)
+        message(FATAL_ERROR "ExternalProject '${name}' step '${step}' is marked INDEPENDENT "
+          "but depends on step '${dependee}' that is not marked INDEPENDENT.")
+      endif()
+    endif()
   endforeach()
 
   # The command to run.
@@ -2137,7 +2425,7 @@ function(ExternalProject_Add_Step name step)
   endif()
   foreach(st ${step_targets})
     if("${st}" STREQUAL "${step}")
-      ExternalProject_Add_StepTargets(${name} ${step})
+      _ep_step_add_target("${name}" "${step}" "FALSE")
       break()
     endif()
   endforeach()
@@ -2146,12 +2434,37 @@ function(ExternalProject_Add_Step name step)
   if(NOT independent_step_targets)
     get_property(independent_step_targets DIRECTORY PROPERTY EP_INDEPENDENT_STEP_TARGETS)
   endif()
-  foreach(st ${independent_step_targets})
-    if("${st}" STREQUAL "${step}")
-      ExternalProject_Add_StepTargets(${name} NO_DEPENDS ${step})
-      break()
+  if(cmp0114 STREQUAL "NEW")
+    if(independent_step_targets)
+      message(FATAL_ERROR
+        "ExternalProject '${name}' option 'INDEPENDENT_STEP_TARGETS' is set to\n"
+        "  ${independent_step_targets}\n"
+        "but the option is no longer allowed.  "
+        "It has been superseded by the per-step 'INDEPENDENT' option.  "
+        "See policy CMP0114."
+        )
     endif()
-  endforeach()
+  else()
+    if(independent_step_targets AND cmp0114 STREQUAL "")
+      get_property(warned TARGET ${name} PROPERTY _EP_CMP0114_WARNED_INDEPENDENT_STEP_TARGETS)
+      if(NOT warned)
+        set_property(TARGET ${name} PROPERTY _EP_CMP0114_WARNED_INDEPENDENT_STEP_TARGETS 1)
+        cmake_policy(GET_WARNING CMP0114 _cmp0114_warning)
+        string(APPEND _cmp0114_warning "\n"
+          "ExternalProject '${name}' option INDEPENDENT_STEP_TARGETS is set to\n"
+          "  ${independent_step_targets}\n"
+          "but the option is deprecated in favor of policy CMP0114."
+          )
+        message(AUTHOR_WARNING "${_cmp0114_warning}")
+      endif()
+    endif()
+    foreach(st ${independent_step_targets})
+      if("${st}" STREQUAL "${step}")
+        _ep_step_add_target("${name}" "${step}" "TRUE")
+        break()
+      endif()
+    endforeach()
+  endif()
 endfunction()
 
 
@@ -2214,6 +2527,7 @@ function(_ep_add_mkdir_command name)
   _ep_get_configuration_subdir_suffix(cfgdir)
 
   ExternalProject_Add_Step(${name} mkdir
+    INDEPENDENT TRUE
     COMMENT "Creating directories for '${name}'"
     COMMAND ${CMAKE_COMMAND} -E make_directory ${source_dir}
     COMMAND ${CMAKE_COMMAND} -E make_directory ${binary_dir}
@@ -2344,10 +2658,13 @@ function(_ep_add_download_command name)
       --non-interactive ${svn_trust_cert_args} ${svn_user_pw_args} ${src_name})
     list(APPEND depends ${stamp_dir}/${name}-svninfo.txt)
   elseif(git_repository)
-    unset(CMAKE_MODULE_PATH) # Use CMake builtin find module
-    find_package(Git QUIET)
-    if(NOT GIT_EXECUTABLE)
-      message(FATAL_ERROR "error: could not find git for clone of ${name}")
+    # FetchContent gives us these directly, so don't try to recompute them
+    if(NOT GIT_EXECUTABLE OR NOT GIT_VERSION_STRING)
+      unset(CMAKE_MODULE_PATH) # Use CMake builtin find module
+      find_package(Git QUIET)
+      if(NOT GIT_EXECUTABLE)
+        message(FATAL_ERROR "error: could not find git for clone of ${name}")
+      endif()
     endif()
 
     _ep_get_git_submodules_recurse(git_submodules_recurse)
@@ -2378,6 +2695,12 @@ function(_ep_add_download_command name)
     get_property(git_shallow TARGET ${name} PROPERTY _EP_GIT_SHALLOW)
     get_property(git_progress TARGET ${name} PROPERTY _EP_GIT_PROGRESS)
     get_property(git_config TARGET ${name} PROPERTY _EP_GIT_CONFIG)
+
+    # If git supports it, make checkouts quiet when checking out a git hash.
+    # This avoids the very noisy detached head message.
+    if(GIT_VERSION_STRING VERSION_GREATER_EQUAL 1.7.7)
+      list(PREPEND git_config advice.detachedHead=false)
+    endif()
 
     # For the download step, and the git clone operation, only the repository
     # should be recorded in a configured RepositoryInfo file. If the repo
@@ -2451,7 +2774,10 @@ function(_ep_add_download_command name)
   elseif(url)
     get_filename_component(work_dir "${source_dir}" PATH)
     get_property(hash TARGET ${name} PROPERTY _EP_URL_HASH)
+    _ep_get_hash_regex(_ep_hash_regex)
     if(hash AND NOT "${hash}" MATCHES "${_ep_hash_regex}")
+      _ep_get_hash_algos(_ep_hash_algos)
+      list(JOIN _ep_hash_algos "|" _ep_hash_algos)
       message(FATAL_ERROR "URL_HASH is set to\n  ${hash}\n"
         "but must be ALGO=value where ALGO is\n  ${_ep_hash_algos}\n"
         "and value is a hex string.")
@@ -2512,6 +2838,7 @@ function(_ep_add_download_command name)
         string(REPLACE ";" "-" fname "${fname}")
         set(file ${download_dir}/${fname})
         get_property(timeout TARGET ${name} PROPERTY _EP_TIMEOUT)
+        get_property(inactivity_timeout TARGET ${name} PROPERTY _EP_INACTIVITY_TIMEOUT)
         get_property(no_progress TARGET ${name} PROPERTY _EP_DOWNLOAD_NO_PROGRESS)
         get_property(tls_verify TARGET ${name} PROPERTY _EP_TLS_VERIFY)
         get_property(tls_cainfo TARGET ${name} PROPERTY _EP_TLS_CAINFO)
@@ -2521,7 +2848,7 @@ function(_ep_add_download_command name)
         get_property(http_password TARGET ${name} PROPERTY _EP_HTTP_PASSWORD)
         get_property(http_headers TARGET ${name} PROPERTY _EP_HTTP_HEADER)
         set(download_script "${stamp_dir}/download-${name}.cmake")
-        _ep_write_downloadfile_script("${download_script}" "${url}" "${file}" "${timeout}" "${no_progress}" "${hash}" "${tls_verify}" "${tls_cainfo}" "${http_username}:${http_password}" "${http_headers}" "${netrc}" "${netrc_file}")
+        _ep_write_downloadfile_script("${download_script}" "${url}" "${file}" "${timeout}" "${inactivity_timeout}" "${no_progress}" "${hash}" "${tls_verify}" "${tls_cainfo}" "${http_username}:${http_password}" "${http_headers}" "${netrc}" "${netrc_file}")
         set(cmd ${CMAKE_COMMAND} -P "${download_script}"
           COMMAND)
         if (no_extract)
@@ -2588,6 +2915,7 @@ function(_ep_add_download_command name)
   endforeach()
   cmake_language(EVAL CODE "
     ExternalProject_Add_Step(\${name} download
+      INDEPENDENT TRUE
       COMMENT \${comment}
       COMMAND ${__cmdQuoted}
       WORKING_DIRECTORY \${work_dir}
@@ -2663,10 +2991,13 @@ function(_ep_add_update_command name)
       --non-interactive ${svn_trust_cert_args} ${svn_user_pw_args})
     set(always 1)
   elseif(git_repository)
-    unset(CMAKE_MODULE_PATH) # Use CMake builtin find module
-    find_package(Git QUIET)
-    if(NOT GIT_EXECUTABLE)
-      message(FATAL_ERROR "error: could not find git for fetch of ${name}")
+    # FetchContent gives us these directly, so don't try to recompute them
+    if(NOT GIT_EXECUTABLE OR NOT GIT_VERSION_STRING)
+      unset(CMAKE_MODULE_PATH) # Use CMake builtin find module
+      find_package(Git QUIET)
+      if(NOT GIT_EXECUTABLE)
+        message(FATAL_ERROR "error: could not find git for fetch of ${name}")
+      endif()
     endif()
     set(work_dir ${source_dir})
     set(comment "Performing update step for '${name}'")
@@ -2751,6 +3082,7 @@ Update to Mercurial >= 2.1.1.
   endforeach()
   cmake_language(EVAL CODE "
     ExternalProject_Add_Step(${name} update
+      INDEPENDENT TRUE
       COMMENT \${comment}
       COMMAND ${__cmdQuoted}
       ALWAYS \${always}
@@ -2761,21 +3093,6 @@ Update to Mercurial >= 2.1.1.
       ${uses_terminal}
       )"
   )
-
-  if(update_disconnected)
-    _ep_get_step_stampfile(${name} skip-update skip-update_stamp_file)
-    string(REPLACE "Performing" "Skipping" comment "${comment}")
-    ExternalProject_Add_Step(${name} skip-update
-      COMMENT ${comment}
-      ALWAYS ${always}
-      EXCLUDE_FROM_MAIN 1
-      WORKING_DIRECTORY ${work_dir}
-      DEPENDEES download
-      ${log}
-      ${uses_terminal}
-    )
-    set_property(SOURCE ${skip-update_stamp_file} PROPERTY SYMBOLIC 1)
-  endif()
 
 endfunction()
 
@@ -2801,9 +3118,9 @@ function(_ep_add_patch_command name)
 
   _ep_get_update_disconnected(update_disconnected ${name})
   if(update_disconnected)
-    set(update_dep skip-update)
+    set(patch_dep download)
   else()
-    set(update_dep update)
+    set(patch_dep update)
   endif()
 
   set(__cmdQuoted)
@@ -2812,14 +3129,32 @@ function(_ep_add_patch_command name)
   endforeach()
   cmake_language(EVAL CODE "
     ExternalProject_Add_Step(${name} patch
+      INDEPENDENT TRUE
       COMMAND ${__cmdQuoted}
       WORKING_DIRECTORY \${work_dir}
-      DEPENDEES download \${update_dep}
+      DEPENDEES \${patch_dep}
       ${log}
       )"
   )
 endfunction()
 
+function(_ep_get_file_deps var name)
+  set(file_deps)
+
+  get_property(deps TARGET ${name} PROPERTY _EP_DEPENDS)
+  foreach(dep IN LISTS deps)
+    get_property(dep_type TARGET ${dep} PROPERTY TYPE)
+    if(dep_type STREQUAL "UTILITY")
+      get_property(is_ep TARGET ${dep} PROPERTY _EP_IS_EXTERNAL_PROJECT)
+      if(is_ep)
+        _ep_get_step_stampfile(${dep} "done" done_stamp_file)
+        list(APPEND file_deps ${done_stamp_file})
+      endif()
+    endif()
+  endforeach()
+
+  set("${var}" "${file_deps}" PARENT_SCOPE)
+endfunction()
 
 function(_ep_extract_configure_command var name)
   get_property(cmd_set TARGET ${name} PROPERTY _EP_CONFIGURE_COMMAND SET)
@@ -2928,19 +3263,13 @@ endfunction()
 function(_ep_add_configure_command name)
   ExternalProject_Get_Property(${name} binary_dir tmp_dir)
 
-  # Depend on other external projects (file-level).
   set(file_deps)
-  get_property(deps TARGET ${name} PROPERTY _EP_DEPENDS)
-  foreach(dep IN LISTS deps)
-    get_property(dep_type TARGET ${dep} PROPERTY TYPE)
-    if(dep_type STREQUAL "UTILITY")
-      get_property(is_ep TARGET ${dep} PROPERTY _EP_IS_EXTERNAL_PROJECT)
-      if(is_ep)
-        _ep_get_step_stampfile(${dep} "done" done_stamp_file)
-        list(APPEND file_deps ${done_stamp_file})
-      endif()
-    endif()
-  endforeach()
+  get_property(configure_handled_by_build TARGET ${name}
+               PROPERTY _EP_CONFIGURE_HANDLED_BY_BUILD)
+  if(NOT configure_handled_by_build)
+    # Depend on other external projects (file-level)
+    _ep_get_file_deps(file_deps ${name})
+  endif()
 
   _ep_extract_configure_command(cmd ${name})
 
@@ -2970,22 +3299,16 @@ function(_ep_add_configure_command name)
     set(uses_terminal "")
   endif()
 
-  _ep_get_update_disconnected(update_disconnected ${name})
-  if(update_disconnected)
-    set(update_dep skip-update)
-  else()
-    set(update_dep update)
-  endif()
-
   set(__cmdQuoted)
   foreach(__item IN LISTS cmd)
     string(APPEND __cmdQuoted " [==[${__item}]==]")
   endforeach()
   cmake_language(EVAL CODE "
     ExternalProject_Add_Step(${name} configure
+      INDEPENDENT FALSE
       COMMAND ${__cmdQuoted}
       WORKING_DIRECTORY \${binary_dir}
-      DEPENDEES \${update_dep} patch
+      DEPENDEES patch
       DEPENDS \${file_deps}
       ${log}
       ${uses_terminal}
@@ -2996,6 +3319,14 @@ endfunction()
 
 function(_ep_add_build_command name)
   ExternalProject_Get_Property(${name} binary_dir)
+
+  set(file_deps)
+  get_property(configure_handled_by_build TARGET ${name}
+               PROPERTY _EP_CONFIGURE_HANDLED_BY_BUILD)
+  if(configure_handled_by_build)
+    # Depend on other external projects (file-level)
+    _ep_get_file_deps(file_deps ${name})
+  endif()
 
   get_property(cmd_set TARGET ${name} PROPERTY _EP_BUILD_COMMAND SET)
   if(cmd_set)
@@ -3034,10 +3365,12 @@ function(_ep_add_build_command name)
   endforeach()
   cmake_language(EVAL CODE "
     ExternalProject_Add_Step(${name} build
+      INDEPENDENT FALSE
       COMMAND ${__cmdQuoted}
       BYPRODUCTS \${build_byproducts}
       WORKING_DIRECTORY \${binary_dir}
       DEPENDEES configure
+      DEPENDS \${file_deps}
       ALWAYS \${always}
       ${log}
       ${uses_terminal}
@@ -3077,6 +3410,7 @@ function(_ep_add_install_command name)
   endforeach()
   cmake_language(EVAL CODE "
     ExternalProject_Add_Step(${name} install
+      INDEPENDENT FALSE
       COMMAND ${__cmdQuoted}
       WORKING_DIRECTORY \${binary_dir}
       DEPENDEES build
@@ -3144,6 +3478,7 @@ function(_ep_add_test_command name)
     endforeach()
     cmake_language(EVAL CODE "
       ExternalProject_Add_Step(${name} test
+        INDEPENDENT FALSE
         COMMAND ${__cmdQuoted}
         WORKING_DIRECTORY \${binary_dir}
         ${dependees_args}
@@ -3161,6 +3496,21 @@ function(ExternalProject_Add name)
   cmake_policy(GET CMP0097 _EP_CMP0097
     PARENT_SCOPE # undocumented, do not use outside of CMake
     )
+  cmake_policy(GET CMP0114 cmp0114
+    PARENT_SCOPE # undocumented, do not use outside of CMake
+    )
+  if(CMAKE_XCODE_BUILD_SYSTEM VERSION_GREATER_EQUAL 12 AND NOT cmp0114 STREQUAL "NEW")
+    message(AUTHOR_WARNING
+      "Policy CMP0114 is not set to NEW.  "
+      "In order to support the Xcode \"new build system\", "
+      "this project must be updated to set policy CMP0114 to NEW."
+      "\n"
+      "Since CMake is generating for the Xcode \"new build system\", "
+      "ExternalProject_Add will use policy CMP0114's NEW behavior anyway, "
+      "but the generated build system may not match what the project intends."
+      )
+    set(cmp0114 "NEW")
+  endif()
 
   _ep_get_configuration_subdir_suffix(cfgdir)
 
@@ -3168,15 +3518,153 @@ function(ExternalProject_Add name)
   set(cmf_dir ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles)
   _ep_get_complete_stampfile(${name} complete_stamp_file)
 
+  cmake_policy(PUSH)
+  if(cmp0114 STREQUAL "NEW")
+    # To implement CMP0114 NEW behavior with Makefile generators,
+    # we need CMP0113 NEW behavior.
+    cmake_policy(SET CMP0113 NEW)
+  endif()
   # The "ALL" option to add_custom_target just tells it to not set the
   # EXCLUDE_FROM_ALL target property. Later, if the EXCLUDE_FROM_ALL
   # argument was passed, we explicitly set it for the target.
   add_custom_target(${name} ALL DEPENDS ${complete_stamp_file})
+  cmake_policy(POP)
   set_property(TARGET ${name} PROPERTY _EP_IS_EXTERNAL_PROJECT 1)
   set_property(TARGET ${name} PROPERTY LABELS ${name})
   set_property(TARGET ${name} PROPERTY FOLDER "ExternalProjectTargets/${name}")
 
-  _ep_parse_arguments(ExternalProject_Add ${name} _EP_ "${ARGN}")
+  set_property(TARGET ${name} PROPERTY _EP_CMP0114 "${cmp0114}")
+
+  set(keywords
+    #
+    # Directory options
+    #
+    PREFIX
+    TMP_DIR
+    STAMP_DIR
+    LOG_DIR
+    DOWNLOAD_DIR
+    SOURCE_DIR
+    BINARY_DIR
+    INSTALL_DIR
+    #
+    # Download step options
+    #
+    DOWNLOAD_COMMAND
+    #
+    URL
+    URL_HASH
+    URL_MD5
+    DOWNLOAD_NAME
+    DOWNLOAD_NO_EXTRACT
+    DOWNLOAD_NO_PROGRESS
+    TIMEOUT
+    INACTIVITY_TIMEOUT
+    HTTP_USERNAME
+    HTTP_PASSWORD
+    HTTP_HEADER
+    TLS_VERIFY     # Also used for git clone operations
+    TLS_CAINFO
+    NETRC
+    NETRC_FILE
+    #
+    GIT_REPOSITORY
+    GIT_TAG
+    GIT_REMOTE_NAME
+    GIT_SUBMODULES
+    GIT_SUBMODULES_RECURSE
+    GIT_SHALLOW
+    GIT_PROGRESS
+    GIT_CONFIG
+    GIT_REMOTE_UPDATE_STRATEGY
+    #
+    SVN_REPOSITORY
+    SVN_REVISION
+    SVN_USERNAME
+    SVN_PASSWORD
+    SVN_TRUST_CERT
+    #
+    HG_REPOSITORY
+    HG_TAG
+    #
+    CVS_REPOSITORY
+    CVS_MODULE
+    CVS_TAG
+    #
+    # Update step options
+    #
+    UPDATE_COMMAND
+    UPDATE_DISCONNECTED
+    #
+    # Patch step options
+    #
+    PATCH_COMMAND
+    #
+    # Configure step options
+    #
+    CONFIGURE_COMMAND
+    CMAKE_COMMAND
+    CMAKE_GENERATOR
+    CMAKE_GENERATOR_PLATFORM
+    CMAKE_GENERATOR_TOOLSET
+    CMAKE_GENERATOR_INSTANCE
+    CMAKE_ARGS
+    CMAKE_CACHE_ARGS
+    CMAKE_CACHE_DEFAULT_ARGS
+    SOURCE_SUBDIR
+    CONFIGURE_HANDLED_BY_BUILD
+    #
+    # Build step options
+    #
+    BUILD_COMMAND
+    BUILD_IN_SOURCE
+    BUILD_ALWAYS
+    BUILD_BYPRODUCTS
+    #
+    # Install step options
+    #
+    INSTALL_COMMAND
+    #
+    # Test step options
+    #
+    TEST_COMMAND
+    TEST_BEFORE_INSTALL
+    TEST_AFTER_INSTALL
+    TEST_EXCLUDE_FROM_MAIN
+    #
+    # Logging options
+    #
+    LOG_DOWNLOAD
+    LOG_UPDATE
+    LOG_PATCH
+    LOG_CONFIGURE
+    LOG_BUILD
+    LOG_INSTALL
+    LOG_TEST
+    LOG_MERGED_STDOUTERR
+    LOG_OUTPUT_ON_FAILURE
+    #
+    # Terminal access options
+    #
+    USES_TERMINAL_DOWNLOAD
+    USES_TERMINAL_UPDATE
+    USES_TERMINAL_CONFIGURE
+    USES_TERMINAL_BUILD
+    USES_TERMINAL_INSTALL
+    USES_TERMINAL_TEST
+    #
+    # Target options
+    #
+    DEPENDS
+    EXCLUDE_FROM_ALL
+    STEP_TARGETS
+    INDEPENDENT_STEP_TARGETS
+    #
+    # Miscellaneous options
+    #
+    LIST_SEPARATOR
+  )
+  _ep_parse_arguments(ExternalProject_Add "${keywords}" ${name} _EP_ "${ARGN}")
   _ep_set_directories(${name})
   _ep_get_step_stampfile(${name} "done" done_stamp_file)
   _ep_get_step_stampfile(${name} "install" install_stamp_file)

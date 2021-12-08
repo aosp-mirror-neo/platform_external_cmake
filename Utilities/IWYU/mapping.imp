@@ -21,13 +21,14 @@
   { include: [ "<wctype.h>", public, "<cwctype>", public ] },
 
   # HACK: check whether this can be removed with next iwyu release.
+  { include: [ "<bits/cxxabi_forced.h>", private, "<ctime>", public ] },
   { include: [ "<bits/shared_ptr.h>", private, "<memory>", public ] },
   { include: [ "<bits/std_function.h>", private, "<functional>", public ] },
   { include: [ "<bits/refwrap.h>", private, "<functional>", public ] },
   { include: [ "<bits/std_abs.h>", private, "<stdlib.h>", public ] },
   { include: [ "<bits/stdint-intn.h>", private, "<stdint.h>", public ] },
   { include: [ "<bits/stdint-uintn.h>", private, "<stdint.h>", public ] },
-  { include: [ "<bits/string_view.tcc>", private, "<string_view>", public ] },
+  { include: [ "<bits/string_view.tcc>", private, "<string_view>", private ] },
   { include: [ "<bits/time.h>", private, "<time.h>", public ] },
   { include: [ "<bits/types/clock_t.h>", private, "<time.h>", public ] },
   { include: [ "<bits/types/mbstate_t.h>", private, "<wchar.h>", public ] },
@@ -96,9 +97,11 @@
   { symbol: [ "std::enable_if<true, std::chrono::duration<long, std::ratio<1, 1> > >::type", private, "\"cmConfigure.h\"", public ] },
   { symbol: [ "std::enable_if<true, std::chrono::duration<long, std::ratio<60, 1> > >::type", private, "\"cmConfigure.h\"", public ] },
   { symbol: [ "std::enable_if<true, std::chrono::duration<long, std::ratio<1, 1000> > >::type", private, "\"cmConfigure.h\"", public ] },
+  { symbol: [ "__gnu_cxx::__enable_if<true, bool>::__type", private, "\"cmConfigure.h\"", public ] },
 
   # Wrappers for 3rd-party libraries
   { include: [ "@<.*curl/curlver.h>", private, "<cm3p/curl/curl.h>", public ] },
+  { include: [ "@<.*json/config.h>", private, "<cm3p/json/value.h>", public ] },
   { include: [ "@<.*json/forwards.h>", private, "<cm3p/json/value.h>", public ] },
   { include: [ "@<.*uv/.+\\.h>", private, "<cm3p/uv.h>", public ] },
   { include: [ "@<.*expat_external.h>", private, "<cm3p/expat.h>", public ] },
@@ -115,6 +118,11 @@
   { include: [ "<istream>", public, "\"cmsys/FStream.hxx\"", public ] },
   { include: [ "<ostream>", public, "\"cmsys/FStream.hxx\"", public ] },
   { include: [ "<fstream>", public, "\"cmsys/FStream.hxx\"", public ] },
+
+  { include: [ "<filesystem>", private, "<cm/filesystem>", public ] },
+  { include: [ "<optional>", private, "<cm/optional>", public ] },
+  { include: [ "<shared_mutex>", private, "<cm/shared_mutex>", public ] },
+  { include: [ "<string_view>", private, "<cm/string_view>", public ] },
 
   # major and minor are used as macro arguments. Those are false matches.
   { symbol: [ "major", private, "\"cmVersion.h\"", public ] },

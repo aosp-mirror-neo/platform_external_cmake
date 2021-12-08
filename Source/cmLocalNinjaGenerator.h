@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmLocalNinjaGenerator_h
-#define cmLocalNinjaGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -11,7 +10,9 @@
 #include <string>
 #include <vector>
 
+#include "cmListFileCache.h"
 #include "cmLocalCommonGenerator.h"
+#include "cmLocalGenerator.h"
 #include "cmNinjaTypes.h"
 #include "cmOutputConverter.h"
 
@@ -60,16 +61,24 @@ public:
   }
 
   std::string BuildCommandLine(
-    std::vector<std::string> const& cmdLines,
+    std::vector<std::string> const& cmdLines, std::string const& outputConfig,
+    std::string const& commandConfig,
     std::string const& customStep = std::string(),
     cmGeneratorTarget const* target = nullptr) const;
 
   void AppendTargetOutputs(cmGeneratorTarget* target, cmNinjaDeps& outputs,
                            const std::string& config);
-  void AppendTargetDepends(
-    cmGeneratorTarget* target, cmNinjaDeps& outputs, const std::string& config,
-    const std::string& fileConfig,
-    cmNinjaTargetDepends depends = DependOnTargetArtifact);
+  void AppendTargetDepends(cmGeneratorTarget* target, cmNinjaDeps& outputs,
+                           const std::string& config,
+                           const std::string& fileConfig,
+                           cmNinjaTargetDepends depends);
+
+  std::string CreateUtilityOutput(std::string const& targetName,
+                                  std::vector<std::string> const& byproducts,
+                                  cmListFileBacktrace const& bt) override;
+
+  std::vector<cmCustomCommandGenerator> MakeCustomCommandGenerators(
+    cmCustomCommand const& cc, std::string const& config) override;
 
   void AddCustomCommandTarget(cmCustomCommand const* cc,
                               cmGeneratorTarget* target);
@@ -79,11 +88,13 @@ public:
                                cmNinjaDeps& ninjaDeps,
                                const std::string& config);
 
+  bool HasUniqueByproducts(std::vector<std::string> const& byproducts,
+                           cmListFileBacktrace const& bt);
+
 protected:
   std::string ConvertToIncludeReference(
-    std::string const& path,
-    cmOutputConverter::OutputFormat format = cmOutputConverter::SHELL,
-    bool forceFullPaths = false) override;
+    std::string const& path, IncludePathStyle pathStyle,
+    cmOutputConverter::OutputFormat format) override;
 
 private:
   cmGeneratedFileStream& GetImplFileStream(const std::string& config) const;
@@ -97,18 +108,21 @@ private:
                                        const std::string& config);
   void WriteNinjaFilesInclusionConfig(std::ostream& os);
   void WriteNinjaFilesInclusionCommon(std::ostream& os);
+  void WriteNinjaWorkDir(std::ostream& os);
   void WriteProcessedMakefile(std::ostream& os);
   void WritePools(std::ostream& os);
 
-  void WriteCustomCommandBuildStatement(cmCustomCommand const* cc,
-                                        const cmNinjaDeps& orderOnlyDeps,
-                                        const std::string& config);
+  void WriteCustomCommandBuildStatement(
+    cmCustomCommand const* cc, const std::set<cmGeneratorTarget*>& targets,
+    const std::string& config);
 
   void WriteCustomCommandBuildStatements(const std::string& config);
 
   std::string MakeCustomLauncher(cmCustomCommandGenerator const& ccg);
 
   std::string WriteCommandScript(std::vector<std::string> const& cmdLines,
+                                 std::string const& outputConfig,
+                                 std::string const& commandConfig,
                                  std::string const& customStep,
                                  cmGeneratorTarget const* target) const;
 
@@ -121,5 +135,3 @@ private:
   CustomCommandTargetMap CustomCommandTargets;
   std::vector<cmCustomCommand const*> CustomCommands;
 };
-
-#endif // ! cmLocalNinjaGenerator_h

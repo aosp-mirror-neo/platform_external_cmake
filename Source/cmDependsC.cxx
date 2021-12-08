@@ -7,10 +7,12 @@
 #include "cmsys/FStream.hxx"
 
 #include "cmFileTime.h"
+#include "cmGlobalUnixMakefileGenerator3.h"
 #include "cmLocalUnixMakefileGenerator3.h"
 #include "cmMakefile.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 
 #define INCLUDE_REGEX_LINE                                                    \
   "^[ \t]*[#%][ \t]*(include|import)[ \t]*[<\"]([^\">]+)([\">])"
@@ -38,13 +40,13 @@ cmDependsC::cmDependsC(cmLocalUnixMakefileGenerator3* lg,
   std::string complainRegex = "^$";
   {
     std::string scanRegexVar = cmStrCat("CMAKE_", lang, "_INCLUDE_REGEX_SCAN");
-    if (const char* sr = mf->GetDefinition(scanRegexVar)) {
-      scanRegex = sr;
+    if (cmValue sr = mf->GetDefinition(scanRegexVar)) {
+      scanRegex = *sr;
     }
     std::string complainRegexVar =
       cmStrCat("CMAKE_", lang, "_INCLUDE_REGEX_COMPLAIN");
-    if (const char* cr = mf->GetDefinition(complainRegexVar)) {
-      complainRegex = cr;
+    if (cmValue cr = mf->GetDefinition(complainRegexVar)) {
+      complainRegex = *cr;
     }
   }
 
@@ -88,13 +90,10 @@ bool cmDependsC::WriteDependencies(const std::set<std::string>& sources,
   std::set<std::string> dependencies;
   bool haveDeps = false;
 
-  std::string binDir = this->LocalGenerator->GetBinaryDirectory();
-
   // Compute a path to the object file to write to the internal depend file.
   // Any existing content of the internal depend file has already been
   // loaded in ValidDeps with this path as a key.
-  std::string obj_i =
-    this->LocalGenerator->MaybeConvertToRelativePath(binDir, obj);
+  std::string obj_i = this->LocalGenerator->MaybeRelativeToTopBinDir(obj);
 
   if (this->ValidDeps != nullptr) {
     auto const tmpIt = this->ValidDeps->find(obj_i);
@@ -214,16 +213,28 @@ bool cmDependsC::WriteDependencies(const std::set<std::string>& sources,
   // directory.  We must do the same here.
   std::string obj_m = this->LocalGenerator->ConvertToMakefilePath(obj_i);
   internalDepends << obj_i << '\n';
-
-  for (std::string const& dep : dependencies) {
-    makeDepends << obj_m << ": "
-                << this->LocalGenerator->ConvertToMakefilePath(
-                     this->LocalGenerator->MaybeConvertToRelativePath(binDir,
-                                                                      dep))
-                << '\n';
-    internalDepends << ' ' << dep << '\n';
+  if (!dependencies.empty()) {
+    const auto& lineContinue = static_cast<cmGlobalUnixMakefileGenerator3*>(
+                                 this->LocalGenerator->GetGlobalGenerator())
+                                 ->LineContinueDirective;
+    bool supportLongLineDepend = static_cast<cmGlobalUnixMakefileGenerator3*>(
+                                   this->LocalGenerator->GetGlobalGenerator())
+                                   ->SupportsLongLineDependencies();
+    if (supportLongLineDepend) {
+      makeDepends << obj_m << ':';
+    }
+    for (std::string const& dep : dependencies) {
+      std::string dependee = this->LocalGenerator->ConvertToMakefilePath(
+        this->LocalGenerator->MaybeRelativeToTopBinDir(dep));
+      if (supportLongLineDepend) {
+        makeDepends << ' ' << lineContinue << ' ' << dependee;
+      } else {
+        makeDepends << obj_m << ": " << dependee << '\n';
+      }
+      internalDepends << ' ' << dep << '\n';
+    }
+    makeDepends << '\n';
   }
-  makeDepends << '\n';
 
   return true;
 }

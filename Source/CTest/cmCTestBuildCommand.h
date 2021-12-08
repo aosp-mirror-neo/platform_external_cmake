@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCTestBuildCommand_h
-#define cmCTestBuildCommand_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -61,6 +60,5 @@ protected:
   std::string Configuration;
   std::string Flags;
   std::string ProjectName;
+  std::string ParallelLevel;
 };
-
-#endif

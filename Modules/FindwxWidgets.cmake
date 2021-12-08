@@ -14,6 +14,12 @@ package:
 
 find_package(wxWidgets COMPONENTS core base ... OPTIONAL_COMPONENTS net ...)
 
+.. versionadded:: 3.4
+  Support for :command:`find_package` version argument; ``webview`` component.
+
+.. versionadded:: 3.14
+  ``OPTIONAL_COMPONENTS`` support.
+
 There are two search branches: a windows style and a unix style.  For
 windows, the following variables are searched for and set to defaults
 in case of multiple choices.  Change them if the defaults are not
@@ -82,6 +88,9 @@ and unix style:
                                "`wx-config --cxxflags`".
   wxWidgets_USE_FILE         - Convenience include file.
 
+.. versionadded:: 3.11
+  The following environment variables can be used as hints: ``WX_CONFIG``,
+  ``WXRC_CMD``.
 
 
 Sample usage:
@@ -760,8 +769,16 @@ else()
     # UNIX: Start actual work.
     #-----------------------------------------------------------------
     # Support cross-compiling, only search in the target platform.
+    #
+    # Look for wx-config -- this can be set in the environment,
+    # or try versioned and toolchain-versioned variants of the -config
+    # executable as well.
     find_program(wxWidgets_CONFIG_EXECUTABLE
-      NAMES $ENV{WX_CONFIG} wx-config wx-config-3.1 wx-config-3.0 wx-config-2.9 wx-config-2.8
+      NAMES
+        $ENV{WX_CONFIG}
+        wx-config
+        wx-config-3.1 wx-config-3.0 wx-config-2.9 wx-config-2.8
+        wxgtk3u-3.1-config wxgtk3u-3.0-config wxgtk2u-2.8-config
       DOC "Location of wxWidgets library configuration provider binary (wx-config)."
       ONLY_CMAKE_FIND_ROOT_PATH
       )

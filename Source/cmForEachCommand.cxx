@@ -17,6 +17,7 @@
 #include <utility>
 
 #include <cm/memory>
+#include <cm/optional>
 #include <cm/string_view>
 #include <cmext/string_view>
 
@@ -25,9 +26,11 @@
 #include "cmListFileCache.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
+#include "cmPolicies.h"
 #include "cmRange.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 
 namespace {
 class cmForEachFunctionBlocker : public cmFunctionBlocker
@@ -89,7 +92,7 @@ bool cmForEachFunctionBlocker::ArgumentsMatch(cmListFileFunction const& lff,
                                               cmMakefile& mf) const
 {
   std::vector<std::string> expandedArguments;
-  mf.ExpandArguments(lff.Arguments, expandedArguments);
+  mf.ExpandArguments(lff.Arguments(), expandedArguments);
   return expandedArguments.empty() ||
     expandedArguments.front() == this->Args.front();
 }
@@ -112,9 +115,11 @@ bool cmForEachFunctionBlocker::ReplayItems(
 
   // At end of for each execute recorded commands
   // store the old value
-  std::string oldDef;
-  if (auto d = mf.GetDefinition(this->Args.front())) {
-    oldDef = d;
+  cm::optional<std::string> oldDef;
+  if (mf.GetPolicyStatus(cmPolicies::CMP0124) != cmPolicies::NEW) {
+    oldDef = mf.GetSafeDefinition(this->Args.front());
+  } else if (mf.IsNormalDefinitionSet(this->Args.front())) {
+    oldDef = *mf.GetDefinition(this->Args.front());
   }
 
   auto restore = false;
@@ -130,9 +135,14 @@ bool cmForEachFunctionBlocker::ReplayItems(
   }
 
   if (restore) {
-    // restore the variable to its prior value
-    mf.AddDefinition(this->Args.front(), oldDef);
+    if (oldDef) {
+      // restore the variable to its prior value
+      mf.AddDefinition(this->Args.front(), *oldDef);
+    } else {
+      mf.RemoveDefinition(this->Args.front());
+    }
   }
+
   return true;
 }
 
@@ -184,10 +194,15 @@ bool cmForEachFunctionBlocker::ReplayZipLists(
   assert("Sanity check" && iterationVars.size() == values.size());
 
   // Store old values for iteration variables
-  std::map<std::string, std::string> oldDefs;
+  std::map<std::string, cm::optional<std::string>> oldDefs;
   for (auto i = 0u; i < values.size(); ++i) {
-    if (auto d = mf.GetDefinition(iterationVars[i])) {
-      oldDefs.emplace(iterationVars[i], d);
+    const auto& varName = iterationVars[i];
+    if (mf.GetPolicyStatus(cmPolicies::CMP0124) != cmPolicies::NEW) {
+      oldDefs.emplace(varName, mf.GetSafeDefinition(varName));
+    } else if (mf.IsNormalDefinitionSet(varName)) {
+      oldDefs.emplace(varName, *mf.GetDefinition(varName));
+    } else {
+      oldDefs.emplace(varName, cm::nullopt);
     }
   }
 
@@ -225,7 +240,11 @@ bool cmForEachFunctionBlocker::ReplayZipLists(
   // Restore the variables to its prior value
   if (restore) {
     for (auto const& p : oldDefs) {
-      mf.AddDefinition(p.first, p.second);
+      if (p.second) {
+        mf.AddDefinition(p.first, *p.second);
+      } else {
+        mf.RemoveDefinition(p.first);
+      }
     }
   }
   return true;
@@ -362,6 +381,12 @@ bool TryParseInteger(cmExecutionStatus& status, const std::string& str, int& i)
   } catch (std::invalid_argument&) {
     std::ostringstream e;
     e << "Invalid integer: '" << str << "'";
+    status.SetError(e.str());
+    cmSystemTools::SetFatalErrorOccured();
+    return false;
+  } catch (std::out_of_range&) {
+    std::ostringstream e;
+    e << "Integer out of range: '" << str << "'";
     status.SetError(e.str());
     cmSystemTools::SetFatalErrorOccured();
     return false;

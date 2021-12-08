@@ -20,13 +20,12 @@
 #include "cmMakefile.h"
 #include "cmMakefileTargetGenerator.h"
 #include "cmOutputConverter.h"
-#include "cmProperty.h"
 #include "cmState.h"
-#include "cmStateDirectory.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmTargetDepend.h"
+#include "cmValue.h"
 #include "cmake.h"
 
 cmGlobalUnixMakefileGenerator3::cmGlobalUnixMakefileGenerator3(cmake* cm)
@@ -44,6 +43,7 @@ cmGlobalUnixMakefileGenerator3::cmGlobalUnixMakefileGenerator3(cmake* cm)
 #endif
 
   this->IncludeDirective = "include";
+  this->LineContinueDirective = "\\\n";
   this->DefineWindowsNULL = false;
   this->PassMakeflags = false;
   this->UnixCD = true;
@@ -76,36 +76,6 @@ void cmGlobalUnixMakefileGenerator3::GetDocumentation(
 {
   entry.Name = cmGlobalUnixMakefileGenerator3::GetActualName();
   entry.Brief = "Generates standard UNIX makefiles.";
-}
-
-std::string cmGlobalUnixMakefileGenerator3::GetEditCacheCommand() const
-{
-  // If generating for an extra IDE, the edit_cache target cannot
-  // launch a terminal-interactive tool, so always use cmake-gui.
-  if (!this->GetExtraGeneratorName().empty()) {
-    return cmSystemTools::GetCMakeGUICommand();
-  }
-
-  // Use an internal cache entry to track the latest dialog used
-  // to edit the cache, and use that for the edit_cache target.
-  cmake* cm = this->GetCMakeInstance();
-  std::string editCacheCommand = cm->GetCMakeEditCommand();
-  if (!cm->GetCacheDefinition("CMAKE_EDIT_COMMAND") ||
-      !editCacheCommand.empty()) {
-    if (editCacheCommand.empty()) {
-      editCacheCommand = cmSystemTools::GetCMakeCursesCommand();
-    }
-    if (editCacheCommand.empty()) {
-      editCacheCommand = cmSystemTools::GetCMakeGUICommand();
-    }
-    if (!editCacheCommand.empty()) {
-      cm->AddCacheEntry("CMAKE_EDIT_COMMAND", editCacheCommand.c_str(),
-                        "Path to cache edit program executable.",
-                        cmStateEnums::INTERNAL);
-    }
-  }
-  const char* edit_cmd = cm->GetCacheDefinition("CMAKE_EDIT_COMMAND");
-  return edit_cmd ? edit_cmd : "";
 }
 
 void cmGlobalUnixMakefileGenerator3::ComputeTargetObjectDirectory(
@@ -143,10 +113,10 @@ void cmGlobalUnixMakefileGenerator3::Generate()
     total += pmi.second.NumberOfActions;
   }
 
-  // write each target's progress.make this loop is done twice. Bascially the
+  // write each target's progress.make this loop is done twice. Basically the
   // Generate pass counts all the actions, the first loop below determines
   // how many actions have progress updates for each target and writes to
-  // corrrect variable values for everything except the all targets. The
+  // correct variable values for everything except the all targets. The
   // second loop actually writes out correct values for the all targets as
   // well. This is because the all targets require more information that is
   // computed in the first loop.
@@ -317,16 +287,13 @@ void cmGlobalUnixMakefileGenerator3::WriteMainCMakefile()
     const auto& lg = cm::static_reference_cast<cmLocalUnixMakefileGenerator3>(
       this->LocalGenerators[0]);
 
-    const std::string& currentBinDir = lg.GetCurrentBinaryDirectory();
     // Save the list to the cmake file.
     cmakefileStream
       << "# The top level Makefile was generated from the following files:\n"
       << "set(CMAKE_MAKEFILE_DEPENDS\n"
       << "  \"CMakeCache.txt\"\n";
     for (std::string const& f : lfiles) {
-      cmakefileStream << "  \""
-                      << lg.MaybeConvertToRelativePath(currentBinDir, f)
-                      << "\"\n";
+      cmakefileStream << "  \"" << lg.MaybeRelativeToCurBinDir(f) << "\"\n";
     }
     cmakefileStream << "  )\n\n";
 
@@ -338,16 +305,10 @@ void cmGlobalUnixMakefileGenerator3::WriteMainCMakefile()
     // Set the corresponding makefile in the cmake file.
     cmakefileStream << "# The corresponding makefile is:\n"
                     << "set(CMAKE_MAKEFILE_OUTPUTS\n"
-                    << "  \""
-                    << lg.MaybeConvertToRelativePath(currentBinDir,
-                                                     makefileName)
+                    << "  \"" << lg.MaybeRelativeToCurBinDir(makefileName)
                     << "\"\n"
-                    << "  \""
-                    << lg.MaybeConvertToRelativePath(currentBinDir, check)
-                    << "\"\n";
+                    << "  \"" << lg.MaybeRelativeToCurBinDir(check) << "\"\n";
     cmakefileStream << "  )\n\n";
-
-    const std::string& binDir = lg.GetBinaryDirectory();
 
     // CMake must rerun if a byproduct is missing.
     cmakefileStream << "# Byproducts of CMake generate step:\n"
@@ -358,14 +319,12 @@ void cmGlobalUnixMakefileGenerator3::WriteMainCMakefile()
     for (const auto& localGen : this->LocalGenerators) {
       for (std::string const& outfile :
            localGen->GetMakefile()->GetOutputFiles()) {
-        cmakefileStream << "  \""
-                        << lg.MaybeConvertToRelativePath(binDir, outfile)
+        cmakefileStream << "  \"" << lg.MaybeRelativeToTopBinDir(outfile)
                         << "\"\n";
       }
       tmpStr = cmStrCat(localGen->GetCurrentBinaryDirectory(),
                         "/CMakeFiles/CMakeDirectoryInformation.cmake");
-      cmakefileStream << "  \""
-                      << localGen->MaybeConvertToRelativePath(binDir, tmpStr)
+      cmakefileStream << "  \"" << localGen->MaybeRelativeToTopBinDir(tmpStr)
                       << "\"\n";
     }
     cmakefileStream << "  )\n\n";
@@ -387,12 +346,8 @@ void cmGlobalUnixMakefileGenerator3::WriteMainCMakefileLanguageRules(
       cm::static_reference_cast<cmLocalUnixMakefileGenerator3>(lGenerator);
     // for all of out targets
     for (const auto& tgt : lg.GetGeneratorTargets()) {
-      if ((tgt->GetType() == cmStateEnums::EXECUTABLE) ||
-          (tgt->GetType() == cmStateEnums::STATIC_LIBRARY) ||
-          (tgt->GetType() == cmStateEnums::SHARED_LIBRARY) ||
-          (tgt->GetType() == cmStateEnums::MODULE_LIBRARY) ||
-          (tgt->GetType() == cmStateEnums::OBJECT_LIBRARY) ||
-          (tgt->GetType() == cmStateEnums::UTILITY)) {
+      if (tgt->IsInBuildSystem() &&
+          tgt->GetType() != cmStateEnums::GLOBAL_TARGET) {
         std::string tname = cmStrCat(lg.GetRelativeTargetDirectory(tgt.get()),
                                      "/DependInfo.cmake");
         cmSystemTools::ConvertToUnixSlashes(tname);
@@ -416,7 +371,7 @@ void cmGlobalUnixMakefileGenerator3::WriteDirectoryRule2(
   std::vector<std::string> depends;
   for (DirectoryTarget::Target const& t : dt.Targets) {
     // Add this to the list of depends rules in this directory.
-    if ((!check_all || !t.ExcludeFromAll) &&
+    if ((!check_all || t.ExcludedFromAllInConfigs.empty()) &&
         (!check_relink ||
          t.GT->NeedRelinkBeforeInstall(lg->GetConfigName()))) {
       // The target may be from a different directory; use its local gen.
@@ -461,9 +416,8 @@ void cmGlobalUnixMakefileGenerator3::WriteDirectoryRules2(
   auto* lg = static_cast<cmLocalUnixMakefileGenerator3*>(dt.LG);
   // Begin the directory-level rules section.
   {
-    std::string dir =
-      cmSystemTools::ConvertToOutputPath(lg->MaybeConvertToRelativePath(
-        lg->GetBinaryDirectory(), lg->GetCurrentBinaryDirectory()));
+    std::string dir = cmSystemTools::ConvertToOutputPath(
+      lg->MaybeRelativeToTopBinDir(lg->GetCurrentBinaryDirectory()));
     lg->WriteDivider(ruleFileStream);
     if (lg->IsRootMakefile()) {
       ruleFileStream << "# Directory level rules for the build root directory";
@@ -567,21 +521,6 @@ cmGlobalUnixMakefileGenerator3::GenerateBuildCommand(
   bool fast, int jobs, bool verbose,
   std::vector<std::string> const& makeOptions)
 {
-  std::unique_ptr<cmMakefile> mfu;
-  cmMakefile* mf;
-  if (!this->Makefiles.empty()) {
-    mf = this->Makefiles[0].get();
-  } else {
-    cmStateSnapshot snapshot = this->CMakeInstance->GetCurrentSnapshot();
-    snapshot.GetDirectory().SetCurrentSource(
-      this->CMakeInstance->GetHomeDirectory());
-    snapshot.GetDirectory().SetCurrentBinary(
-      this->CMakeInstance->GetHomeOutputDirectory());
-    snapshot.SetDefaultDefinitions();
-    mfu = cm::make_unique<cmMakefile>(this, snapshot);
-    mf = mfu.get();
-  }
-
   GeneratedMakeCommand makeCommand;
 
   // Make it possible to set verbosity also from command line
@@ -593,10 +532,16 @@ cmGlobalUnixMakefileGenerator3::GenerateBuildCommand(
   }
   makeCommand.Add(this->SelectMakeProgram(makeProgram));
 
+  // Explicitly tell the make tool to use the Makefile written by
+  // cmLocalUnixMakefileGenerator3::WriteLocalMakefile
+  makeCommand.Add("-f");
+  makeCommand.Add("Makefile");
+
   if (jobs != cmake::NO_BUILD_PARALLEL_LEVEL) {
-    makeCommand.Add("-j");
-    if (jobs != cmake::DEFAULT_BUILD_PARALLEL_LEVEL) {
-      makeCommand.Add(std::to_string(jobs));
+    if (jobs == cmake::DEFAULT_BUILD_PARALLEL_LEVEL) {
+      makeCommand.Add("-j");
+    } else {
+      makeCommand.Add("-j" + std::to_string(jobs));
     }
   }
 
@@ -606,9 +551,6 @@ cmGlobalUnixMakefileGenerator3::GenerateBuildCommand(
       if (fast) {
         tname += "/fast";
       }
-      tname =
-        mf->GetStateSnapshot().GetDirectory().ConvertToRelPathIfNotContained(
-          mf->GetState()->GetBinaryDirectory(), tname);
       cmSystemTools::ConvertToOutputSlashes(tname);
       makeCommand.Add(std::move(tname));
     }
@@ -635,17 +577,12 @@ void cmGlobalUnixMakefileGenerator3::WriteConvenienceRules(
     for (const auto& gtarget : lg.GetGeneratorTargets()) {
       // Don't emit the same rule twice (e.g. two targets with the same
       // simple name)
-      int type = gtarget->GetType();
       std::string name = gtarget->GetName();
       if (!name.empty() && emitted.insert(name).second &&
           // Handle user targets here.  Global targets are handled in
           // the local generator on a per-directory basis.
-          ((type == cmStateEnums::EXECUTABLE) ||
-           (type == cmStateEnums::STATIC_LIBRARY) ||
-           (type == cmStateEnums::SHARED_LIBRARY) ||
-           (type == cmStateEnums::MODULE_LIBRARY) ||
-           (type == cmStateEnums::OBJECT_LIBRARY) ||
-           (type == cmStateEnums::UTILITY))) {
+          (gtarget->IsInBuildSystem() &&
+           gtarget->GetType() != cmStateEnums::GLOBAL_TARGET)) {
         // Add a rule to build the target by name.
         lg.WriteDivider(ruleFileStream);
         ruleFileStream << "# Target rules for targets named " << name
@@ -709,15 +646,10 @@ void cmGlobalUnixMakefileGenerator3::WriteConvenienceRules2(
 
   // for each target Generate the rule files for each target.
   for (const auto& gtarget : lg.GetGeneratorTargets()) {
-    int type = gtarget->GetType();
     std::string name = gtarget->GetName();
     if (!name.empty() &&
-        ((type == cmStateEnums::EXECUTABLE) ||
-         (type == cmStateEnums::STATIC_LIBRARY) ||
-         (type == cmStateEnums::SHARED_LIBRARY) ||
-         (type == cmStateEnums::MODULE_LIBRARY) ||
-         (type == cmStateEnums::OBJECT_LIBRARY) ||
-         (type == cmStateEnums::UTILITY))) {
+        (gtarget->IsInBuildSystem() &&
+         gtarget->GetType() != cmStateEnums::GLOBAL_TARGET)) {
       std::string makefileName;
       // Add a rule to build the target by name.
       localName = lg.GetRelativeTargetDirectory(gtarget.get());
@@ -752,7 +684,7 @@ void cmGlobalUnixMakefileGenerator3::WriteConvenienceRules2(
       }
 
       bool targetMessages = true;
-      if (cmProp tgtMsg =
+      if (cmValue tgtMsg =
             this->GetCMakeInstance()->GetState()->GetGlobalProperty(
               "TARGET_MESSAGES")) {
         targetMessages = cmIsOn(*tgtMsg);
@@ -845,8 +777,7 @@ void cmGlobalUnixMakefileGenerator3::InitializeProgressMarks()
     for (const auto& gt : lg->GetGeneratorTargets()) {
       cmLocalGenerator* tlg = gt->GetLocalGenerator();
 
-      if (gt->GetType() == cmStateEnums::INTERFACE_LIBRARY ||
-          gt->GetPropertyAsBool("EXCLUDE_FROM_ALL")) {
+      if (!gt->IsInBuildSystem() || this->IsExcluded(lg.get(), gt.get())) {
         continue;
       }
 
@@ -881,7 +812,7 @@ size_t cmGlobalUnixMakefileGenerator3::CountProgressMarksInTarget(
   if (emitted.insert(target).second) {
     count = this->ProgressMap[target].Marks.size();
     for (cmTargetDepend const& depend : this->GetTargetDirectDepends(target)) {
-      if (depend->GetType() == cmStateEnums::INTERFACE_LIBRARY) {
+      if (!depend->IsInBuildSystem()) {
         continue;
       }
       count += this->CountProgressMarksInTarget(depend, emitted);
@@ -938,7 +869,7 @@ void cmGlobalUnixMakefileGenerator3::AppendGlobalTargetDepends(
   for (cmTargetDepend const& i : this->GetTargetDirectDepends(target)) {
     // Create the target-level dependency.
     cmGeneratorTarget const* dep = i;
-    if (dep->GetType() == cmStateEnums::INTERFACE_LIBRARY) {
+    if (!dep->IsInBuildSystem()) {
       continue;
     }
     cmLocalUnixMakefileGenerator3* lg3 =
@@ -986,7 +917,9 @@ void cmGlobalUnixMakefileGenerator3::WriteHelpRule(
             (type == cmStateEnums::STATIC_LIBRARY) ||
             (type == cmStateEnums::SHARED_LIBRARY) ||
             (type == cmStateEnums::MODULE_LIBRARY) ||
-            (type == cmStateEnums::OBJECT_LIBRARY)) {
+            (type == cmStateEnums::OBJECT_LIBRARY) ||
+            (type == cmStateEnums::INTERFACE_LIBRARY &&
+             target->IsInBuildSystem())) {
           project_targets.insert(target->GetName());
         } else if (type == cmStateEnums::GLOBAL_TARGET) {
           globals_targets.insert(target->GetName());

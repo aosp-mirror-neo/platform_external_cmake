@@ -2,7 +2,6 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmTargetLinkLibrariesCommand.h"
 
-#include <cstring>
 #include <memory>
 #include <sstream>
 #include <unordered_set>
@@ -11,6 +10,7 @@
 #include "cmExecutionStatus.h"
 #include "cmGeneratorExpression.h"
 #include "cmGlobalGenerator.h"
+#include "cmListFileCache.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
 #include "cmPolicies.h"
@@ -20,6 +20,7 @@
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 #include "cmTargetLinkLibraryType.h"
+#include "cmValue.h"
 #include "cmake.h"
 
 namespace {
@@ -142,6 +143,7 @@ bool cmTargetLinkLibrariesCommand(std::vector<std::string> const& args,
       case cmPolicies::WARN:
         e << cmPolicies::GetPolicyWarning(cmPolicies::CMP0039) << "\n";
         modal = "should";
+        CM_FALLTHROUGH;
       case cmPolicies::OLD:
         break;
       case cmPolicies::REQUIRED_ALWAYS:
@@ -149,6 +151,7 @@ bool cmTargetLinkLibrariesCommand(std::vector<std::string> const& args,
       case cmPolicies::NEW:
         modal = "must";
         messageType = MessageType::FATAL_ERROR;
+        break;
     }
     if (modal) {
       e << "Utility target \"" << target->GetName() << "\" " << modal
@@ -277,12 +280,12 @@ bool cmTargetLinkLibrariesCommand(std::vector<std::string> const& args,
       // with old versions of CMake and new)
       llt = GENERAL_LibraryType;
       std::string linkType = cmStrCat(args[0], "_LINK_TYPE");
-      const char* linkTypeString = mf.GetDefinition(linkType);
+      cmValue linkTypeString = mf.GetDefinition(linkType);
       if (linkTypeString) {
-        if (strcmp(linkTypeString, "debug") == 0) {
+        if (*linkTypeString == "debug") {
           llt = DEBUG_LibraryType;
         }
-        if (strcmp(linkTypeString, "optimized") == 0) {
+        if (*linkTypeString == "optimized") {
           llt = OPTIMIZED_LibraryType;
         }
       }
@@ -386,7 +389,7 @@ bool TLL::HandleLibrary(ProcessingState currentProcessingState,
     ? cmTarget::KeywordTLLSignature
     : cmTarget::PlainTLLSignature;
   if (!this->Target->PushTLLCommandTrace(
-        sig, this->Makefile.GetExecutionContext())) {
+        sig, this->Makefile.GetBacktrace().Top())) {
     std::ostringstream e;
     const char* modal = nullptr;
     MessageType messageType = MessageType::AUTHOR_WARNING;
@@ -394,6 +397,7 @@ bool TLL::HandleLibrary(ProcessingState currentProcessingState,
       case cmPolicies::WARN:
         e << cmPolicies::GetPolicyWarning(cmPolicies::CMP0023) << "\n";
         modal = "should";
+        CM_FALLTHROUGH;
       case cmPolicies::OLD:
         break;
       case cmPolicies::REQUIRED_ALWAYS:
@@ -401,6 +405,7 @@ bool TLL::HandleLibrary(ProcessingState currentProcessingState,
       case cmPolicies::NEW:
         modal = "must";
         messageType = MessageType::FATAL_ERROR;
+        break;
     }
 
     if (modal) {
@@ -564,7 +569,7 @@ void TLL::AffectsProperty(std::string const& prop)
   if (!this->EncodeRemoteReference) {
     return;
   }
-  // Add a wrapper to the expression to tell LookupLinkItems to look up
+  // Add a wrapper to the expression to tell LookupLinkItem to look up
   // names in the caller's directory.
   if (this->Props.insert(prop).second) {
     this->Target->AppendProperty(prop, this->DirectoryId);

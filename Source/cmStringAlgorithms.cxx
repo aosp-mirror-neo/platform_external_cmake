@@ -7,9 +7,13 @@
 #include <cstddef> // IWYU pragma: keep
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
 
 std::string cmTrimWhitespace(cm::string_view str)
 {
+  // XXX(clang-tidy): This declaration and the next cannot be `const auto*`
+  // because the qualification of `auto` is platform-dependent.
+  // NOLINTNEXTLINE(readability-qualified-auto)
   auto start = str.begin();
   while (start != str.end() && cmIsSpace(*start)) {
     ++start;
@@ -17,6 +21,7 @@ std::string cmTrimWhitespace(cm::string_view str)
   if (start == str.end()) {
     return std::string();
   }
+  // NOLINTNEXTLINE(readability-qualified-auto)
   auto stop = str.end() - 1;
   while (cmIsSpace(*stop)) {
     --stop;
@@ -160,42 +165,42 @@ inline void MakeDigits(cm::string_view& view, char (&digits)[N],
 
 cmAlphaNum::cmAlphaNum(int val)
 {
-  MakeDigits(View_, Digits_, "%i", val);
+  MakeDigits(this->View_, this->Digits_, "%i", val);
 }
 
 cmAlphaNum::cmAlphaNum(unsigned int val)
 {
-  MakeDigits(View_, Digits_, "%u", val);
+  MakeDigits(this->View_, this->Digits_, "%u", val);
 }
 
 cmAlphaNum::cmAlphaNum(long int val)
 {
-  MakeDigits(View_, Digits_, "%li", val);
+  MakeDigits(this->View_, this->Digits_, "%li", val);
 }
 
 cmAlphaNum::cmAlphaNum(unsigned long int val)
 {
-  MakeDigits(View_, Digits_, "%lu", val);
+  MakeDigits(this->View_, this->Digits_, "%lu", val);
 }
 
 cmAlphaNum::cmAlphaNum(long long int val)
 {
-  MakeDigits(View_, Digits_, "%lli", val);
+  MakeDigits(this->View_, this->Digits_, "%lli", val);
 }
 
 cmAlphaNum::cmAlphaNum(unsigned long long int val)
 {
-  MakeDigits(View_, Digits_, "%llu", val);
+  MakeDigits(this->View_, this->Digits_, "%llu", val);
 }
 
 cmAlphaNum::cmAlphaNum(float val)
 {
-  MakeDigits(View_, Digits_, "%g", static_cast<double>(val));
+  MakeDigits(this->View_, this->Digits_, "%g", static_cast<double>(val));
 }
 
 cmAlphaNum::cmAlphaNum(double val)
 {
-  MakeDigits(View_, Digits_, "%g", val);
+  MakeDigits(this->View_, this->Digits_, "%g", val);
 }
 
 std::string cmCatViews(std::initializer_list<cm::string_view> views)
@@ -211,85 +216,6 @@ std::string cmCatViews(std::initializer_list<cm::string_view> views)
     sit = std::copy_n(view.data(), view.size(), sit);
   }
   return result;
-}
-
-bool cmIsInternallyOn(cm::string_view val)
-{
-  return (val.size() == 4) &&           //
-    (val[0] == 'I' || val[0] == 'i') && //
-    (val[1] == '_') &&                  //
-    (val[2] == 'O' || val[2] == 'o') && //
-    (val[3] == 'N' || val[3] == 'n');
-}
-
-bool cmIsNOTFOUND(cm::string_view val)
-{
-  return (val == "NOTFOUND") || cmHasLiteralSuffix(val, "-NOTFOUND");
-}
-
-bool cmIsOn(cm::string_view val)
-{
-  switch (val.size()) {
-    case 1:
-      return val[0] == '1' || val[0] == 'Y' || val[0] == 'y';
-    case 2:
-      return                                //
-        (val[0] == 'O' || val[0] == 'o') && //
-        (val[1] == 'N' || val[1] == 'n');
-    case 3:
-      return                                //
-        (val[0] == 'Y' || val[0] == 'y') && //
-        (val[1] == 'E' || val[1] == 'e') && //
-        (val[2] == 'S' || val[2] == 's');
-    case 4:
-      return                                //
-        (val[0] == 'T' || val[0] == 't') && //
-        (val[1] == 'R' || val[1] == 'r') && //
-        (val[2] == 'U' || val[2] == 'u') && //
-        (val[3] == 'E' || val[3] == 'e');
-    default:
-      break;
-  }
-
-  return false;
-}
-
-bool cmIsOff(cm::string_view val)
-{
-  switch (val.size()) {
-    case 0:
-      return true;
-    case 1:
-      return val[0] == '0' || val[0] == 'N' || val[0] == 'n';
-    case 2:
-      return                                //
-        (val[0] == 'N' || val[0] == 'n') && //
-        (val[1] == 'O' || val[1] == 'o');
-    case 3:
-      return                                //
-        (val[0] == 'O' || val[0] == 'o') && //
-        (val[1] == 'F' || val[1] == 'f') && //
-        (val[2] == 'F' || val[2] == 'f');
-    case 5:
-      return                                //
-        (val[0] == 'F' || val[0] == 'f') && //
-        (val[1] == 'A' || val[1] == 'a') && //
-        (val[2] == 'L' || val[2] == 'l') && //
-        (val[3] == 'S' || val[3] == 's') && //
-        (val[4] == 'E' || val[4] == 'e');
-    case 6:
-      return                                //
-        (val[0] == 'I' || val[0] == 'i') && //
-        (val[1] == 'G' || val[1] == 'g') && //
-        (val[2] == 'N' || val[2] == 'n') && //
-        (val[3] == 'O' || val[3] == 'o') && //
-        (val[4] == 'R' || val[4] == 'r') && //
-        (val[5] == 'E' || val[5] == 'e');
-    default:
-      break;
-  }
-
-  return cmIsNOTFOUND(val);
 }
 
 bool cmStrToLong(const char* str, long* value)
@@ -322,4 +248,53 @@ bool cmStrToULong(const char* str, unsigned long* value)
 bool cmStrToULong(std::string const& str, unsigned long* value)
 {
   return cmStrToULong(str.c_str(), value);
+}
+
+template <typename Range>
+std::size_t getJoinedLength(Range const& rng, cm::string_view separator)
+{
+  std::size_t rangeLength{};
+  for (auto const& item : rng) {
+    rangeLength += item.size();
+  }
+
+  auto const separatorsLength = (rng.size() - 1) * separator.size();
+
+  return rangeLength + separatorsLength;
+}
+
+template <typename Range>
+std::string cmJoinImpl(Range const& rng, cm::string_view separator,
+                       cm::string_view initial)
+{
+  if (rng.empty()) {
+    return { std::begin(initial), std::end(initial) };
+  }
+
+  std::string result;
+  result.reserve(initial.size() + getJoinedLength(rng, separator));
+  result.append(std::begin(initial), std::end(initial));
+
+  auto begin = std::begin(rng);
+  auto end = std::end(rng);
+  result += *begin;
+
+  for (++begin; begin != end; ++begin) {
+    result.append(std::begin(separator), std::end(separator));
+    result += *begin;
+  }
+
+  return result;
+}
+
+std::string cmJoin(std::vector<std::string> const& rng,
+                   cm::string_view separator, cm::string_view initial)
+{
+  return cmJoinImpl(rng, separator, initial);
+}
+
+std::string cmJoin(cmStringRange const& rng, cm::string_view separator,
+                   cm::string_view initial)
+{
+  return cmJoinImpl(rng, separator, initial);
 }

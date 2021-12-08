@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmArchiveWrite_h
-#define cmArchiveWrite_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -27,7 +26,7 @@ public:
   }
   void Clear() { this->IsValueSet = false; }
   bool IsSet() const { return this->IsValueSet; }
-  T Get() const { return Value; }
+  T Get() const { return this->Value; }
 
 private:
   T Value;
@@ -55,7 +54,8 @@ public:
 
   /** Construct with output stream to which to write archive.  */
   cmArchiveWrite(std::ostream& os, Compress c = CompressNone,
-                 std::string const& format = "paxr");
+                 std::string const& format = "paxr", int compressionLevel = 0,
+                 int numThreads = 1);
 
   ~cmArchiveWrite();
 
@@ -141,9 +141,6 @@ public:
     this->Gname = "";
   }
 
-  //! Set an option on a filter;
-  bool SetFilterOption(const char* module, const char* key, const char* value);
-
 private:
   bool Okay() const { return this->Error.empty(); }
   bool AddPath(const char* path, size_t skip, const char* prefix,
@@ -180,5 +177,3 @@ private:
   cmArchiveWriteOptional<int> Permissions;
   cmArchiveWriteOptional<int> PermissionsMask;
 };
-
-#endif

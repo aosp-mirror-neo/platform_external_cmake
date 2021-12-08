@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCTestUpdateHandler_h
-#define cmCTestUpdateHandler_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -60,8 +59,6 @@ private:
   std::string UpdateCommand;
   int UpdateType;
 
-  int DetectVCS(const char* dir);
+  int DetectVCS(const std::string& dir);
   bool SelectVCS();
 };
-
-#endif

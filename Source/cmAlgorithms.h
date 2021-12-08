@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmAlgorithms_h
-#define cmAlgorithms_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -48,7 +47,8 @@ struct BinarySearcher
 
   bool operator()(argument_type const& item) const
   {
-    return std::binary_search(m_range.begin(), m_range.end(), item);
+    return std::binary_search(this->m_range.begin(), this->m_range.end(),
+                              item);
   }
 
 private:
@@ -59,6 +59,10 @@ private:
 class cmListFileBacktrace;
 using cmBacktraceRange =
   cmRange<std::vector<cmListFileBacktrace>::const_iterator>;
+
+template <typename T>
+class BT;
+using cmBTStringRange = cmRange<std::vector<BT<std::string>>::const_iterator>;
 
 template <typename Range>
 typename Range::const_iterator cmRemoveN(Range& r, size_t n)
@@ -133,7 +137,13 @@ ForwardIterator cmRemoveDuplicates(ForwardIterator first, ForwardIterator last)
 }
 
 template <typename Range>
-typename Range::const_iterator cmRemoveDuplicates(Range& r)
+typename Range::iterator cmRemoveDuplicates(Range& r)
+{
+  return cmRemoveDuplicates(r.begin(), r.end());
+}
+
+template <typename Range>
+typename Range::const_iterator cmRemoveDuplicates(Range const& r)
 {
   return cmRemoveDuplicates(r.begin(), r.end());
 }
@@ -143,5 +153,3 @@ typename Range::const_iterator cmFindNot(Range const& r, T const& t)
 {
   return std::find_if(r.begin(), r.end(), [&t](T const& i) { return i != t; });
 }
-
-#endif

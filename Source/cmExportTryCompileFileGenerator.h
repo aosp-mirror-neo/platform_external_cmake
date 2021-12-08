@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmExportTryCompileFileGenerator_h
-#define cmExportTryCompileFileGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -37,7 +36,8 @@ protected:
   {
   }
   void HandleMissingTarget(std::string&, std::vector<std::string>&,
-                           cmGeneratorTarget*, cmGeneratorTarget*) override
+                           cmGeneratorTarget const*,
+                           cmGeneratorTarget*) override
   {
   }
 
@@ -45,7 +45,7 @@ protected:
                           ImportPropertyMap& properties,
                           std::set<const cmGeneratorTarget*>& emitted);
 
-  std::string InstallNameDir(cmGeneratorTarget* target,
+  std::string InstallNameDir(cmGeneratorTarget const* target,
                              const std::string& config) override;
 
 private:
@@ -58,5 +58,3 @@ private:
   std::string Config;
   std::vector<std::string> Languages;
 };
-
-#endif

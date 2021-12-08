@@ -8,7 +8,7 @@ if(APPLE)
   else()
     execute_process(
       COMMAND xcodebuild -version
-      OUTPUT_VARIABLE _version ERROR_VARIABLE _version
+      OUTPUT_VARIABLE _version ERROR_VARIABLE _version_err
       )
     if(_version MATCHES "^Xcode ([0-9]+(\\.[0-9]+)*)")
       set(CMake_TEST_XCODE_VERSION "${CMAKE_MATCH_1}")
@@ -59,6 +59,10 @@ add_executable(bar bar.cxx
   ${CMAKE_CURRENT_BINARY_DIR}/noregen.h
   )
 
+if(CMAKE_XCODE_BUILD_SYSTEM VERSION_GREATER_EQUAL 12)
+  target_compile_definitions(bar PRIVATE XCODE_NEW_BUILD_SYSTEM)
+endif()
+
 #-----------------------------------------------------------------------------
 if("${CMAKE_GENERATOR}" MATCHES "Make")
   # Test the IMPLICIT_DEPENDS feature.
@@ -97,6 +101,12 @@ add_library(zot_pch zot_pch.cxx)
 target_link_libraries(zot zot_pch)
 if(NOT CMAKE_OSX_ARCHITECTURES MATCHES "[;$]")
   target_precompile_headers(zot_pch PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/zot_pch.hxx)
+endif()
+if (CMAKE_CXX_DEPENDS_USE_COMPILER AND
+    CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.4")
+  # Mixing pre-compile headers and flags to generate dependencies (-M options family)
+  # causes the compiler to crash
+  set_property(TARGET zot_pch PROPERTY DISABLE_PRECOMPILE_HEADERS ON)
 endif()
 
 # Test the #include line macro transformation rule support.

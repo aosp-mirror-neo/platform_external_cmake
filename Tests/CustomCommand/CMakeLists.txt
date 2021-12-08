@@ -1,7 +1,7 @@
 #
 # Wrapping
 #
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 2.8.12)
 project (CustomCommand)
 
 add_subdirectory(GeneratedHeader)
@@ -514,6 +514,14 @@ add_custom_target(UseConsoleTarget ALL
   USES_TERMINAL
 )
 
+if(CMAKE_XCODE_BUILD_SYSTEM VERSION_GREATER_EQUAL 12)
+  # Xcode's "new build system" does not support multiple targets
+  # producing the same custom command output.
+  add_custom_target(GenPath DEPENDS "${gen_path}")
+  add_dependencies(NormDepends GenPath)
+  add_dependencies(UseConsole GenPath)
+endif()
+
 # Test COMMAND_EXPAND_LISTS
 set(cmp_args "1ARG=COMMAND_EXPAND_LISTS" "2ARG=test" "3ARG=outfile"
   "4ARG=content")
@@ -574,3 +582,7 @@ set_target_properties(mac_fw PROPERTIES
   )
 add_custom_command(OUTPUT mac_fw.txt COMMAND ${CMAKE_COMMAND} -E touch mac_fw.txt DEPENDS mac_fw)
 add_custom_target(drive_mac_fw ALL DEPENDS mac_fw.txt)
+
+# Test empty COMMANDs are omitted
+add_executable(empty_command empty_command.cxx)
+add_custom_command(TARGET empty_command POST_BUILD COMMAND $<0:date>)

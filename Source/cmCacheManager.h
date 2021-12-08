@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCacheManager_h
-#define cmCacheManager_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -12,9 +11,9 @@
 #include <utility>
 #include <vector>
 
-#include "cmProperty.h"
 #include "cmPropertyMap.h"
 #include "cmStateTypes.h"
+#include "cmValue.h"
 
 class cmMessenger;
 
@@ -32,13 +31,13 @@ class cmCacheManager
 
   public:
     const std::string& GetValue() const { return this->Value; }
-    void SetValue(const char*);
+    void SetValue(cmValue);
 
     cmStateEnums::CacheEntryType GetType() const { return this->Type; }
     void SetType(cmStateEnums::CacheEntryType ty) { this->Type = ty; }
 
     std::vector<std::string> GetPropertyList() const;
-    cmProp GetProperty(const std::string& property) const;
+    cmValue GetProperty(const std::string& property) const;
     bool GetPropertyAsBool(const std::string& property) const;
     void SetProperty(const std::string& property, const char* value);
     void SetProperty(const std::string& property, bool value);
@@ -67,27 +66,30 @@ public:
   //! Print the cache to a stream
   void PrintCache(std::ostream&) const;
 
-  //! Get a value from the cache given a key
-  cmProp GetInitializedCacheValue(const std::string& key) const;
+  //! Get whether or not cache is loaded
+  bool IsCacheLoaded() const { return this->CacheLoaded; }
 
-  cmProp GetCacheEntryValue(const std::string& key) const
+  //! Get a value from the cache given a key
+  cmValue GetInitializedCacheValue(const std::string& key) const;
+
+  cmValue GetCacheEntryValue(const std::string& key) const
   {
-    if (auto entry = this->GetCacheEntry(key)) {
-      return &entry->GetValue();
+    if (const auto* entry = this->GetCacheEntry(key)) {
+      return cmValue(entry->GetValue());
     }
     return nullptr;
   }
 
   void SetCacheEntryValue(std::string const& key, std::string const& value)
   {
-    if (auto entry = this->GetCacheEntry(key)) {
-      entry->SetValue(value.c_str());
+    if (auto* entry = this->GetCacheEntry(key)) {
+      entry->SetValue(cmValue(value));
     }
   }
 
   cmStateEnums::CacheEntryType GetCacheEntryType(std::string const& key) const
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (const auto* entry = this->GetCacheEntry(key)) {
       return entry->GetType();
     }
     return cmStateEnums::UNINITIALIZED;
@@ -96,16 +98,16 @@ public:
   std::vector<std::string> GetCacheEntryPropertyList(
     std::string const& key) const
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (const auto* entry = this->GetCacheEntry(key)) {
       return entry->GetPropertyList();
     }
     return {};
   }
 
-  cmProp GetCacheEntryProperty(std::string const& key,
-                               std::string const& propName) const
+  cmValue GetCacheEntryProperty(std::string const& key,
+                                std::string const& propName) const
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (const auto* entry = this->GetCacheEntry(key)) {
       return entry->GetProperty(propName);
     }
     return nullptr;
@@ -114,7 +116,7 @@ public:
   bool GetCacheEntryPropertyAsBool(std::string const& key,
                                    std::string const& propName) const
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (const auto* entry = this->GetCacheEntry(key)) {
       return entry->GetPropertyAsBool(propName);
     }
     return false;
@@ -124,7 +126,7 @@ public:
                              std::string const& propName,
                              std::string const& value)
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (auto* entry = this->GetCacheEntry(key)) {
       entry->SetProperty(propName, value.c_str());
     }
   }
@@ -132,7 +134,7 @@ public:
   void SetCacheEntryBoolProperty(std::string const& key,
                                  std::string const& propName, bool value)
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (auto* entry = this->GetCacheEntry(key)) {
       entry->SetProperty(propName, value);
     }
   }
@@ -140,7 +142,7 @@ public:
   void RemoveCacheEntryProperty(std::string const& key,
                                 std::string const& propName)
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (auto* entry = this->GetCacheEntry(key)) {
       entry->SetProperty(propName, nullptr);
     }
   }
@@ -150,7 +152,7 @@ public:
                                 std::string const& value,
                                 bool asString = false)
   {
-    if (auto entry = this->GetCacheEntry(key)) {
+    if (auto* entry = this->GetCacheEntry(key)) {
       entry->AppendProperty(propName, value, asString);
     }
   }
@@ -171,6 +173,18 @@ public:
 
   //! Add an entry into the cache
   void AddCacheEntry(const std::string& key, const char* value,
+                     const char* helpString, cmStateEnums::CacheEntryType type)
+  {
+    this->AddCacheEntry(key,
+                        value ? cmValue(std::string(value)) : cmValue(nullptr),
+                        helpString, type);
+  }
+  void AddCacheEntry(const std::string& key, const std::string& value,
+                     const char* helpString, cmStateEnums::CacheEntryType type)
+  {
+    this->AddCacheEntry(key, cmValue(value), helpString, type);
+  }
+  void AddCacheEntry(const std::string& key, cmValue value,
                      const char* helpString,
                      cmStateEnums::CacheEntryType type);
 
@@ -205,10 +219,9 @@ private:
                             const CacheEntry& e, cmMessenger* messenger) const;
 
   std::map<std::string, CacheEntry> Cache;
+  bool CacheLoaded = false;
 
   // Cache version info
   unsigned int CacheMajorVersion = 0;
   unsigned int CacheMinorVersion = 0;
 };
-
-#endif

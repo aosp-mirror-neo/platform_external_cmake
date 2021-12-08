@@ -13,11 +13,12 @@ endfunction()
 
 function(compiler_id_detection outvar lang)
 
-  if (NOT lang STREQUAL Fortran AND NOT lang STREQUAL CSharp)
+  if (NOT "x${lang}" STREQUAL "xFortran" AND NOT "x${lang}" STREQUAL "xCSharp"
+      AND NOT "x${lang}" STREQUAL "xISPC")
     file(GLOB lang_files
       "${CMAKE_ROOT}/Modules/Compiler/*-DetermineCompiler.cmake")
     set(nonlang CXX)
-    if (lang STREQUAL CXX)
+    if ("x${lang}" STREQUAL "xCXX")
       set(nonlang C)
     endif()
 
@@ -41,13 +42,14 @@ function(compiler_id_detection outvar lang)
 
     # Order is relevant here. For example, compilers which pretend to be
     # GCC must appear before the actual GCC.
-    if (lang STREQUAL CXX)
+    if ("x${lang}" STREQUAL "xCXX")
       list(APPEND ordered_compilers
         Comeau
       )
     endif()
     list(APPEND ordered_compilers
       Intel
+      IntelLLVM
       PathScale
       Embarcadero
       Borland
@@ -60,13 +62,15 @@ function(compiler_id_detection outvar lang)
       XLClang
       XL
       VisualAge
+      NVHPC
       PGI
       Cray
       TI
+      FujitsuClang
       Fujitsu
       GHS
     )
-    if (lang STREQUAL C)
+    if ("x${lang}" STREQUAL "xC")
       list(APPEND ordered_compilers
         TinyCC
         Bruce
@@ -77,19 +81,21 @@ function(compiler_id_detection outvar lang)
       ARMCC
       AppleClang
       ARMClang
+    )
+    list(APPEND ordered_compilers
       Clang
       GNU
       MSVC
       ADSP
       IAR
     )
-    if (lang STREQUAL C)
+    if ("x${lang}" STREQUAL "xC")
       list(APPEND ordered_compilers
         SDCC
       )
     endif()
 
-    if(lang STREQUAL CUDA)
+    if("x${lang}" STREQUAL "xCUDA")
       set(ordered_compilers NVIDIA Clang)
     endif()
 

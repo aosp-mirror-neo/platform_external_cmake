@@ -51,6 +51,54 @@ The :variable:`CMAKE_MINIMUM_REQUIRED_VERSION` variable may also be used
 to determine whether to report an error on use of deprecated macros or
 functions.
 
+Policies Introduced by CMake 3.22
+=================================
+
+.. toctree::
+   :maxdepth: 1
+
+   CMP0128: Selection of language standard and extension flags improved. </policy/CMP0128>
+   CMP0127: cmake_dependent_option() supports full Condition Syntax. </policy/CMP0127>
+
+Policies Introduced by CMake 3.21
+=================================
+
+.. toctree::
+   :maxdepth: 1
+
+   CMP0126: set(CACHE) does not remove a normal variable of the same name. </policy/CMP0126>
+   CMP0125: find_(path|file|library|program) have consistent behavior for cache variables. </policy/CMP0125>
+   CMP0124: foreach() loop variables are only available in the loop scope. </policy/CMP0124>
+   CMP0123: ARMClang cpu/arch compile and link flags must be set explicitly. </policy/CMP0123>
+   CMP0122: UseSWIG use standard library name conventions for csharp language. </policy/CMP0122>
+   CMP0121: The list command detects invalid indices. </policy/CMP0121>
+
+Policies Introduced by CMake 3.20
+=================================
+
+.. toctree::
+   :maxdepth: 1
+
+   CMP0120: The WriteCompilerDetectionHeader module is removed. </policy/CMP0120>
+   CMP0119: LANGUAGE source file property explicitly compiles as language. </policy/CMP0119>
+   CMP0118: The GENERATED source file property is now visible in all directories. </policy/CMP0118>
+   CMP0117: MSVC RTTI flag /GR is not added to CMAKE_CXX_FLAGS by default. </policy/CMP0117>
+   CMP0116: Ninja generators transform DEPFILEs from add_custom_command(). </policy/CMP0116>
+   CMP0115: Source file extensions must be explicit. </policy/CMP0115>
+
+Policies Introduced by CMake 3.19
+=================================
+
+.. toctree::
+   :maxdepth: 1
+
+   CMP0114: ExternalProject step targets fully adopt their steps. </policy/CMP0114>
+   CMP0113: Makefile generators do not repeat custom commands from target dependencies. </policy/CMP0113>
+   CMP0112: Target file component generator expressions do not add target dependencies. </policy/CMP0112>
+   CMP0111: An imported target missing its location property fails during generation. </policy/CMP0111>
+   CMP0110: add_test() supports arbitrary characters in test names. </policy/CMP0110>
+   CMP0109: find_program() requires permission to execute but not to read. </policy/CMP0109>
+
 Policies Introduced by CMake 3.18
 =================================
 

@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmNinjaTypes_h
-#define cmNinjaTypes_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -54,11 +53,10 @@ public:
   std::string Rule;
   cmNinjaDeps Outputs;
   cmNinjaDeps ImplicitOuts;
+  cmNinjaDeps WorkDirOuts; // For cmake_ninja_workdir.
   cmNinjaDeps ExplicitDeps;
   cmNinjaDeps ImplicitDeps;
   cmNinjaDeps OrderOnlyDeps;
   cmNinjaVars Variables;
   std::string RspFile;
 };
-
-#endif // ! cmNinjaTypes_h

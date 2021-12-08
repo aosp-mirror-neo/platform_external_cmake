@@ -25,6 +25,9 @@ files:
    ldd (Linux/Unix)
    otool (Mac OSX)
 
+.. versionchanged:: 3.16
+  The tool specified by ``CMAKE_OBJDUMP`` will be used, if set.
+
 The following functions are provided by this module:
 
 ::
@@ -42,9 +45,6 @@ The following functions are provided by this module:
      (projects can override with gp_resolved_file_type_override)
    gp_file_type
 
-Requires CMake 2.6 or greater because it uses function, break, return
-and PARENT_SCOPE.
-
 ::
 
   GET_PREREQUISITES(<target> <prerequisites_var> <exclude_system> <recurse>
@@ -61,14 +61,15 @@ is the name of a CMake variable to contain the results.
 exclude "system" prerequisites.  If <recurse> is set to 1 all
 prerequisites will be found recursively, if set to 0 only direct
 prerequisites are listed.  <exepath> is the path to the top level
-executable used for @executable_path replacment on the Mac.  <dirs> is
+executable used for @executable_path replacement on the Mac.  <dirs> is
 a list of paths where libraries might be found: these paths are
 searched first when a target without any path info is given.  Then
 standard system locations are also searched: PATH, Framework
 locations, /usr/lib...
 
-The variable GET_PREREQUISITES_VERBOSE can be set to true to enable verbose
-output.
+.. versionadded:: 3.14
+  The variable GET_PREREQUISITES_VERBOSE can be set to true to enable verbose
+  output.
 
 ::
 
@@ -82,7 +83,7 @@ to 1 all prerequisites will be found recursively, if set to 0 only
 direct prerequisites are listed.  <exclude_system> must be 0 or 1
 indicating whether to include or exclude "system" prerequisites.  With
 <verbose> set to 0 only the full path names of the prerequisites are
-printed, set to 1 extra informatin will be displayed.
+printed, set to 1 extra information will be displayed.
 
 ::
 
@@ -735,7 +736,7 @@ function(get_prerequisites target prerequisites_var exclude_system recurse exepa
     set(gp_regex_cmp_count 1)
   elseif(gp_tool MATCHES "otool$")
     set(gp_cmd_args "-L")
-    set(gp_regex "^\t([^\t]+) \\(compatibility version ([0-9]+.[0-9]+.[0-9]+), current version ([0-9]+.[0-9]+.[0-9]+)\\)${eol_char}$")
+    set(gp_regex "^\t([^\t]+) \\(compatibility version ([0-9]+.[0-9]+.[0-9]+), current version ([0-9]+.[0-9]+.[0-9]+)(, weak)?\\)${eol_char}$")
     set(gp_regex_error "")
     set(gp_regex_fallback "")
     set(gp_regex_cmp_count 3)
@@ -745,7 +746,7 @@ function(get_prerequisites target prerequisites_var exclude_system recurse exepa
     set(gp_regex_error "")
     set(gp_regex_fallback "")
     set(gp_regex_cmp_count 1)
-  elseif(gp_tool MATCHES "objdump$")
+  elseif(gp_tool MATCHES "objdump(\\.exe)?$")
     set(gp_cmd_args "-p")
     set(gp_regex "^\t*DLL Name: (.*\\.[Dd][Ll][Ll])${eol_char}$")
     set(gp_regex_error "")

@@ -4,7 +4,7 @@
 
 /* IWYU pragma: no_forward_declare yyguts_t */
 
-#ifndef __clang_analyzer__ /* Suppress clang scan-build warnings */
+#ifndef __clang_analyzer__ /* Suppress clang-analyzer warnings */
 
 #include <cmGccDepfileLexerHelper.h>
 #include <string>
@@ -42,7 +42,7 @@ NEWLINE \r?\n
                        }
 {WSPACE}*\\{NEWLINE}   {
                          // A line continuation ends the current file name.
-                         yyextra->newDependency();
+                         yyextra->newRuleOrDependency();
                        }
 {NEWLINE}              {
                          // A newline ends the current file name and the current rule.

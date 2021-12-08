@@ -1,6 +1,8 @@
 CMP0104
 -------
 
+.. versionadded:: 3.18
+
 Initialize :variable:`CMAKE_CUDA_ARCHITECTURES` when
 :variable:`CMAKE_CUDA_COMPILER_ID <CMAKE_<LANG>_COMPILER_ID>` is ``NVIDIA``.
 Raise an error if :prop_tgt:`CUDA_ARCHITECTURES` is empty.
@@ -39,7 +41,7 @@ Examples
 
 .. code-block:: cmake
 
-  set_property(TARGET tgt PROPERTY CUDA_ARCHITECTURES 35 50 72)
+  set_target_properties(tgt PROPERTIES CUDA_ARCHITECTURES "35;50;72")
 
 Generates code for real and virtual architectures ``30``, ``50`` and ``72``.
 

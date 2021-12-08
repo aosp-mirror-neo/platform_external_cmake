@@ -10,6 +10,7 @@
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 
 // cmUtilitySourceCommand
 bool cmUtilitySourceCommand(std::vector<std::string> const& args,
@@ -24,7 +25,7 @@ bool cmUtilitySourceCommand(std::vector<std::string> const& args,
 
   // The first argument is the cache entry name.
   std::string const& cacheEntry = *arg++;
-  const char* cacheValue = status.GetMakefile().GetDefinition(cacheEntry);
+  cmValue cacheValue = status.GetMakefile().GetDefinition(cacheEntry);
   // If it exists already and appears up to date then we are done.  If
   // the string contains "(IntDir)" but that is not the
   // CMAKE_CFG_INTDIR setting then the value is out of date.
@@ -45,7 +46,7 @@ bool cmUtilitySourceCommand(std::vector<std::string> const& args,
   } else {
     cmState* state = status.GetMakefile().GetState();
     haveCacheValue = (cacheValue &&
-                      (strstr(cacheValue, "(IntDir)") == nullptr ||
+                      (strstr(cacheValue->c_str(), "(IntDir)") == nullptr ||
                        (intDir == "$(IntDir)")) &&
                       (state->GetCacheMajorVersion() != 0 &&
                        state->GetCacheMinorVersion() != 0));
@@ -84,8 +85,9 @@ bool cmUtilitySourceCommand(std::vector<std::string> const& args,
   std::string utilityDirectory =
     status.GetMakefile().GetCurrentBinaryDirectory();
   std::string exePath;
-  if (auto d = status.GetMakefile().GetDefinition("EXECUTABLE_OUTPUT_PATH")) {
-    exePath = d;
+  if (cmValue d =
+        status.GetMakefile().GetDefinition("EXECUTABLE_OUTPUT_PATH")) {
+    exePath = *d;
   }
   if (!exePath.empty()) {
     utilityDirectory = exePath;
@@ -96,7 +98,7 @@ bool cmUtilitySourceCommand(std::vector<std::string> const& args,
   // Construct the cache entry for the executable's location.
   std::string utilityExecutable = utilityDirectory + "/" + cmakeCFGout + "/" +
     utilityName +
-    status.GetMakefile().GetDefinition("CMAKE_EXECUTABLE_SUFFIX");
+    *status.GetMakefile().GetDefinition("CMAKE_EXECUTABLE_SUFFIX");
 
   // make sure we remove any /./ in the name
   cmSystemTools::ReplaceString(utilityExecutable, "/./", "/");

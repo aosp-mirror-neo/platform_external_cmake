@@ -11,7 +11,7 @@ endif()
 
 include(CMakeTestCompilerCommon)
 
-# work around enforced code signing and / or missing exectuable target type
+# work around enforced code signing and / or missing executable target type
 set(__CMAKE_SAVED_TRY_COMPILE_TARGET_TYPE ${CMAKE_TRY_COMPILE_TARGET_TYPE})
 if(_CMAKE_FEATURE_DETECTION_TARGET_TYPE)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE ${_CMAKE_FEATURE_DETECTION_TARGET_TYPE})
@@ -47,6 +47,9 @@ if(NOT CMAKE_OBJC_COMPILER_WORKS)
     "#endif\n"
     "int main(int argc, char* argv[])\n"
     "{ (void)argv; return argc-1;}\n")
+  # Clear result from normal variable.
+  unset(CMAKE_OBJC_COMPILER_WORKS)
+  # Puts test result in cache variable.
   try_compile(CMAKE_OBJC_COMPILER_WORKS ${CMAKE_BINARY_DIR}
     ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testOBJCCompiler.m
     OUTPUT_VARIABLE __CMAKE_OBJC_COMPILER_OUTPUT)

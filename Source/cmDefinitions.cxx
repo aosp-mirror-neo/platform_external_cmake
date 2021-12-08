@@ -19,7 +19,6 @@ cmDefinitions::Def const& cmDefinitions::GetInternal(const std::string& key,
   {
     auto it = begin->Map.find(cm::String::borrow(key));
     if (it != begin->Map.end()) {
-      it->second.Used = true;
       return it->second;
     }
   }
@@ -35,11 +34,11 @@ cmDefinitions::Def const& cmDefinitions::GetInternal(const std::string& key,
   return begin->Map.emplace(key, def).first->second;
 }
 
-const std::string* cmDefinitions::Get(const std::string& key, StackIter begin,
-                                      StackIter end)
+cmValue cmDefinitions::Get(const std::string& key, StackIter begin,
+                           StackIter end)
 {
   Def const& def = cmDefinitions::GetInternal(key, begin, end, false);
-  return def.Value ? def.Value.str_if_stable() : nullptr;
+  return def.Value ? cmValue(def.Value.str_if_stable()) : nullptr;
 }
 
 void cmDefinitions::Raise(const std::string& key, StackIter begin,
@@ -107,17 +106,4 @@ void cmDefinitions::Set(const std::string& key, cm::string_view value)
 void cmDefinitions::Unset(const std::string& key)
 {
   this->Map[key] = Def();
-}
-
-std::vector<std::string> cmDefinitions::UnusedKeys() const
-{
-  std::vector<std::string> keys;
-  keys.reserve(this->Map.size());
-  // Consider local definitions.
-  for (auto const& mi : this->Map) {
-    if (!mi.second.Used) {
-      keys.push_back(*mi.first.str_if_stable());
-    }
-  }
-  return keys;
 }

@@ -18,6 +18,7 @@
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
+#include "cmValue.h"
 
 static bool IncludeByVariable(cmExecutionStatus& status,
                               const std::string& variable);
@@ -58,6 +59,11 @@ bool cmProjectCommand(std::vector<std::string> const& args,
 
   mf.AddDefinition("PROJECT_NAME", projectName);
 
+  mf.AddDefinitionBool("PROJECT_IS_TOP_LEVEL", mf.IsRootMakefile());
+  mf.AddCacheDefinition(projectName + "_IS_TOP_LEVEL",
+                        mf.IsRootMakefile() ? "ON" : "OFF",
+                        "Value Computed by CMake", cmStateEnums::STATIC);
+
   // Set the CMAKE_PROJECT_NAME variable to be the highest-level
   // project name in the tree. If there are two project commands
   // in the same CMakeLists.txt file, and it is the top level
@@ -65,7 +71,7 @@ bool cmProjectCommand(std::vector<std::string> const& args,
   // CMAKE_PROJECT_NAME will match PROJECT_NAME, and cmake --build
   // will work.
   if (!mf.GetDefinition("CMAKE_PROJECT_NAME") || mf.IsRootMakefile()) {
-    mf.AddDefinition("CMAKE_PROJECT_NAME", projectName);
+    mf.RemoveDefinition("CMAKE_PROJECT_NAME");
     mf.AddCacheDefinition("CMAKE_PROJECT_NAME", projectName,
                           "Value Computed by CMake", cmStateEnums::STATIC);
   }
@@ -302,8 +308,8 @@ bool cmProjectCommand(std::vector<std::string> const& args,
     }
     std::string vw;
     for (std::string const& i : vv) {
-      const char* const v = mf.GetDefinition(i);
-      if (v && *v) {
+      cmValue v = mf.GetDefinition(i);
+      if (cmNonempty(v)) {
         if (cmp0048 == cmPolicies::WARN) {
           if (!injectedProjectCommand) {
             vw += "\n  ";
@@ -352,12 +358,23 @@ static bool IncludeByVariable(cmExecutionStatus& status,
                               const std::string& variable)
 {
   cmMakefile& mf = status.GetMakefile();
-  const char* const include = mf.GetDefinition(variable);
+  cmValue include = mf.GetDefinition(variable);
   if (!include) {
     return true;
   }
 
-  const bool readit = mf.ReadDependentFile(include);
+  std::string includeFile =
+    cmSystemTools::CollapseFullPath(*include, mf.GetCurrentSourceDirectory());
+  if (!cmSystemTools::FileExists(includeFile)) {
+    status.SetError(cmStrCat("could not find requested file:\n  ", *include));
+    return false;
+  }
+  if (cmSystemTools::FileIsDirectory(includeFile)) {
+    status.SetError(cmStrCat("requested file is a directory:\n  ", *include));
+    return false;
+  }
+
+  const bool readit = mf.ReadDependentFile(*include);
   if (readit) {
     return true;
   }
@@ -366,7 +383,7 @@ static bool IncludeByVariable(cmExecutionStatus& status,
     return true;
   }
 
-  status.SetError(cmStrCat("could not find file:\n  ", include));
+  status.SetError(cmStrCat("could not load requested file:\n  ", *include));
   return false;
 }
 
@@ -378,7 +395,7 @@ static void TopLevelCMakeVarCondSet(cmMakefile& mf, std::string const& name,
   // in the same CMakeLists.txt file, and it is the top level
   // CMakeLists.txt file, then go with the last one.
   if (!mf.GetDefinition(name) || mf.IsRootMakefile()) {
-    mf.AddDefinition(name, value);
+    mf.RemoveDefinition(name);
     mf.AddCacheDefinition(name, value, "Value Computed by CMake",
                           cmStateEnums::STATIC);
   }

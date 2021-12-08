@@ -2,7 +2,10 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmInstallCommand.h"
 
+#include <algorithm>
+#include <cassert>
 #include <cstddef>
+#include <iterator>
 #include <set>
 #include <sstream>
 #include <utility>
@@ -22,21 +25,50 @@
 #include "cmInstallExportGenerator.h"
 #include "cmInstallFilesGenerator.h"
 #include "cmInstallGenerator.h"
+#include "cmInstallGetRuntimeDependenciesGenerator.h"
+#include "cmInstallImportedRuntimeArtifactsGenerator.h"
+#include "cmInstallRuntimeDependencySet.h"
+#include "cmInstallRuntimeDependencySetGenerator.h"
 #include "cmInstallScriptGenerator.h"
 #include "cmInstallTargetGenerator.h"
 #include "cmListFileCache.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
 #include "cmPolicies.h"
-#include "cmProperty.h"
+#include "cmRange.h"
+#include "cmRuntimeDependencyArchive.h"
 #include "cmStateTypes.h"
 #include "cmStringAlgorithms.h"
 #include "cmSubcommandTable.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 #include "cmTargetExport.h"
+#include "cmValue.h"
 
 namespace {
+
+struct RuntimeDependenciesArgs
+{
+  std::vector<std::string> Directories;
+  std::vector<std::string> PreIncludeRegexes;
+  std::vector<std::string> PreExcludeRegexes;
+  std::vector<std::string> PostIncludeRegexes;
+  std::vector<std::string> PostExcludeRegexes;
+  std::vector<std::string> PostIncludeFiles;
+  std::vector<std::string> PostExcludeFiles;
+};
+
+auto const RuntimeDependenciesArgHelper =
+  cmArgumentParser<RuntimeDependenciesArgs>{}
+    .Bind("DIRECTORIES"_s, &RuntimeDependenciesArgs::Directories)
+    .Bind("PRE_INCLUDE_REGEXES"_s, &RuntimeDependenciesArgs::PreIncludeRegexes)
+    .Bind("PRE_EXCLUDE_REGEXES"_s, &RuntimeDependenciesArgs::PreExcludeRegexes)
+    .Bind("POST_INCLUDE_REGEXES"_s,
+          &RuntimeDependenciesArgs::PostIncludeRegexes)
+    .Bind("POST_EXCLUDE_REGEXES"_s,
+          &RuntimeDependenciesArgs::PostExcludeRegexes)
+    .Bind("POST_INCLUDE_FILES"_s, &RuntimeDependenciesArgs::PostIncludeFiles)
+    .Bind("POST_EXCLUDE_FILES"_s, &RuntimeDependenciesArgs::PostExcludeFiles);
 
 class Helper
 {
@@ -57,28 +89,38 @@ public:
   bool MakeFilesFullPath(const char* modeName,
                          const std::vector<std::string>& relFiles,
                          std::vector<std::string>& absFiles);
-  bool CheckCMP0006(bool& failure);
+  bool CheckCMP0006(bool& failure) const;
 
   std::string GetDestination(const cmInstallCommandArguments* args,
                              const std::string& varName,
-                             const std::string& guess);
-  std::string GetRuntimeDestination(const cmInstallCommandArguments* args);
-  std::string GetSbinDestination(const cmInstallCommandArguments* args);
-  std::string GetArchiveDestination(const cmInstallCommandArguments* args);
-  std::string GetLibraryDestination(const cmInstallCommandArguments* args);
-  std::string GetIncludeDestination(const cmInstallCommandArguments* args);
-  std::string GetSysconfDestination(const cmInstallCommandArguments* args);
-  std::string GetSharedStateDestination(const cmInstallCommandArguments* args);
-  std::string GetLocalStateDestination(const cmInstallCommandArguments* args);
-  std::string GetRunStateDestination(const cmInstallCommandArguments* args);
-  std::string GetDataRootDestination(const cmInstallCommandArguments* args);
-  std::string GetDataDestination(const cmInstallCommandArguments* args);
-  std::string GetInfoDestination(const cmInstallCommandArguments* args);
-  std::string GetLocaleDestination(const cmInstallCommandArguments* args);
-  std::string GetManDestination(const cmInstallCommandArguments* args);
-  std::string GetDocDestination(const cmInstallCommandArguments* args);
+                             const std::string& guess) const;
+  std::string GetRuntimeDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetSbinDestination(const cmInstallCommandArguments* args) const;
+  std::string GetArchiveDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetLibraryDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetIncludeDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetSysconfDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetSharedStateDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetLocalStateDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetRunStateDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetDataRootDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetDataDestination(const cmInstallCommandArguments* args) const;
+  std::string GetInfoDestination(const cmInstallCommandArguments* args) const;
+  std::string GetLocaleDestination(
+    const cmInstallCommandArguments* args) const;
+  std::string GetManDestination(const cmInstallCommandArguments* args) const;
+  std::string GetDocDestination(const cmInstallCommandArguments* args) const;
   std::string GetDestinationForType(const cmInstallCommandArguments* args,
-                                    const std::string& type);
+                                    const std::string& type) const;
 
   cmExecutionStatus& Status;
   cmMakefile* Makefile;
@@ -123,7 +165,8 @@ std::unique_ptr<cmInstallFilesGenerator> CreateInstallFilesGenerator(
   return cm::make_unique<cmInstallFilesGenerator>(
     absFiles, destination, programs, args.GetPermissions(),
     args.GetConfigurations(), args.GetComponent(), message,
-    args.GetExcludeFromAll(), args.GetRename(), args.GetOptional());
+    args.GetExcludeFromAll(), args.GetRename(), args.GetOptional(),
+    mf->GetBacktrace());
 }
 
 std::unique_ptr<cmInstallFilesGenerator> CreateInstallFilesGenerator(
@@ -134,11 +177,105 @@ std::unique_ptr<cmInstallFilesGenerator> CreateInstallFilesGenerator(
                                      args.GetDestination());
 }
 
+void AddInstallRuntimeDependenciesGenerator(
+  Helper& helper, cmInstallRuntimeDependencySet* runtimeDependencySet,
+  const cmInstallCommandArguments& runtimeArgs,
+  const cmInstallCommandArguments& libraryArgs,
+  const cmInstallCommandArguments& frameworkArgs,
+  RuntimeDependenciesArgs runtimeDependenciesArgs, bool& installsRuntime,
+  bool& installsLibrary, bool& installsFramework)
+{
+  bool dllPlatform =
+    !helper.Makefile->GetSafeDefinition("CMAKE_IMPORT_LIBRARY_SUFFIX").empty();
+  bool apple =
+    helper.Makefile->GetSafeDefinition("CMAKE_HOST_SYSTEM_NAME") == "Darwin";
+  auto const& runtimeDependenciesArgsRef =
+    dllPlatform ? runtimeArgs : libraryArgs;
+  std::vector<std::string> configurations =
+    runtimeDependenciesArgsRef.GetConfigurations();
+  if (apple) {
+    std::copy(frameworkArgs.GetConfigurations().begin(),
+              frameworkArgs.GetConfigurations().end(),
+              std::back_inserter(configurations));
+  }
+
+  // Create file(GET_RUNTIME_DEPENDENCIES) generator.
+  auto getRuntimeDependenciesGenerator =
+    cm::make_unique<cmInstallGetRuntimeDependenciesGenerator>(
+      runtimeDependencySet, std::move(runtimeDependenciesArgs.Directories),
+      std::move(runtimeDependenciesArgs.PreIncludeRegexes),
+      std::move(runtimeDependenciesArgs.PreExcludeRegexes),
+      std::move(runtimeDependenciesArgs.PostIncludeRegexes),
+      std::move(runtimeDependenciesArgs.PostExcludeRegexes),
+      std::move(runtimeDependenciesArgs.PostIncludeFiles),
+      std::move(runtimeDependenciesArgs.PostExcludeFiles),
+      runtimeDependenciesArgsRef.GetComponent(),
+      apple ? frameworkArgs.GetComponent() : "", true, "_CMAKE_DEPS",
+      "_CMAKE_RPATH", configurations,
+      cmInstallGenerator::SelectMessageLevel(helper.Makefile),
+      runtimeDependenciesArgsRef.GetExcludeFromAll() &&
+        (apple ? frameworkArgs.GetExcludeFromAll() : true),
+      helper.Makefile->GetBacktrace());
+  helper.Makefile->AddInstallGenerator(
+    std::move(getRuntimeDependenciesGenerator));
+
+  // Create the library dependencies generator.
+  auto libraryRuntimeDependenciesGenerator =
+    cm::make_unique<cmInstallRuntimeDependencySetGenerator>(
+      cmInstallRuntimeDependencySetGenerator::DependencyType::Library,
+      runtimeDependencySet, std::vector<std::string>{}, true, std::string{},
+      true, "_CMAKE_DEPS", "_CMAKE_RPATH", "_CMAKE_TMP",
+      dllPlatform ? helper.GetRuntimeDestination(&runtimeArgs)
+                  : helper.GetLibraryDestination(&libraryArgs),
+      runtimeDependenciesArgsRef.GetConfigurations(),
+      runtimeDependenciesArgsRef.GetComponent(),
+      runtimeDependenciesArgsRef.GetPermissions(),
+      cmInstallGenerator::SelectMessageLevel(helper.Makefile),
+      runtimeDependenciesArgsRef.GetExcludeFromAll(),
+      helper.Makefile->GetBacktrace());
+  helper.Makefile->AddInstallGenerator(
+    std::move(libraryRuntimeDependenciesGenerator));
+  if (dllPlatform) {
+    installsRuntime = true;
+  } else {
+    installsLibrary = true;
+  }
+
+  if (apple) {
+    // Create the framework dependencies generator.
+    auto frameworkRuntimeDependenciesGenerator =
+      cm::make_unique<cmInstallRuntimeDependencySetGenerator>(
+        cmInstallRuntimeDependencySetGenerator::DependencyType::Framework,
+        runtimeDependencySet, std::vector<std::string>{}, true, std::string{},
+        true, "_CMAKE_DEPS", "_CMAKE_RPATH", "_CMAKE_TMP",
+        frameworkArgs.GetDestination(), frameworkArgs.GetConfigurations(),
+        frameworkArgs.GetComponent(), frameworkArgs.GetPermissions(),
+        cmInstallGenerator::SelectMessageLevel(helper.Makefile),
+        frameworkArgs.GetExcludeFromAll(), helper.Makefile->GetBacktrace());
+    helper.Makefile->AddInstallGenerator(
+      std::move(frameworkRuntimeDependenciesGenerator));
+    installsFramework = true;
+  }
+}
+
 std::set<std::string> const allowedTypes{
   "BIN",         "SBIN",       "LIB",      "INCLUDE", "SYSCONF",
   "SHAREDSTATE", "LOCALSTATE", "RUNSTATE", "DATA",    "INFO",
   "LOCALE",      "MAN",        "DOC",
 };
+
+template <typename T>
+bool AddBundleExecutable(Helper& helper,
+                         cmInstallRuntimeDependencySet* runtimeDependencySet,
+                         T&& bundleExecutable)
+{
+  if (!runtimeDependencySet->AddBundleExecutable(bundleExecutable)) {
+    helper.SetError(
+      "A runtime dependency set may only have one bundle executable.");
+    return false;
+  }
+  return true;
+}
 
 bool HandleScriptMode(std::vector<std::string> const& args,
                       cmExecutionStatus& status)
@@ -150,6 +287,7 @@ bool HandleScriptMode(std::vector<std::string> const& args,
   bool doing_script = false;
   bool doing_code = false;
   bool exclude_from_all = false;
+  bool all_components = false;
 
   // Scan the args once for COMPONENT. Only allow one.
   //
@@ -161,6 +299,8 @@ bool HandleScriptMode(std::vector<std::string> const& args,
     }
     if (args[i] == "EXCLUDE_FROM_ALL") {
       exclude_from_all = true;
+    } else if (args[i] == "ALL_COMPONENTS") {
+      all_components = true;
     }
   }
 
@@ -168,6 +308,11 @@ bool HandleScriptMode(std::vector<std::string> const& args,
     status.SetError("given more than one COMPONENT for the SCRIPT or CODE "
                     "signature of the INSTALL command. "
                     "Use multiple INSTALL commands with one COMPONENT each.");
+    return false;
+  }
+
+  if (all_components && componentCount == 1) {
+    status.SetError("ALL_COMPONENTS and COMPONENT are mutually exclusive");
     return false;
   }
 
@@ -196,14 +341,16 @@ bool HandleScriptMode(std::vector<std::string> const& args,
         return false;
       }
       helper.Makefile->AddInstallGenerator(
-        cm::make_unique<cmInstallScriptGenerator>(script, false, component,
-                                                  exclude_from_all));
+        cm::make_unique<cmInstallScriptGenerator>(
+          script, false, component, exclude_from_all, all_components,
+          helper.Makefile->GetBacktrace()));
     } else if (doing_code) {
       doing_code = false;
       std::string const& code = arg;
       helper.Makefile->AddInstallGenerator(
-        cm::make_unique<cmInstallScriptGenerator>(code, true, component,
-                                                  exclude_from_all));
+        cm::make_unique<cmInstallScriptGenerator>(
+          code, true, component, exclude_from_all, all_components,
+          helper.Makefile->GetBacktrace()));
     }
   }
 
@@ -266,12 +413,24 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
   // These generic args also contain the targets and the export stuff
   std::vector<std::string> targetList;
   std::string exports;
+  std::vector<std::string> runtimeDependenciesArgVector;
+  std::string runtimeDependencySetArg;
   std::vector<std::string> unknownArgs;
+  std::vector<std::string> parsedArgs;
   cmInstallCommandArguments genericArgs(helper.DefaultComponentName);
   genericArgs.Bind("TARGETS"_s, targetList);
   genericArgs.Bind("EXPORT"_s, exports);
-  genericArgs.Parse(genericArgVector, &unknownArgs);
+  genericArgs.Bind("RUNTIME_DEPENDENCIES"_s, runtimeDependenciesArgVector);
+  genericArgs.Bind("RUNTIME_DEPENDENCY_SET"_s, runtimeDependencySetArg);
+  genericArgs.Parse(genericArgVector, &unknownArgs, nullptr, &parsedArgs);
   bool success = genericArgs.Finalize();
+
+  bool withRuntimeDependencies =
+    std::find(parsedArgs.begin(), parsedArgs.end(), "RUNTIME_DEPENDENCIES") !=
+    parsedArgs.end();
+  RuntimeDependenciesArgs runtimeDependenciesArgs =
+    RuntimeDependenciesArgHelper.Parse(runtimeDependenciesArgVector,
+                                       &unknownArgs);
 
   cmInstallCommandArguments archiveArgs(helper.DefaultComponentName);
   cmInstallCommandArguments libraryArgs(helper.DefaultComponentName);
@@ -379,6 +538,49 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
     return false;
   }
 
+  cmInstallRuntimeDependencySet* runtimeDependencySet = nullptr;
+  if (withRuntimeDependencies) {
+    if (!runtimeDependencySetArg.empty()) {
+      status.SetError("TARGETS cannot have both RUNTIME_DEPENDENCIES and "
+                      "RUNTIME_DEPENDENCY_SET.");
+      return false;
+    }
+    auto system = helper.Makefile->GetSafeDefinition("CMAKE_HOST_SYSTEM_NAME");
+    if (!cmRuntimeDependencyArchive::PlatformSupportsRuntimeDependencies(
+          system)) {
+      status.SetError(
+        cmStrCat("TARGETS RUNTIME_DEPENDENCIES is not supported on system \"",
+                 system, '"'));
+      return false;
+    }
+    if (helper.Makefile->IsOn("CMAKE_CROSSCOMPILING")) {
+      status.SetError("TARGETS RUNTIME_DEPENDENCIES is not supported "
+                      "when cross-compiling.");
+      return false;
+    }
+    if (helper.Makefile->GetSafeDefinition("CMAKE_HOST_SYSTEM_NAME") ==
+          "Darwin" &&
+        frameworkArgs.GetDestination().empty()) {
+      status.SetError(
+        "TARGETS RUNTIME_DEPENDENCIES given no FRAMEWORK DESTINATION");
+      return false;
+    }
+    runtimeDependencySet = helper.Makefile->GetGlobalGenerator()
+                             ->CreateAnonymousRuntimeDependencySet();
+  } else if (!runtimeDependencySetArg.empty()) {
+    auto system = helper.Makefile->GetSafeDefinition("CMAKE_HOST_SYSTEM_NAME");
+    if (!cmRuntimeDependencyArchive::PlatformSupportsRuntimeDependencies(
+          system)) {
+      status.SetError(cmStrCat(
+        "TARGETS RUNTIME_DEPENDENCY_SET is not supported on system \"", system,
+        '"'));
+      return false;
+    }
+    runtimeDependencySet =
+      helper.Makefile->GetGlobalGenerator()->GetNamedRuntimeDependencySet(
+        runtimeDependencySetArg);
+  }
+
   // Select the mode for installing symlinks to versioned shared libraries.
   cmInstallTargetGenerator::NamelinkModeType namelinkMode =
     cmInstallTargetGenerator::NamelinkModeNone;
@@ -468,6 +670,27 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
     // Track whether this is a namelink-only rule.
     bool namelinkOnly = false;
 
+    auto addTargetExport = [&]() {
+      // Add this install rule to an export if one was specified.
+      if (!exports.empty()) {
+        auto te = cm::make_unique<cmTargetExport>();
+        te->TargetName = target.GetName();
+        te->ArchiveGenerator = archiveGenerator.get();
+        te->BundleGenerator = bundleGenerator.get();
+        te->FrameworkGenerator = frameworkGenerator.get();
+        te->HeaderGenerator = publicHeaderGenerator.get();
+        te->LibraryGenerator = libraryGenerator.get();
+        te->RuntimeGenerator = runtimeGenerator.get();
+        te->ObjectsGenerator = objectGenerator.get();
+        target.AddInstallIncludeDirectories(
+          cmMakeRange(includesArgs.GetIncludeDirs()));
+        te->NamelinkOnly = namelinkOnly;
+        helper.Makefile->GetGlobalGenerator()
+          ->GetExportSets()[exports]
+          .AddTargetExport(std::move(te));
+      }
+    };
+
     switch (target.GetType()) {
       case cmStateEnums::SHARED_LIBRARY: {
         // Shared libraries are handled differently on DLL and non-DLL
@@ -476,6 +699,8 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
         if (target.IsDLLPlatform()) {
           // When in namelink only mode skip all libraries on Windows.
           if (namelinkMode == cmInstallTargetGenerator::NamelinkModeOnly) {
+            namelinkOnly = true;
+            addTargetExport();
             continue;
           }
 
@@ -500,6 +725,9 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
               target, runtimeArgs, false, helper.Makefile->GetBacktrace(),
               helper.GetRuntimeDestination(nullptr));
           }
+          if (runtimeDependencySet && runtimeGenerator) {
+            runtimeDependencySet->AddLibrary(runtimeGenerator.get());
+          }
         } else {
           // This is a non-DLL platform.
           // If it is marked with FRAMEWORK property use the FRAMEWORK set of
@@ -507,6 +735,8 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
           if (target.IsFrameworkOnApple()) {
             // When in namelink only mode skip frameworks.
             if (namelinkMode == cmInstallTargetGenerator::NamelinkModeOnly) {
+              namelinkOnly = true;
+              addTargetExport();
               continue;
             }
 
@@ -543,6 +773,9 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
             namelinkOnly =
               (namelinkMode == cmInstallTargetGenerator::NamelinkModeOnly);
           }
+          if (runtimeDependencySet && libraryGenerator) {
+            runtimeDependencySet->AddLibrary(libraryGenerator.get());
+          }
         }
       } break;
       case cmStateEnums::STATIC_LIBRARY: {
@@ -551,6 +784,8 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
         if (target.IsFrameworkOnApple()) {
           // When in namelink only mode skip frameworks.
           if (namelinkMode == cmInstallTargetGenerator::NamelinkModeOnly) {
+            namelinkOnly = true;
+            addTargetExport();
             continue;
           }
 
@@ -583,6 +818,9 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
           libraryGenerator->SetNamelinkMode(namelinkMode);
           namelinkOnly =
             (namelinkMode == cmInstallTargetGenerator::NamelinkModeOnly);
+          if (runtimeDependencySet) {
+            runtimeDependencySet->AddModule(libraryGenerator.get());
+          }
         } else {
           status.SetError(
             cmStrCat("TARGETS given no LIBRARY DESTINATION for module "
@@ -635,6 +873,12 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
                                      target.GetName(), "\"."));
             return false;
           }
+          if (runtimeDependencySet) {
+            if (!AddBundleExecutable(helper, runtimeDependencySet,
+                                     bundleGenerator.get())) {
+              return false;
+            }
+          }
         } else {
           // Executables use the RUNTIME properties.
           if (!runtimeArgs.GetDestination().empty()) {
@@ -643,6 +887,9 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
           runtimeGenerator = CreateInstallTargetGenerator(
             target, runtimeArgs, false, helper.Makefile->GetBacktrace(),
             helper.GetRuntimeDestination(&runtimeArgs));
+          if (runtimeDependencySet) {
+            runtimeDependencySet->AddExecutable(runtimeGenerator.get());
+          }
         }
 
         // On DLL platforms an executable may also have an import
@@ -679,8 +926,8 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
     }
 
     if (createInstallGeneratorsForTargetFileSets && !namelinkOnly) {
-      cmProp files = target.GetProperty("PRIVATE_HEADER");
-      if (files && !files->empty()) {
+      cmValue files = target.GetProperty("PRIVATE_HEADER");
+      if (cmNonempty(files)) {
         std::vector<std::string> relFiles = cmExpandedList(*files);
         std::vector<std::string> absFiles;
         if (!helper.MakeFilesFullPath("PRIVATE_HEADER", relFiles, absFiles)) {
@@ -702,7 +949,7 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
       }
 
       files = target.GetProperty("PUBLIC_HEADER");
-      if (files && !files->empty()) {
+      if (cmNonempty(files)) {
         std::vector<std::string> relFiles = cmExpandedList(*files);
         std::vector<std::string> absFiles;
         if (!helper.MakeFilesFullPath("PUBLIC_HEADER", relFiles, absFiles)) {
@@ -724,7 +971,7 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
       }
 
       files = target.GetProperty("RESOURCE");
-      if (files && !files->empty()) {
+      if (cmNonempty(files)) {
         std::vector<std::string> relFiles = cmExpandedList(*files);
         std::vector<std::string> absFiles;
         if (!helper.MakeFilesFullPath("RESOURCE", relFiles, absFiles)) {
@@ -735,7 +982,7 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
         if (!resourceArgs.GetDestination().empty()) {
           resourceGenerator = CreateInstallFilesGenerator(
             helper.Makefile, absFiles, resourceArgs, false);
-        } else {
+        } else if (!target.IsAppBundleOnApple()) {
           cmSystemTools::Message(
             cmStrCat("INSTALL TARGETS - target ", target.GetName(),
                      " has RESOURCE files but no RESOURCE DESTINATION."),
@@ -744,25 +991,8 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
       }
     }
 
-    // Add this install rule to an export if one was specified and
-    // this is not a namelink-only rule.
-    if (!exports.empty() && !namelinkOnly) {
-      auto te = cm::make_unique<cmTargetExport>();
-      te->TargetName = target.GetName();
-      te->ArchiveGenerator = archiveGenerator.get();
-      te->BundleGenerator = bundleGenerator.get();
-      te->FrameworkGenerator = frameworkGenerator.get();
-      te->HeaderGenerator = publicHeaderGenerator.get();
-      te->LibraryGenerator = libraryGenerator.get();
-      te->RuntimeGenerator = runtimeGenerator.get();
-      te->ObjectsGenerator = objectGenerator.get();
-      te->InterfaceIncludeDirectories =
-        cmJoin(includesArgs.GetIncludeDirs(), ";");
-
-      helper.Makefile->GetGlobalGenerator()
-        ->GetExportSets()[exports]
-        .AddTargetExport(std::move(te));
-    }
+    // Add this install rule to an export if one was specified.
+    addTargetExport();
 
     // Keep track of whether we're installing anything in each category
     installsArchive = installsArchive || archiveGenerator;
@@ -786,6 +1016,13 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
     helper.Makefile->AddInstallGenerator(std::move(privateHeaderGenerator));
     helper.Makefile->AddInstallGenerator(std::move(publicHeaderGenerator));
     helper.Makefile->AddInstallGenerator(std::move(resourceGenerator));
+  }
+
+  if (withRuntimeDependencies && !runtimeDependencySet->Empty()) {
+    AddInstallRuntimeDependenciesGenerator(
+      helper, runtimeDependencySet, runtimeArgs, libraryArgs, frameworkArgs,
+      std::move(runtimeDependenciesArgs), installsRuntime, installsLibrary,
+      installsFramework);
   }
 
   // Tell the global generator about any installation component names
@@ -829,6 +1066,266 @@ bool HandleTargetsMode(std::vector<std::string> const& args,
   if (installsResource) {
     helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
       resourceArgs.GetComponent());
+  }
+
+  return true;
+}
+
+bool HandleImportedRuntimeArtifactsMode(std::vector<std::string> const& args,
+                                        cmExecutionStatus& status)
+{
+  Helper helper(status);
+
+  // This is the IMPORTED_RUNTIME_ARTIFACTS mode.
+  std::vector<cmTarget*> targets;
+
+  struct ArgVectors
+  {
+    std::vector<std::string> Library;
+    std::vector<std::string> Runtime;
+    std::vector<std::string> Framework;
+    std::vector<std::string> Bundle;
+  };
+
+  static auto const argHelper = cmArgumentParser<ArgVectors>{}
+                                  .Bind("LIBRARY"_s, &ArgVectors::Library)
+                                  .Bind("RUNTIME"_s, &ArgVectors::Runtime)
+                                  .Bind("FRAMEWORK"_s, &ArgVectors::Framework)
+                                  .Bind("BUNDLE"_s, &ArgVectors::Bundle);
+
+  std::vector<std::string> genericArgVector;
+  ArgVectors const argVectors = argHelper.Parse(args, &genericArgVector);
+
+  // now parse the generic args (i.e. the ones not specialized on LIBRARY,
+  // RUNTIME etc. (see above)
+  std::vector<std::string> targetList;
+  std::string runtimeDependencySetArg;
+  std::vector<std::string> unknownArgs;
+  cmInstallCommandArguments genericArgs(helper.DefaultComponentName);
+  genericArgs.Bind("IMPORTED_RUNTIME_ARTIFACTS"_s, targetList)
+    .Bind("RUNTIME_DEPENDENCY_SET"_s, runtimeDependencySetArg);
+  genericArgs.Parse(genericArgVector, &unknownArgs);
+  bool success = genericArgs.Finalize();
+
+  cmInstallCommandArguments libraryArgs(helper.DefaultComponentName);
+  cmInstallCommandArguments runtimeArgs(helper.DefaultComponentName);
+  cmInstallCommandArguments frameworkArgs(helper.DefaultComponentName);
+  cmInstallCommandArguments bundleArgs(helper.DefaultComponentName);
+
+  // now parse the args for specific parts of the target (e.g. LIBRARY,
+  // RUNTIME etc.
+  libraryArgs.Parse(argVectors.Library, &unknownArgs);
+  runtimeArgs.Parse(argVectors.Runtime, &unknownArgs);
+  frameworkArgs.Parse(argVectors.Framework, &unknownArgs);
+  bundleArgs.Parse(argVectors.Bundle, &unknownArgs);
+
+  if (!unknownArgs.empty()) {
+    // Unknown argument.
+    status.SetError(
+      cmStrCat("IMPORTED_RUNTIME_ARTIFACTS given unknown argument \"",
+               unknownArgs[0], "\"."));
+    return false;
+  }
+
+  // apply generic args
+  libraryArgs.SetGenericArguments(&genericArgs);
+  runtimeArgs.SetGenericArguments(&genericArgs);
+  frameworkArgs.SetGenericArguments(&genericArgs);
+  bundleArgs.SetGenericArguments(&genericArgs);
+
+  success = success && libraryArgs.Finalize();
+  success = success && runtimeArgs.Finalize();
+  success = success && frameworkArgs.Finalize();
+  success = success && bundleArgs.Finalize();
+
+  if (!success) {
+    return false;
+  }
+
+  cmInstallRuntimeDependencySet* runtimeDependencySet = nullptr;
+  if (!runtimeDependencySetArg.empty()) {
+    auto system = helper.Makefile->GetSafeDefinition("CMAKE_HOST_SYSTEM_NAME");
+    if (!cmRuntimeDependencyArchive::PlatformSupportsRuntimeDependencies(
+          system)) {
+      status.SetError(
+        cmStrCat("IMPORTED_RUNTIME_ARTIFACTS RUNTIME_DEPENDENCY_SET is not "
+                 "supported on system \"",
+                 system, '"'));
+      return false;
+    }
+    runtimeDependencySet =
+      helper.Makefile->GetGlobalGenerator()->GetNamedRuntimeDependencySet(
+        runtimeDependencySetArg);
+  }
+
+  // Check if there is something to do.
+  if (targetList.empty()) {
+    return true;
+  }
+
+  for (std::string const& tgt : targetList) {
+    if (helper.Makefile->IsAlias(tgt)) {
+      status.SetError(cmStrCat("IMPORTED_RUNTIME_ARTIFACTS given target \"",
+                               tgt, "\" which is an alias."));
+      return false;
+    }
+    // Lookup this target in the current directory.
+    cmTarget* target = helper.Makefile->FindTargetToUse(tgt);
+    if (!target || !target->IsImported()) {
+      // If no local target has been found, find it in the global scope.
+      cmTarget* const global_target =
+        helper.Makefile->GetGlobalGenerator()->FindTarget(tgt, true);
+      if (global_target && global_target->IsImported()) {
+        target = global_target;
+      }
+    }
+    if (target) {
+      // Found the target.  Check its type.
+      if (target->GetType() != cmStateEnums::EXECUTABLE &&
+          target->GetType() != cmStateEnums::SHARED_LIBRARY &&
+          target->GetType() != cmStateEnums::MODULE_LIBRARY) {
+        status.SetError(
+          cmStrCat("IMPORTED_RUNTIME_ARTIFACTS given target \"", tgt,
+                   "\" which is not an executable, library, or module."));
+        return false;
+      }
+      // Store the target in the list to be installed.
+      targets.push_back(target);
+    } else {
+      // Did not find the target.
+      status.SetError(cmStrCat("IMPORTED_RUNTIME_ARTIFACTS given target \"",
+                               tgt, "\" which does not exist."));
+      return false;
+    }
+  }
+
+  // Keep track of whether we will be performing an installation of
+  // any files of the given type.
+  bool installsLibrary = false;
+  bool installsRuntime = false;
+  bool installsFramework = false;
+  bool installsBundle = false;
+
+  auto const createInstallGenerator =
+    [helper](cmTarget& target, const cmInstallCommandArguments& typeArgs,
+             const std::string& destination)
+    -> std::unique_ptr<cmInstallImportedRuntimeArtifactsGenerator> {
+    return cm::make_unique<cmInstallImportedRuntimeArtifactsGenerator>(
+      target.GetName(), destination, typeArgs.GetPermissions(),
+      typeArgs.GetConfigurations(), typeArgs.GetComponent(),
+      cmInstallGenerator::SelectMessageLevel(helper.Makefile),
+      typeArgs.GetExcludeFromAll(), typeArgs.GetOptional(),
+      helper.Makefile->GetBacktrace());
+  };
+
+  // Generate install script code to install the given targets.
+  for (cmTarget* ti : targets) {
+    // Handle each target type.
+    cmTarget& target = *ti;
+    std::unique_ptr<cmInstallImportedRuntimeArtifactsGenerator>
+      libraryGenerator;
+    std::unique_ptr<cmInstallImportedRuntimeArtifactsGenerator>
+      runtimeGenerator;
+    std::unique_ptr<cmInstallImportedRuntimeArtifactsGenerator>
+      frameworkGenerator;
+    std::unique_ptr<cmInstallImportedRuntimeArtifactsGenerator>
+      bundleGenerator;
+
+    switch (target.GetType()) {
+      case cmStateEnums::SHARED_LIBRARY:
+        if (target.IsDLLPlatform()) {
+          runtimeGenerator = createInstallGenerator(
+            target, runtimeArgs, helper.GetRuntimeDestination(&runtimeArgs));
+          if (runtimeDependencySet) {
+            runtimeDependencySet->AddLibrary(runtimeGenerator.get());
+          }
+        } else if (target.IsFrameworkOnApple()) {
+          if (frameworkArgs.GetDestination().empty()) {
+            status.SetError(cmStrCat("IMPORTED_RUNTIME_ARTIFACTS given no "
+                                     "FRAMEWORK DESTINATION for shared "
+                                     "library FRAMEWORK target \"",
+                                     target.GetName(), "\"."));
+            return false;
+          }
+          frameworkGenerator = createInstallGenerator(
+            target, frameworkArgs, frameworkArgs.GetDestination());
+          if (runtimeDependencySet) {
+            runtimeDependencySet->AddLibrary(frameworkGenerator.get());
+          }
+        } else {
+          libraryGenerator = createInstallGenerator(
+            target, libraryArgs, helper.GetLibraryDestination(&libraryArgs));
+          if (runtimeDependencySet) {
+            runtimeDependencySet->AddLibrary(libraryGenerator.get());
+          }
+        }
+        break;
+      case cmStateEnums::MODULE_LIBRARY:
+        libraryGenerator = createInstallGenerator(
+          target, libraryArgs, helper.GetLibraryDestination(&libraryArgs));
+        if (runtimeDependencySet) {
+          runtimeDependencySet->AddModule(libraryGenerator.get());
+        }
+        break;
+      case cmStateEnums::EXECUTABLE:
+        if (target.IsAppBundleOnApple()) {
+          if (bundleArgs.GetDestination().empty()) {
+            status.SetError(
+              cmStrCat("IMPORTED_RUNTIME_ARTIFACTS given no BUNDLE "
+                       "DESTINATION for MACOSX_BUNDLE executable target \"",
+                       target.GetName(), "\"."));
+            return false;
+          }
+          bundleGenerator = createInstallGenerator(
+            target, bundleArgs, bundleArgs.GetDestination());
+          if (runtimeDependencySet) {
+            if (!AddBundleExecutable(helper, runtimeDependencySet,
+                                     bundleGenerator.get())) {
+              return false;
+            }
+          }
+        } else {
+          runtimeGenerator = createInstallGenerator(
+            target, runtimeArgs, helper.GetRuntimeDestination(&runtimeArgs));
+          if (runtimeDependencySet) {
+            runtimeDependencySet->AddExecutable(runtimeGenerator.get());
+          }
+        }
+        break;
+      default:
+        assert(false && "This should never happen");
+        break;
+    }
+
+    // Keep track of whether we're installing anything in each category
+    installsLibrary = installsLibrary || libraryGenerator;
+    installsRuntime = installsRuntime || runtimeGenerator;
+    installsFramework = installsFramework || frameworkGenerator;
+    installsBundle = installsBundle || bundleGenerator;
+
+    helper.Makefile->AddInstallGenerator(std::move(libraryGenerator));
+    helper.Makefile->AddInstallGenerator(std::move(runtimeGenerator));
+    helper.Makefile->AddInstallGenerator(std::move(frameworkGenerator));
+    helper.Makefile->AddInstallGenerator(std::move(bundleGenerator));
+  }
+
+  // Tell the global generator about any installation component names
+  // specified
+  if (installsLibrary) {
+    helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
+      libraryArgs.GetComponent());
+  }
+  if (installsRuntime) {
+    helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
+      runtimeArgs.GetComponent());
+  }
+  if (installsFramework) {
+    helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
+      frameworkArgs.GetComponent());
+  }
+  if (installsBundle) {
+    helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
+      bundleArgs.GetComponent());
   }
 
   return true;
@@ -894,6 +1391,7 @@ bool HandleFilesMode(std::vector<std::string> const& args,
         case cmPolicies::WARN:
           e << cmPolicies::GetPolicyWarning(cmPolicies::CMP0062) << "\n";
           modal = "should";
+          CM_FALLTHROUGH;
         case cmPolicies::OLD:
           break;
         case cmPolicies::REQUIRED_IF_USED:
@@ -901,6 +1399,7 @@ bool HandleFilesMode(std::vector<std::string> const& args,
         case cmPolicies::NEW:
           modal = "may";
           messageType = MessageType::FATAL_ERROR;
+          break;
       }
       if (modal) {
         e << "The file\n  " << file
@@ -1157,7 +1656,7 @@ bool HandleDirectoryMode(std::vector<std::string> const& args,
     } else if (doing == DoingRegex) {
       literal_args += " REGEX \"";
 // Match rules are case-insensitive on some platforms.
-#if defined(_WIN32) || defined(__APPLE__) || defined(__CYGWIN__)
+#if defined(_WIN32) || defined(__APPLE__)
       std::string regex = cmSystemTools::LowerCase(args[i]);
 #else
       std::string regex = args[i];
@@ -1233,7 +1732,8 @@ bool HandleDirectoryMode(std::vector<std::string> const& args,
   helper.Makefile->AddInstallGenerator(
     cm::make_unique<cmInstallDirectoryGenerator>(
       dirs, *destination, permissions_file, permissions_dir, configurations,
-      component, message, exclude_from_all, literal_args, optional));
+      component, message, exclude_from_all, literal_args, optional,
+      helper.Makefile->GetBacktrace()));
 
   // Tell the global generator about any installation component names
   // specified.
@@ -1325,7 +1825,8 @@ bool HandleExportAndroidMKMode(std::vector<std::string> const& args,
     cm::make_unique<cmInstallExportGenerator>(
       &exportSet, ica.GetDestination(), ica.GetPermissions(),
       ica.GetConfigurations(), ica.GetComponent(), message,
-      ica.GetExcludeFromAll(), fname, name_space, exportOld, true));
+      ica.GetExcludeFromAll(), fname, name_space, exportOld, true,
+      helper.Makefile->GetBacktrace()));
 
   return true;
 #else
@@ -1438,7 +1939,122 @@ bool HandleExportMode(std::vector<std::string> const& args,
     cm::make_unique<cmInstallExportGenerator>(
       &exportSet, ica.GetDestination(), ica.GetPermissions(),
       ica.GetConfigurations(), ica.GetComponent(), message,
-      ica.GetExcludeFromAll(), fname, name_space, exportOld, false));
+      ica.GetExcludeFromAll(), fname, name_space, exportOld, false,
+      helper.Makefile->GetBacktrace()));
+
+  return true;
+}
+
+bool HandleRuntimeDependencySetMode(std::vector<std::string> const& args,
+                                    cmExecutionStatus& status)
+{
+  Helper helper(status);
+
+  auto system = helper.Makefile->GetSafeDefinition("CMAKE_HOST_SYSTEM_NAME");
+  if (!cmRuntimeDependencyArchive::PlatformSupportsRuntimeDependencies(
+        system)) {
+    status.SetError(cmStrCat(
+      "RUNTIME_DEPENDENCY_SET is not supported on system \"", system, '"'));
+    return false;
+  }
+
+  // This is the RUNTIME_DEPENDENCY_SET mode.
+  cmInstallRuntimeDependencySet* runtimeDependencySet;
+
+  struct ArgVectors
+  {
+    std::vector<std::string> Library;
+    std::vector<std::string> Runtime;
+    std::vector<std::string> Framework;
+  };
+
+  static auto const argHelper = cmArgumentParser<ArgVectors>{}
+                                  .Bind("LIBRARY"_s, &ArgVectors::Library)
+                                  .Bind("RUNTIME"_s, &ArgVectors::Runtime)
+                                  .Bind("FRAMEWORK"_s, &ArgVectors::Framework);
+
+  std::vector<std::string> genericArgVector;
+  ArgVectors const argVectors = argHelper.Parse(args, &genericArgVector);
+
+  // now parse the generic args (i.e. the ones not specialized on LIBRARY,
+  // RUNTIME, FRAMEWORK etc. (see above)
+  // These generic args also contain the runtime dependency set
+  std::string runtimeDependencySetArg;
+  std::vector<std::string> runtimeDependencyArgVector;
+  std::vector<std::string> parsedArgs;
+  cmInstallCommandArguments genericArgs(helper.DefaultComponentName);
+  genericArgs.Bind("RUNTIME_DEPENDENCY_SET"_s, runtimeDependencySetArg);
+  genericArgs.Parse(genericArgVector, &runtimeDependencyArgVector, nullptr,
+                    &parsedArgs);
+  bool success = genericArgs.Finalize();
+
+  cmInstallCommandArguments libraryArgs(helper.DefaultComponentName);
+  cmInstallCommandArguments runtimeArgs(helper.DefaultComponentName);
+  cmInstallCommandArguments frameworkArgs(helper.DefaultComponentName);
+
+  // Now also parse the file(GET_RUNTIME_DEPENDENCY) args
+  std::vector<std::string> unknownArgs;
+  auto runtimeDependencyArgs = RuntimeDependenciesArgHelper.Parse(
+    runtimeDependencyArgVector, &unknownArgs);
+
+  // now parse the args for specific parts of the target (e.g. LIBRARY,
+  // RUNTIME, FRAMEWORK etc.
+  libraryArgs.Parse(argVectors.Library, &unknownArgs);
+  runtimeArgs.Parse(argVectors.Runtime, &unknownArgs);
+  frameworkArgs.Parse(argVectors.Framework, &unknownArgs);
+
+  libraryArgs.SetGenericArguments(&genericArgs);
+  runtimeArgs.SetGenericArguments(&genericArgs);
+  frameworkArgs.SetGenericArguments(&genericArgs);
+
+  success = success && libraryArgs.Finalize();
+  success = success && runtimeArgs.Finalize();
+  success = success && frameworkArgs.Finalize();
+
+  if (!success) {
+    return false;
+  }
+
+  if (!unknownArgs.empty()) {
+    helper.SetError(
+      cmStrCat("RUNTIME_DEPENDENCY_SET given unknown argument \"",
+               unknownArgs.front(), "\"."));
+    return false;
+  }
+
+  if (runtimeDependencySetArg.empty()) {
+    helper.SetError(
+      "RUNTIME_DEPENDENCY_SET not given a runtime dependency set.");
+    return false;
+  }
+
+  runtimeDependencySet =
+    helper.Makefile->GetGlobalGenerator()->GetNamedRuntimeDependencySet(
+      runtimeDependencySetArg);
+
+  bool installsRuntime = false;
+  bool installsLibrary = false;
+  bool installsFramework = false;
+
+  AddInstallRuntimeDependenciesGenerator(
+    helper, runtimeDependencySet, runtimeArgs, libraryArgs, frameworkArgs,
+    std::move(runtimeDependencyArgs), installsRuntime, installsLibrary,
+    installsFramework);
+
+  // Tell the global generator about any installation component names
+  // specified
+  if (installsLibrary) {
+    helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
+      libraryArgs.GetComponent());
+  }
+  if (installsRuntime) {
+    helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
+      runtimeArgs.GetComponent());
+  }
+  if (installsFramework) {
+    helper.Makefile->GetGlobalGenerator()->AddInstallComponent(
+      frameworkArgs.GetComponent());
+  }
 
   return true;
 }
@@ -1456,7 +2072,8 @@ bool Helper::MakeFilesFullPath(const char* modeName,
     }
 
     // Make sure the file is not a directory.
-    if (gpos == std::string::npos && cmSystemTools::FileIsDirectory(file)) {
+    if (gpos == std::string::npos && !cmSystemTools::FileIsSymlink(file) &&
+        cmSystemTools::FileIsDirectory(file)) {
       this->SetError(
         cmStrCat(modeName, " given directory \"", relFile, "\" to install."));
       return false;
@@ -1467,7 +2084,7 @@ bool Helper::MakeFilesFullPath(const char* modeName,
   return true;
 }
 
-bool Helper::CheckCMP0006(bool& failure)
+bool Helper::CheckCMP0006(bool& failure) const
 {
   switch (this->Makefile->GetPolicyStatus(cmPolicies::CMP0006)) {
     case cmPolicies::WARN:
@@ -1494,7 +2111,7 @@ bool Helper::CheckCMP0006(bool& failure)
 
 std::string Helper::GetDestination(const cmInstallCommandArguments* args,
                                    const std::string& varName,
-                                   const std::string& guess)
+                                   const std::string& guess) const
 {
   if (args && !args->GetDestination().empty()) {
     return args->GetDestination();
@@ -1507,54 +2124,55 @@ std::string Helper::GetDestination(const cmInstallCommandArguments* args,
 }
 
 std::string Helper::GetRuntimeDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_BINDIR", "bin");
 }
 
-std::string Helper::GetSbinDestination(const cmInstallCommandArguments* args)
+std::string Helper::GetSbinDestination(
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_SBINDIR", "sbin");
 }
 
 std::string Helper::GetArchiveDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_LIBDIR", "lib");
 }
 
 std::string Helper::GetLibraryDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_LIBDIR", "lib");
 }
 
 std::string Helper::GetIncludeDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_INCLUDEDIR", "include");
 }
 
 std::string Helper::GetSysconfDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_SYSCONFDIR", "etc");
 }
 
 std::string Helper::GetSharedStateDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_SHAREDSTATEDIR", "com");
 }
 
 std::string Helper::GetLocalStateDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_LOCALSTATEDIR", "var");
 }
 
 std::string Helper::GetRunStateDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_RUNSTATEDIR",
                               this->GetLocalStateDestination(nullptr) +
@@ -1562,44 +2180,49 @@ std::string Helper::GetRunStateDestination(
 }
 
 std::string Helper::GetDataRootDestination(
-  const cmInstallCommandArguments* args)
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_DATAROOTDIR", "share");
 }
 
-std::string Helper::GetDataDestination(const cmInstallCommandArguments* args)
+std::string Helper::GetDataDestination(
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_DATADIR",
                               this->GetDataRootDestination(nullptr));
 }
 
-std::string Helper::GetInfoDestination(const cmInstallCommandArguments* args)
+std::string Helper::GetInfoDestination(
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_INFODIR",
                               this->GetDataRootDestination(nullptr) + "/info");
 }
 
-std::string Helper::GetLocaleDestination(const cmInstallCommandArguments* args)
+std::string Helper::GetLocaleDestination(
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_LOCALEDIR",
                               this->GetDataRootDestination(nullptr) +
                                 "/locale");
 }
 
-std::string Helper::GetManDestination(const cmInstallCommandArguments* args)
+std::string Helper::GetManDestination(
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_MANDIR",
                               this->GetDataRootDestination(nullptr) + "/man");
 }
 
-std::string Helper::GetDocDestination(const cmInstallCommandArguments* args)
+std::string Helper::GetDocDestination(
+  const cmInstallCommandArguments* args) const
 {
   return this->GetDestination(args, "CMAKE_INSTALL_DOCDIR",
                               this->GetDataRootDestination(nullptr) + "/doc");
 }
 
 std::string Helper::GetDestinationForType(
-  const cmInstallCommandArguments* args, const std::string& type)
+  const cmInstallCommandArguments* args, const std::string& type) const
 {
   if (args && !args->GetDestination().empty()) {
     return args->GetDestination();
@@ -1664,11 +2287,13 @@ bool cmInstallCommand(std::vector<std::string> const& args,
     { "SCRIPT"_s, HandleScriptMode },
     { "CODE"_s, HandleScriptMode },
     { "TARGETS"_s, HandleTargetsMode },
+    { "IMPORTED_RUNTIME_ARTIFACTS"_s, HandleImportedRuntimeArtifactsMode },
     { "FILES"_s, HandleFilesMode },
     { "PROGRAMS"_s, HandleFilesMode },
     { "DIRECTORY"_s, HandleDirectoryMode },
     { "EXPORT"_s, HandleExportMode },
     { "EXPORT_ANDROID_MK"_s, HandleExportAndroidMKMode },
+    { "RUNTIME_DEPENDENCY_SET"_s, HandleRuntimeDependencySetMode },
   };
 
   return subcommand(args[0], args, status);

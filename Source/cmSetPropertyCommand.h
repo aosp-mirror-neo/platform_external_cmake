@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmSetsPropertiesCommand_h
-#define cmSetsPropertiesCommand_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -10,6 +9,7 @@
 
 class cmMakefile;
 class cmExecutionStatus;
+class cmSourceFile;
 
 bool cmSetPropertyCommand(std::vector<std::string> const& args,
                           cmExecutionStatus& status);
@@ -26,7 +26,7 @@ bool HandleSourceFileDirectoryScopeValidation(
   std::vector<std::string>& source_file_directories,
   std::vector<std::string>& source_file_target_directories);
 
-bool HandleAndValidateSourceFileDirectortoryScopes(
+bool HandleAndValidateSourceFileDirectoryScopes(
   cmExecutionStatus& status, bool source_directories_option_encountered,
   bool source_target_directories_option_encountered,
   std::vector<std::string>& source_directories,
@@ -40,6 +40,16 @@ void MakeSourceFilePathsAbsoluteIfNeeded(
   std::vector<std::string>& source_files_absolute_paths,
   std::vector<std::string>::const_iterator files_it_begin,
   std::vector<std::string>::const_iterator files_it_end, bool needed);
-}
 
-#endif
+enum class PropertyOp
+{
+  Remove,
+  Set,
+  Append,
+  AppendAsString
+};
+
+bool HandleAndValidateSourceFilePropertyGENERATED(
+  cmSourceFile* sf, std::string const& propertyValue,
+  PropertyOp op = PropertyOp::Set);
+}

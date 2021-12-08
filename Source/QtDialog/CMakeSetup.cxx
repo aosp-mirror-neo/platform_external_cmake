@@ -7,7 +7,6 @@
 #include <QDir>
 #include <QLocale>
 #include <QString>
-#include <QTextCodec>
 #include <QTranslator>
 #include <QtPlugin>
 
@@ -21,7 +20,6 @@
 #include "cmDocumentationEntry.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h" // IWYU pragma: keep
-#include "cmVersion.h"
 #include "cmake.h"
 
 static const char* cmDocumentationName[][2] = { { nullptr,
@@ -33,11 +31,17 @@ static const char* cmDocumentationUsage[][2] = {
     "  cmake-gui [options]\n"
     "  cmake-gui [options] <path-to-source>\n"
     "  cmake-gui [options] <path-to-existing-build>\n"
-    "  cmake-gui [options] -S <path-to-source> -B <path-to-build>\n" },
+    "  cmake-gui [options] -S <path-to-source> -B <path-to-build>\n"
+    "  cmake-gui [options] --browse-manual\n" },
   { nullptr, nullptr }
 };
 
-static const char* cmDocumentationOptions[][2] = { { nullptr, nullptr } };
+static const char* cmDocumentationOptions[][2] = {
+  { "-S <path-to-source>", "Explicitly specify a source directory." },
+  { "-B <path-to-build>", "Explicitly specify a build directory." },
+  { "--preset=<preset>", "Specify a configure preset." },
+  { nullptr, nullptr }
+};
 
 #if defined(Q_OS_MAC)
 static int cmOSXInstall(std::string dir);
@@ -54,6 +58,10 @@ Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin);
 Q_IMPORT_PLUGIN(QWindowsVistaStylePlugin);
 #  endif
 #endif
+
+int CMakeGUIExec(CMakeSetupDialog* window);
+void SetupDefaultQSettings();
+void OpenReferenceManual();
 
 int main(int argc, char** argv)
 {
@@ -104,24 +112,17 @@ int main(int argc, char** argv)
   cmAddPluginPath();
 #endif
 
-#if QT_VERSION >= 0x050600
+// HighDpiScaling is always enabled starting with Qt6, but will still issue a
+// deprecation warning if you try to set the attribute for it
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 6, 0) &&                               \
+     QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
   QGuiApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
 #endif
 
+  SetupDefaultQSettings();
   QApplication app(argc, argv);
 
   setlocale(LC_NUMERIC, "C");
-
-  QTextCodec* utf8_codec = QTextCodec::codecForName("UTF-8");
-  QTextCodec::setCodecForLocale(utf8_codec);
-
-#if QT_VERSION < 0x050000
-  // clean out standard Qt paths for plugins, which we don't use anyway
-  // when creating Mac bundles, it potentially causes problems
-  foreach (QString p, QApplication::libraryPaths()) {
-    QApplication::removeLibraryPath(p);
-  }
-#endif
 
   // tell the cmake library where cmake is
   QDir cmExecDir(QApplication::applicationDirPath());
@@ -134,9 +135,9 @@ int main(int argc, char** argv)
   translationsDir.cd(QString::fromLocal8Bit(".." CMAKE_DATA_DIR));
   translationsDir.cd("i18n");
   QTranslator translator;
-  QString transfile = QString("cmake_%1").arg(QLocale::system().name());
-  translator.load(transfile, translationsDir.path());
-  QApplication::installTranslator(&translator);
+  if (translator.load(QLocale(), "cmake", "_", translationsDir.path())) {
+    QApplication::installTranslator(&translator);
+  }
 
   // app setup
   QApplication::setApplicationName("CMakeSetup");
@@ -144,7 +145,7 @@ int main(int argc, char** argv)
   QIcon appIcon;
   appIcon.addFile(":/Icons/CMakeSetup32.png");
   appIcon.addFile(":/Icons/CMakeSetup128.png");
-  QApplication::setWindowIcon(appIcon);
+  QApplication::setWindowIcon(QIcon::fromTheme("cmake-gui", appIcon));
 
   CMakeSetupDialog dialog;
   dialog.show();
@@ -152,6 +153,7 @@ int main(int argc, char** argv)
   QStringList args = QApplication::arguments();
   std::string binaryDirectory;
   std::string sourceDirectory;
+  std::string presetName;
   for (int i = 1; i < args.size(); ++i) {
     const QString& arg = args[i];
     if (arg.startsWith("-S")) {
@@ -190,11 +192,31 @@ int main(int argc, char** argv)
       binaryDirectory =
         cmSystemTools::CollapseFullPath(path.toLocal8Bit().data());
       cmSystemTools::ConvertToUnixSlashes(binaryDirectory);
+    } else if (arg.startsWith("--preset=")) {
+      QString preset = arg.mid(cmStrLen("--preset="));
+      if (preset.isEmpty()) {
+        std::cerr << "No preset specified for --preset" << std::endl;
+        return 1;
+      }
+      presetName = preset.toLocal8Bit().data();
+    } else if (arg == "--browse-manual") {
+      OpenReferenceManual();
+      return 0;
     }
   }
-  if (!sourceDirectory.empty() && !binaryDirectory.empty()) {
+  if (!sourceDirectory.empty() &&
+      (!binaryDirectory.empty() || !presetName.empty())) {
     dialog.setSourceDirectory(QString::fromLocal8Bit(sourceDirectory.c_str()));
-    dialog.setBinaryDirectory(QString::fromLocal8Bit(binaryDirectory.c_str()));
+    if (!binaryDirectory.empty()) {
+      dialog.setBinaryDirectory(
+        QString::fromLocal8Bit(binaryDirectory.c_str()));
+      if (!presetName.empty()) {
+        dialog.setStartupBinaryDirectory(true);
+      }
+    }
+    if (!presetName.empty()) {
+      dialog.setDeferredPreset(QString::fromLocal8Bit(presetName.c_str()));
+    }
   } else {
     if (args.count() == 2) {
       std::string filePath =
@@ -223,7 +245,7 @@ int main(int argc, char** argv)
     }
   }
 
-  return QApplication::exec();
+  return CMakeGUIExec(&dialog);
 }
 
 #if defined(Q_OS_MAC)

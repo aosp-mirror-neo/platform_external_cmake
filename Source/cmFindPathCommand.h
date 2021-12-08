@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmFindPathCommand_h
-#define cmFindPathCommand_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -23,6 +22,7 @@ class cmFindPathCommand : public cmFindBase
 {
 public:
   cmFindPathCommand(cmExecutionStatus& status);
+  cmFindPathCommand(std::string findCommandName, cmExecutionStatus& status);
 
   bool InitialPass(std::vector<std::string> const& args);
 
@@ -30,7 +30,7 @@ public:
 
 private:
   std::string FindHeaderInFramework(std::string const& file,
-                                    std::string const& dir);
+                                    std::string const& dir) const;
   std::string FindHeader();
   std::string FindNormalHeader(cmFindBaseDebugState& debug);
   std::string FindFrameworkHeader(cmFindBaseDebugState& debug);
@@ -38,5 +38,3 @@ private:
 
 bool cmFindPath(std::vector<std::string> const& args,
                 cmExecutionStatus& status);
-
-#endif

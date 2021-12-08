@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmCustomCommand_h
-#define cmCustomCommand_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -11,6 +10,7 @@
 
 #include "cmCustomCommandLines.h"
 #include "cmListFileCache.h"
+#include "cmPolicies.h"
 
 class cmImplicitDependsList
   : public std::vector<std::pair<std::string, std::string>>
@@ -96,6 +96,14 @@ public:
   const std::string& GetJobPool() const;
   void SetJobPool(const std::string& job_pool);
 
+  /** Set/Get the CMP0116 status (used by the Ninja generator) */
+  cmPolicies::PolicyStatus GetCMP0116Status() const;
+  void SetCMP0116Status(cmPolicies::PolicyStatus cmp0116);
+
+  /** Set/Get the associated target */
+  const std::string& GetTarget() const;
+  void SetTarget(const std::string& target);
+
 private:
   std::vector<std::string> Outputs;
   std::vector<std::string> Byproducts;
@@ -103,6 +111,7 @@ private:
   cmCustomCommandLines CommandLines;
   cmListFileBacktrace Backtrace;
   cmImplicitDependsList ImplicitDepends;
+  std::string Target;
   std::string Comment;
   std::string WorkingDirectory;
   std::string Depfile;
@@ -113,6 +122,5 @@ private:
   bool UsesTerminal = false;
   bool CommandExpandLists = false;
   bool StdPipesUTF8 = false;
+  cmPolicies::PolicyStatus CMP0116Status = cmPolicies::WARN;
 };
-
-#endif

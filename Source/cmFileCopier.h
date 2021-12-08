@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmFileCopier_h
-#define cmFileCopier_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -68,8 +67,9 @@ protected:
 
   bool InstallSymlinkChain(std::string& fromFile, std::string& toFile);
   bool InstallSymlink(const std::string& fromFile, const std::string& toFile);
-  bool InstallFile(const std::string& fromFile, const std::string& toFile,
-                   MatchProperties match_properties);
+  virtual bool InstallFile(const std::string& fromFile,
+                           const std::string& toFile,
+                           MatchProperties match_properties);
   bool InstallDirectory(const std::string& source,
                         const std::string& destination,
                         MatchProperties match_properties);
@@ -120,5 +120,3 @@ protected:
 
   bool GetDefaultDirectoryPermissions(mode_t** mode);
 };
-
-#endif

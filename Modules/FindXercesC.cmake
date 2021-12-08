@@ -5,10 +5,14 @@
 FindXercesC
 -----------
 
+.. versionadded:: 3.1
+
 Find the Apache Xerces-C++ validating XML parser headers and libraries.
 
 Imported targets
 ^^^^^^^^^^^^^^^^
+
+.. versionadded:: 3.5
 
 This module defines the following :prop_tgt:`IMPORTED` targets:
 
@@ -38,6 +42,9 @@ The following cache variables may also be set:
   the directory containing the Xerces headers
 ``XercesC_LIBRARY``
   the Xerces library
+
+.. versionadded:: 3.4
+  Debug and Release variants are found separately.
 #]=======================================================================]
 
 # Written by Roger Leigh <rleigh@codelibre.net>

@@ -5,7 +5,7 @@
 #include "cmCustomCommandLines.h"
 #include "cmExecutionStatus.h"
 #include "cmMakefile.h"
-#include "cmProperty.h"
+#include "cmPolicies.h"
 #include "cmRange.h"
 #include "cmSourceFile.h"
 #include "cmStringAlgorithms.h"
@@ -40,8 +40,7 @@ bool cmQTWrapCPPCommand(std::vector<std::string> const& args,
         cmStrCat(mf.GetCurrentBinaryDirectory(), "/moc_", srcName, ".cxx");
       cmSourceFile* sf = mf.GetOrCreateSource(newName, true);
       if (curr) {
-        cmProp p = curr->GetProperty("ABSTRACT");
-        sf->SetProperty("ABSTRACT", p ? p->c_str() : nullptr);
+        sf->SetProperty("ABSTRACT", curr->GetProperty("ABSTRACT"));
       }
 
       // Compute the name of the header from which to generate the file.
@@ -74,9 +73,9 @@ bool cmQTWrapCPPCommand(std::vector<std::string> const& args,
 
       std::string no_main_dependency;
       const char* no_working_dir = nullptr;
-      mf.AddCustomCommandToOutput(newName, depends, no_main_dependency,
-                                  commandLines, "Qt Wrapped File",
-                                  no_working_dir);
+      mf.AddCustomCommandToOutput(
+        newName, depends, no_main_dependency, commandLines, "Qt Wrapped File",
+        no_working_dir, mf.GetPolicyStatus(cmPolicies::CMP0116));
     }
   }
 

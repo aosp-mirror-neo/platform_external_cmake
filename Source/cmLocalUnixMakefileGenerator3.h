@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmLocalUnixMakefileGenerator3_h
-#define cmLocalUnixMakefileGenerator3_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -14,12 +13,14 @@
 
 #include "cmDepends.h"
 #include "cmLocalCommonGenerator.h"
+#include "cmLocalGenerator.h"
 
 class cmCustomCommand;
 class cmCustomCommandGenerator;
 class cmGeneratorTarget;
 class cmGlobalGenerator;
 class cmMakefile;
+class cmSourceFile;
 
 /** \class cmLocalUnixMakefileGenerator3
  * \brief Write a LocalUnix makefiles.
@@ -152,23 +153,21 @@ public:
 
   // File pairs for implicit dependency scanning.  The key of the map
   // is the depender and the value is the explicit dependee.
-  struct ImplicitDependFileMap : public cmDepends::DependencyMap
-  {
-  };
-  struct ImplicitDependLanguageMap
-    : public std::map<std::string, ImplicitDependFileMap>
-  {
-  };
-  struct ImplicitDependTargetMap
-    : public std::map<std::string, ImplicitDependLanguageMap>
-  {
-  };
+  using ImplicitDependFileMap = cmDepends::DependencyMap;
+  using ImplicitDependLanguageMap =
+    std::map<std::string, ImplicitDependFileMap>;
+  using ImplicitDependScannerMap =
+    std::map<cmDependencyScannerKind, ImplicitDependLanguageMap>;
+  using ImplicitDependTargetMap =
+    std::map<std::string, ImplicitDependScannerMap>;
   ImplicitDependLanguageMap const& GetImplicitDepends(
-    cmGeneratorTarget const* tgt);
+    cmGeneratorTarget const* tgt,
+    cmDependencyScannerKind scanner = cmDependencyScannerKind::CMake);
 
-  void AddImplicitDepends(cmGeneratorTarget const* tgt,
-                          const std::string& lang, const std::string& obj,
-                          const std::string& src);
+  void AddImplicitDepends(
+    cmGeneratorTarget const* tgt, const std::string& lang,
+    const std::string& obj, const std::string& src,
+    cmDependencyScannerKind scanner = cmDependencyScannerKind::CMake);
 
   // write the target rules for the local Makefile into the stream
   void WriteLocalAllRules(std::ostream& ruleFileStream);
@@ -178,11 +177,11 @@ public:
   /** Get whether to create rules to generate preprocessed and
       assembly sources.  This could be converted to a variable lookup
       later.  */
-  bool GetCreatePreprocessedSourceRules()
+  bool GetCreatePreprocessedSourceRules() const
   {
     return !this->SkipPreprocessedSourceRules;
   }
-  bool GetCreateAssemblySourceRules()
+  bool GetCreateAssemblySourceRules() const
   {
     return !this->SkipAssemblySourceRules;
   }
@@ -295,6 +294,13 @@ private:
   bool ColorMakefile;
   bool SkipPreprocessedSourceRules;
   bool SkipAssemblySourceRules;
-};
 
-#endif
+  std::set<cmSourceFile const*>& GetCommandsVisited(
+    cmGeneratorTarget const* target)
+  {
+    return this->CommandsVisited[target];
+  }
+
+  std::map<cmGeneratorTarget const*, std::set<cmSourceFile const*>>
+    CommandsVisited;
+};

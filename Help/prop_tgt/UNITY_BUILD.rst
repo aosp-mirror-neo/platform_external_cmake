@@ -1,6 +1,8 @@
 UNITY_BUILD
 -----------
 
+.. versionadded:: 3.16
+
 When this property is set to true, the target source files will be combined
 into batches for faster compilation.  This is done by creating a (set of)
 unity sources which ``#include`` the original sources, then compiling these
@@ -67,6 +69,11 @@ a number of measures to help address such problems:
   source property to true.  This can be a more effective way to prevent
   problems with specific files than disabling unity builds for an entire
   target.
+
+* Projects can set :prop_tgt:`UNITY_BUILD_UNIQUE_ID` to cause a valid
+  C-identifier to be generated which is unique per file in a unity
+  build.  This can be used to avoid problems with anonymous namespaces
+  in unity builds.
 
 * The :prop_tgt:`UNITY_BUILD_CODE_BEFORE_INCLUDE` and
   :prop_tgt:`UNITY_BUILD_CODE_AFTER_INCLUDE` target properties can be used

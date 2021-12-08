@@ -79,6 +79,9 @@ macro(__android_compiler_clang lang)
     endif()
     list(APPEND CMAKE_${lang}_COMPILER_PREDEFINES_COMMAND "--target=${CMAKE_${lang}_COMPILER_TARGET}")
   endif()
+  if(CMAKE_GENERATOR MATCHES "Visual Studio")
+    set(_ANDROID_STL_NOSTDLIBXX 1)
+  endif()
 endmacro()
 
 # Include the NDK hook.

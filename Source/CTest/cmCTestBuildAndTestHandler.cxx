@@ -19,6 +19,8 @@
 #include "cmWorkingDirectory.h"
 #include "cmake.h"
 
+struct cmMessageMetadata;
+
 cmCTestBuildAndTestHandler::cmCTestBuildAndTestHandler()
 {
   this->BuildTwoConfig = false;
@@ -125,7 +127,7 @@ public:
     : CM(cm)
   {
     cmSystemTools::SetMessageCallback(
-      [&s](const std::string& msg, const char* /*unused*/) {
+      [&s](const std::string& msg, const cmMessageMetadata& /* unused */) {
         s += msg;
         s += "\n";
       });
@@ -182,10 +184,9 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
     std::vector<std::string> extraPaths;
     std::vector<std::string> failed;
     fullPath = cmCTestTestHandler::FindExecutable(
-      this->CTest, this->ConfigSample.c_str(), resultingConfig, extraPaths,
-      failed);
+      this->CTest, this->ConfigSample, resultingConfig, extraPaths, failed);
     if (!fullPath.empty() && !resultingConfig.empty()) {
-      this->CTest->SetConfigType(resultingConfig.c_str());
+      this->CTest->SetConfigType(resultingConfig);
     }
     out << "Using config sample with results: " << fullPath << " and "
         << resultingConfig << std::endl;
@@ -296,9 +297,8 @@ int cmCTestBuildAndTestHandler::RunCMakeAndTest(std::string* outstring)
     extraPaths.push_back(tempPath);
   }
   std::vector<std::string> failed;
-  fullPath =
-    cmCTestTestHandler::FindExecutable(this->CTest, this->TestCommand.c_str(),
-                                       resultingConfig, extraPaths, failed);
+  fullPath = cmCTestTestHandler::FindExecutable(
+    this->CTest, this->TestCommand, resultingConfig, extraPaths, failed);
 
   if (!cmSystemTools::FileExists(fullPath)) {
     out << "Could not find path to executable, perhaps it was not built: "

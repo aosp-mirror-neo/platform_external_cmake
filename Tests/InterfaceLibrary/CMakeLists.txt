@@ -1,5 +1,5 @@
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.12)
 
 project(InterfaceLibrary)
 
@@ -44,6 +44,7 @@ add_executable(InterfaceLibrary definetestexe.cpp)
 target_link_libraries(InterfaceLibrary
   iface_nodepends
   headeriface
+  iface_genheader
   subiface
   intermediate
 

@@ -1,21 +1,20 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
 
+#include <cstring>
+#include <iostream>
+#include <string>
+#include <vector>
+
 #include "cmsys/Encoding.hxx"
 
 #include "cmCTest.h"
+#include "cmConsoleBuf.h"
 #include "cmDocumentation.h"
 #include "cmSystemTools.h"
 
 #include "CTest/cmCTestLaunch.h"
 #include "CTest/cmCTestScriptHandler.h"
-#if defined(_WIN32) && !defined(CMAKE_BOOTSTRAP)
-#  include "cmsys/ConsoleBuf.hxx"
-#endif
-#include <cstring>
-#include <iostream>
-#include <string>
-#include <vector>
 
 static const char* cmDocumentationName[][2] = {
   { nullptr, "  ctest - Testing driver provided by CMake." },
@@ -27,6 +26,9 @@ static const char* cmDocumentationUsage[][2] = { { nullptr,
                                                  { nullptr, nullptr } };
 
 static const char* cmDocumentationOptions[][2] = {
+  { "--preset <preset>, --preset=<preset>",
+    "Read arguments from a test preset." },
+  { "--list-presets", "List available test presets." },
   { "-C <cfg>, --build-config <cfg>", "Choose configuration to test." },
   { "--progress", "Enable short progress output from tests." },
   { "-V,--verbose", "Enable verbose output from tests." },
@@ -48,13 +50,15 @@ static const char* cmDocumentationOptions[][2] = {
     "given number of jobs." },
   { "-Q,--quiet", "Make ctest quiet." },
   { "-O <file>, --output-log <file>", "Output to log file" },
+  { "--output-junit <file>", "Output test results to JUnit XML file." },
   { "-N,--show-only[=format]",
     "Disable actual execution of tests. The optional 'format' defines the "
     "format of the test information and can be 'human' for the current text "
     "format or 'json-v1' for json format. Defaults to 'human'." },
   { "-L <regex>, --label-regex <regex>",
-    "Run tests with labels matching "
-    "regular expression." },
+    "Run tests with labels matching regular expression. "
+    "With multiple -L, run tests where each "
+    "regular expression matches at least one label." },
   { "-R <regex>, --tests-regex <regex>",
     "Run tests matching regular "
     "expression." },
@@ -62,8 +66,9 @@ static const char* cmDocumentationOptions[][2] = {
     "Exclude tests matching regular "
     "expression." },
   { "-LE <regex>, --label-exclude <regex>",
-    "Exclude tests with labels "
-    "matching regular expression." },
+    "Exclude tests with labels matching regular expression. "
+    "With multiple -LE, exclude tests where each "
+    "regular expression matches at least one label." },
   { "-FA <regex>, --fixture-exclude-any <regex>",
     "Do not automatically "
     "add any tests for "
@@ -112,6 +117,7 @@ static const char* cmDocumentationOptions[][2] = {
   { "--no-subproject-summary",
     "Disable timing summary information for "
     "subprojects." },
+  { "--test-dir <dir>", "Specify the directory in which to look for tests." },
   { "--build-and-test", "Configure, build and run a test." },
   { "--build-target", "Specify a specific target to build." },
   { "--build-nocmake", "Run the build without running cmake first." },
@@ -154,13 +160,11 @@ static const char* cmDocumentationOptions[][2] = {
 int main(int argc, char const* const* argv)
 {
   cmSystemTools::EnsureStdPipes();
-#if defined(_WIN32) && !defined(CMAKE_BOOTSTRAP)
+
   // Replace streambuf so we can output Unicode to console
-  cmsys::ConsoleBuf::Manager consoleOut(std::cout);
-  consoleOut.SetUTF8Pipes();
-  cmsys::ConsoleBuf::Manager consoleErr(std::cerr, true);
-  consoleErr.SetUTF8Pipes();
-#endif
+  cmConsoleBuf consoleBuf;
+  consoleBuf.SetUTF8Pipes();
+
   cmsys::Encoding::CommandLineArguments encoding_args =
     cmsys::Encoding::CommandLineArguments::Main(argc, argv);
   argc = encoding_args.argc();

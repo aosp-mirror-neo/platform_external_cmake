@@ -1,7 +1,6 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
    file Copyright.txt or https://cmake.org/licensing for details.  */
-#ifndef cmExportInstallFileGenerator_h
-#define cmExportInstallFileGenerator_h
+#pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
@@ -64,13 +63,13 @@ protected:
     cmTargetExport const* targetExport) const;
   void HandleMissingTarget(std::string& link_libs,
                            std::vector<std::string>& missingTargets,
-                           cmGeneratorTarget* depender,
+                           cmGeneratorTarget const* depender,
                            cmGeneratorTarget* dependee) override;
 
   void ReplaceInstallPrefix(std::string& input) override;
 
-  void ComplainAboutMissingTarget(cmGeneratorTarget* depender,
-                                  cmGeneratorTarget* dependee,
+  void ComplainAboutMissingTarget(cmGeneratorTarget const* depender,
+                                  cmGeneratorTarget const* dependee,
                                   std::vector<std::string> const& exportFiles);
 
   std::pair<std::vector<std::string>, std::string> FindNamespaces(
@@ -95,7 +94,7 @@ protected:
                                  ImportPropertyMap& properties,
                                  std::set<std::string>& importedLocations);
 
-  std::string InstallNameDir(cmGeneratorTarget* target,
+  std::string InstallNameDir(cmGeneratorTarget const* target,
                              const std::string& config) override;
 
   cmInstallExportGenerator* IEGen;
@@ -103,5 +102,3 @@ protected:
   // The import file generated for each configuration.
   std::map<std::string, std::string> ConfigImportFiles;
 };
-
-#endif
