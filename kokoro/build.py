@@ -97,6 +97,9 @@ def get_cmake_defines(host, args):
     defines['CMAKE_SHARED_LINKER_FLAGS'] = ldflags_str
     defines['CMAKE_MODULE_LINKER_FLAGS'] = ldflags_str
 
+    if host == Host.Windows:
+        defines['CMAKE_MSVC_RUNTIME_LIBRARY'] = 'MultiThreaded$<$<CONFIG:Debug>:Debug>'
+
     if host == Host.Linux:
         defines['OPENSSL_USE_STATIC_LIBS'] = 'ON'
 
