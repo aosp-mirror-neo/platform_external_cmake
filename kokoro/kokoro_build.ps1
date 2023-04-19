@@ -4,7 +4,15 @@ $cmake_src = "$top\external\cmake"
 
 Remove-Item $out -Recurse -ErrorAction Ignore
 
-$vcvarsall = (Resolve-Path "C:\Program Files*\Microsoft Visual Studio\2017\*\VC\Auxiliary\Build\vcvarsall.bat")[-1]
+try {
+  echo "Searching in Program Files"
+  $vcvarsall = (Resolve-Path "C:\Program Files*\Microsoft Visual Studio\2022\*\VC\Auxiliary\Build\vcvarsall.bat")[-1]
+} catch {
+  # Kokoro installs MSVC to C:\VS\VC instead, so look there too.
+  echo "Searching in C:\VS"
+  $vcvarsall = (Resolve-Path "C:\VS\VC\Auxiliary\Build\vcvarsall.bat")[-1]
+}
+
 echo "Invoking $vcvarsall to configure clang-cl"
 
 pushd (Split-Path $vcvarsall)
