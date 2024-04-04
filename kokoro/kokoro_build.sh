@@ -41,7 +41,7 @@ elif [ "$(uname)" == "Linux" ]; then
   make -j$(nproc)
   # Use install_sw to skip installing OpenSSL docs, which is slow.
   make install_sw
-  extra_notices="$extra_notices $openssl_src/LICENSE:doc/$(basename $openssl_src)/LICENSE"
+  extra_notices="$extra_notices $openssl_src/LICENSE.txt:doc/$(basename $openssl_src)/LICENSE.txt"
   popd
 else
   echo "Unrecognized uname -s: $(uname -s)"

@@ -11,4 +11,5 @@ RUN yum -y update && \
     git \
     make \
     perl \
+    perl-IPC-Cmd \
     python3
