@@ -159,9 +159,9 @@ def zip_dir(path, ziph):
             ziph.write(install_file, rel_file)
 
 
-def package_target(install_dir, package_name, dest_dir):
+def package_target(install_dir, dest_dir):
     os.makedirs(dest_dir, exist_ok=True)
-    package_path = os.path.join(dest_dir, package_name + '.zip')
+    package_path = os.path.join(dest_dir, 'cmake.zip')
 
     print('## Packaging ##')
     print('## Package     : {}'.format(package_path))
@@ -172,11 +172,11 @@ def package_target(install_dir, package_name, dest_dir):
         zip_dir(install_dir, zip)
 
 
-def package_target_for_studio(install_dir, package_name, cmake_version,
-                              ninja_path, android_cmake, dest_dir):
+def package_target_for_studio(install_dir, cmake_version, ninja_path,
+                              android_cmake, dest_dir):
     """Create a package with ninja.exe and source.properties for Android SDK"""
     os.makedirs(dest_dir, exist_ok=True)
-    package_path = os.path.join(dest_dir, package_name + '-for-studio.zip')
+    package_path = os.path.join(dest_dir, 'cmake-for-studio.zip')
     source_properties = get_source_properties(cmake_version)
 
     print('## Packaging with Ninja ##')
@@ -238,11 +238,9 @@ def main():
     host = get_default_host()
     install_dir = build_cmake_target(host, args)
     cmake_target_version = get_cmake_version(install_dir)
-    package_name = 'cmake-{}-{}-{}'.format(host.value, cmake_target_version,
-                                           args.build_id)
-    package_target(install_dir, package_name, args.dest_dir)
-    package_target_for_studio(install_dir, package_name, cmake_target_version,
-                              args.ninja, args.android_cmake, args.dest_dir)
+    package_target(install_dir, args.dest_dir)
+    package_target_for_studio(install_dir, cmake_target_version, args.ninja,
+                              args.android_cmake, args.dest_dir)
 
 
 if __name__ == '__main__':
