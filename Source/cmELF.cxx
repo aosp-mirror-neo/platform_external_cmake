@@ -26,17 +26,14 @@ template <size_t s>
 struct cmELFByteSwapSize
 {
 };
-void cmELFByteSwap(char* /*unused*/, cmELFByteSwapSize<1> /*unused*/)
-{
-}
-void cmELFByteSwap(char* data, cmELFByteSwapSize<2> /*unused*/)
+static void cmELFByteSwap(char* data, cmELFByteSwapSize<2> /*unused*/)
 {
   char one_byte;
   one_byte = data[0];
   data[0] = data[1];
   data[1] = one_byte;
 }
-void cmELFByteSwap(char* data, cmELFByteSwapSize<4> /*unused*/)
+static void cmELFByteSwap(char* data, cmELFByteSwapSize<4> /*unused*/)
 {
   char one_byte;
   one_byte = data[0];
@@ -46,7 +43,7 @@ void cmELFByteSwap(char* data, cmELFByteSwapSize<4> /*unused*/)
   data[1] = data[2];
   data[2] = one_byte;
 }
-void cmELFByteSwap(char* data, cmELFByteSwapSize<8> /*unused*/)
+static void cmELFByteSwap(char* data, cmELFByteSwapSize<8> /*unused*/)
 {
   char one_byte;
   one_byte = data[0];
@@ -86,7 +83,6 @@ public:
     : External(external)
     , Stream(std::move(fin))
     , ByteOrder(order)
-    , ELFType(cmELF::FileTypeInvalid)
   {
 // In most cases the processor-specific byte order will match that
 // of the target execution environment.  If we choose wrong here
@@ -153,7 +149,7 @@ protected:
   ByteOrderType ByteOrder;
 
   // The ELF file type.
-  cmELF::FileType ELFType;
+  cmELF::FileType ELFType = cmELF::FileTypeInvalid;
 
   // The ELF architecture.
   std::uint16_t Machine;

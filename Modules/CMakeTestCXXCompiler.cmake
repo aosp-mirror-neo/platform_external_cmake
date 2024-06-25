@@ -37,8 +37,15 @@ endif()
 # any makefiles or projects.
 if(NOT CMAKE_CXX_COMPILER_WORKS)
   PrintTestCompilerStatus("CXX")
+  # FIXME: Use a block() to isolate the variables we set/unset here.
+  if(DEFINED CMAKE_CXX_SCAN_FOR_MODULES)
+    set(__CMAKE_SAVED_CXX_SCAN_FOR_MODULES "${CMAKE_CXX_SCAN_FOR_MODULES}")
+  else()
+    unset(__CMAKE_SAVED_CXX_SCAN_FOR_MODULES)
+  endif()
+  set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
   __TestCompiler_setTryCompileTargetType()
-  file(WRITE ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testCXXCompiler.cxx
+  string(CONCAT __TestCompiler_testCXXCompilerSource
     "#ifndef __cplusplus\n"
     "# error \"The CMAKE_CXX_COMPILER is set to a C compiler\"\n"
     "#endif\n"
@@ -46,18 +53,22 @@ if(NOT CMAKE_CXX_COMPILER_WORKS)
   # Clear result from normal variable.
   unset(CMAKE_CXX_COMPILER_WORKS)
   # Puts test result in cache variable.
-  try_compile(CMAKE_CXX_COMPILER_WORKS ${CMAKE_BINARY_DIR}
-    ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeTmp/testCXXCompiler.cxx
+  try_compile(CMAKE_CXX_COMPILER_WORKS
+    SOURCE_FROM_VAR testCXXCompiler.cxx __TestCompiler_testCXXCompilerSource
     OUTPUT_VARIABLE __CMAKE_CXX_COMPILER_OUTPUT)
+  if(DEFINED __CMAKE_SAVED_CXX_SCAN_FOR_MODULES)
+    set(CMAKE_CXX_SCAN_FOR_MODULES "${__CMAKE_SAVED_CXX_SCAN_FOR_MODULES}")
+    unset(__CMAKE_SAVED_CXX_SCAN_FOR_MODULES)
+  else()
+    unset(CMAKE_CXX_SCAN_FOR_MODULES)
+  endif()
+  unset(__TestCompiler_testCXXCompilerSource)
   # Move result from cache to normal variable.
   set(CMAKE_CXX_COMPILER_WORKS ${CMAKE_CXX_COMPILER_WORKS})
   unset(CMAKE_CXX_COMPILER_WORKS CACHE)
   __TestCompiler_restoreTryCompileTargetType()
   if(NOT CMAKE_CXX_COMPILER_WORKS)
     PrintTestCompilerResult(CHECK_FAIL "broken")
-    file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
-      "Determining if the CXX compiler works failed with "
-      "the following output:\n${__CMAKE_CXX_COMPILER_OUTPUT}\n\n")
     string(REPLACE "\n" "\n  " _output "${__CMAKE_CXX_COMPILER_OUTPUT}")
     message(FATAL_ERROR "The C++ compiler\n  \"${CMAKE_CXX_COMPILER}\"\n"
       "is not able to compile a simple test program.\nIt fails "
@@ -65,9 +76,6 @@ if(NOT CMAKE_CXX_COMPILER_WORKS)
       "CMake will not be able to correctly generate this project.")
   endif()
   PrintTestCompilerResult(CHECK_PASS "works")
-  file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
-    "Determining if the CXX compiler works passed with "
-    "the following output:\n${__CMAKE_CXX_COMPILER_OUTPUT}\n\n")
 endif()
 
 # Try to identify the compiler features

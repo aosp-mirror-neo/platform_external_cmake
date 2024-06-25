@@ -12,7 +12,7 @@ This module finds an installed Fortran library that implements the
 
 At least one of the ``C``, ``CXX``, or ``Fortran`` languages must be enabled.
 
-.. _`LAPACK linear-algebra interface`: http://www.netlib.org/lapack/
+.. _`LAPACK linear-algebra interface`: https://netlib.org/lapack/
 
 Input Variables
 ^^^^^^^^^^^^^^^
@@ -34,6 +34,13 @@ The following variables may be set to influence this module's behavior:
 
   if set ``pkg-config`` will be used to search for a LAPACK library first
   and if one is found that is preferred
+
+``BLA_PKGCONFIG_LAPACK``
+  .. versionadded:: 3.25
+
+  If set, the ``pkg-config`` method will look for this module name instead of
+  just ``lapack``.
+
 
 ``BLA_SIZEOF_INTEGER``
   .. versionadded:: 3.22
@@ -278,8 +285,11 @@ endif()
 
 # Search with pkg-config if specified
 if(BLA_PREFER_PKGCONFIG)
-  find_package(PkgConfig)
-  pkg_check_modules(PKGC_LAPACK lapack)
+  if(NOT BLA_PKGCONFIG_LAPACK)
+    set(BLA_PKGCONFIG_LAPACK "lapack")
+  endif()
+  find_package(PkgConfig QUIET)
+  pkg_check_modules(PKGC_LAPACK QUIET ${BLA_PKGCONFIG_LAPACK})
   if(PKGC_LAPACK_FOUND)
     set(LAPACK_FOUND TRUE)
     set(LAPACK_LIBRARIES "${PKGC_LAPACK_LINK_LIBRARIES}")
@@ -294,10 +304,12 @@ endif()
 # Search for different LAPACK distributions if BLAS is found
 if(NOT LAPACK_NOT_FOUND_MESSAGE)
   set(LAPACK_LINKER_FLAGS ${BLAS_LINKER_FLAGS})
-  if(NOT $ENV{BLA_VENDOR} STREQUAL "")
-    set(BLA_VENDOR $ENV{BLA_VENDOR})
-  elseif(NOT BLA_VENDOR)
-    set(BLA_VENDOR "All")
+  if(NOT BLA_VENDOR)
+    if(NOT "$ENV{BLA_VENDOR}" STREQUAL "")
+      set(BLA_VENDOR "$ENV{BLA_VENDOR}")
+    else()
+      set(BLA_VENDOR "All")
+    endif()
   endif()
 
   # LAPACK in the Intel MKL 10+ library?
@@ -475,7 +487,11 @@ if(NOT LAPACK_NOT_FOUND_MESSAGE)
     set(_lapack_openblas_lib "openblas")
 
     if(_lapack_sizeof_integer EQUAL 8)
-      string(APPEND _lapack_openblas_lib "64")
+      if(MINGW)
+        string(APPEND _lapack_openblas_lib "_64")
+      else()
+        string(APPEND _lapack_openblas_lib "64")
+      endif()
     endif()
 
     check_lapack_libraries(
@@ -547,6 +563,29 @@ if(NOT LAPACK_NOT_FOUND_MESSAGE)
         "${BLAS_LIBRARIES}"
       )
     endif()
+  endif()
+
+  # AOCL? (https://developer.amd.com/amd-aocl/)
+  if(NOT LAPACK_LIBRARIES
+      AND (BLA_VENDOR MATCHES "AOCL" OR BLA_VENDOR STREQUAL "All"))
+    if(_lapack_sizeof_integer EQUAL 8)
+      set(_lapack_aocl_subdir "ILP64")
+    else()
+      set(_lapack_aocl_subdir "LP64")
+    endif()
+
+    check_lapack_libraries(
+      LAPACK_LIBRARIES
+      LAPACK
+      cheev
+      ""
+      "flame"
+      "-fopenmp"
+      ""
+      "${_lapack_aocl_subdir}"
+      "${BLAS_LIBRARIES}"
+    )
+    unset(_lapack_aocl_subdir)
   endif()
 
   # LAPACK in SCSL library? (SGI/Cray Scientific Library)
@@ -663,6 +702,10 @@ if(NOT LAPACK_NOT_FOUND_MESSAGE)
     elseif(_lapack_sizeof_integer EQUAL 4)
       string(APPEND _lapack_nvhpc_lib "_lp64")
     endif()
+    set(_lapack_nvhpc_flags)
+    if(";${CMAKE_C_COMPILER_ID};${CMAKE_CXX_COMPILER_ID};${CMAKE_Fortran_COMPILER_ID};" MATCHES ";(NVHPC|PGI);")
+      set(_lapack_nvhpc_flags "-fortranlibs")
+    endif()
 
     check_lapack_libraries(
       LAPACK_LIBRARIES
@@ -670,7 +713,7 @@ if(NOT LAPACK_NOT_FOUND_MESSAGE)
       cheev
       ""
       "${_lapack_nvhpc_lib}"
-      "-fortranlibs"
+      "${_lapack_nvhpc_flags}"
       ""
       ""
       "${BLAS_LIBRARIES}"
@@ -688,7 +731,7 @@ if(NOT LAPACK_NOT_FOUND_MESSAGE)
         cheev
         ""
         "${_lapack_nvhpc_lib}"
-        "-fortranlibs"
+        "${_lapack_nvhpc_flags}"
         ""
         ""
         "${BLAS_LIBRARIES}"
@@ -696,6 +739,7 @@ if(NOT LAPACK_NOT_FOUND_MESSAGE)
     endif()
 
     unset(_lapack_nvhpc_lib)
+    unset(_lapack_nvhpc_flags)
   endif()
 
   # Generic LAPACK library?

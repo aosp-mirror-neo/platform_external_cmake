@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <memory>
 #include <ostream>
+#include <vector>
 
 #include "cmExportBuildAndroidMKGenerator.h"
 #include "cmExportSet.h"
@@ -34,8 +35,7 @@ void cmExportInstallAndroidMKGenerator::GenerateImportHeaderCode(
   for (size_t n = 0; n < numDotDot; n++) {
     path += "/..";
   }
-  os << "_IMPORT_PREFIX := "
-     << "$(LOCAL_PATH)" << path << "\n\n";
+  os << "_IMPORT_PREFIX := $(LOCAL_PATH)" << path << "\n\n";
   for (std::unique_ptr<cmTargetExport> const& te :
        this->IEGen->GetExportSet()->GetTargetExports()) {
     // Collect import properties for this target.
@@ -80,13 +80,13 @@ void cmExportInstallAndroidMKGenerator::GenerateExpectedTargetsCode(
 }
 
 void cmExportInstallAndroidMKGenerator::GenerateImportPropertyCode(
-  std::ostream&, const std::string&, cmGeneratorTarget const*,
-  ImportPropertyMap const&)
+  std::ostream&, const std::string&, const std::string&,
+  cmGeneratorTarget const*, ImportPropertyMap const&, const std::string&)
 {
 }
 
 void cmExportInstallAndroidMKGenerator::GenerateMissingTargetsCheckCode(
-  std::ostream&, const std::vector<std::string>&)
+  std::ostream&)
 {
 }
 
@@ -110,11 +110,6 @@ void cmExportInstallAndroidMKGenerator::GenerateImportPrefix(std::ostream&)
 {
 }
 
-void cmExportInstallAndroidMKGenerator::GenerateRequiredCMakeVersion(
-  std::ostream&, const char*)
-{
-}
-
 void cmExportInstallAndroidMKGenerator::CleanupTemporaryVariables(
   std::ostream&)
 {
@@ -127,12 +122,12 @@ void cmExportInstallAndroidMKGenerator::GenerateImportedFileCheckLoop(
 
 void cmExportInstallAndroidMKGenerator::GenerateImportedFileChecksCode(
   std::ostream&, cmGeneratorTarget*, ImportPropertyMap const&,
-  const std::set<std::string>&)
+  const std::set<std::string>&, const std::string&)
 {
 }
 
 bool cmExportInstallAndroidMKGenerator::GenerateImportFileConfig(
-  const std::string&, std::vector<std::string>&)
+  const std::string&)
 {
   return true;
 }

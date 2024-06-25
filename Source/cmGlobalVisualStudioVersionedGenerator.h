@@ -4,16 +4,18 @@
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
-#include <iosfwd>
 #include <memory>
 #include <string>
 
 #include <cm/optional>
 
+#include "cmGlobalVisualStudio10Generator.h"
 #include "cmGlobalVisualStudio14Generator.h"
+#include "cmGlobalVisualStudioGenerator.h"
 #include "cmVSSetupHelper.h"
 
 class cmGlobalGeneratorFactory;
+class cmMakefile;
 class cmake;
 
 /** \class cmGlobalVisualStudioVersionedGenerator  */
@@ -42,14 +44,24 @@ public:
 
   bool IsUtf8EncodingSupported() const override;
 
+  bool IsScanDependenciesSupported() const override;
+
   const char* GetAndroidApplicationTypeRevision() const override;
+
+  bool CheckCxxModuleSupport(CxxModuleSupportQuery /*query*/) override
+  {
+    return this->SupportsCxxModuleDyndep();
+  }
+  bool SupportsCxxModuleDyndep() const override
+  {
+    return this->Version >= cmGlobalVisualStudioGenerator::VSVersion::VS17;
+  }
 
 protected:
   cmGlobalVisualStudioVersionedGenerator(
     VSVersion version, cmake* cm, const std::string& name,
     std::string const& platformInGeneratorName);
 
-  bool InitializeWindows(cmMakefile* mf) override;
   bool SelectWindowsStoreToolset(std::string& toolset) const override;
 
   // Used to verify that the Desktop toolset for the current generator is
@@ -61,9 +73,12 @@ protected:
   bool IsWindowsStoreToolsetInstalled() const;
 
   // Check for a Win 8 SDK known to the registry or VS installer tool.
-  bool IsWin81SDKInstalled() const;
+  bool IsWin81SDKInstalled() const override;
 
   std::string GetWindows10SDKMaxVersionDefault(cmMakefile*) const override;
+
+  virtual bool ProcessGeneratorInstanceField(std::string const& key,
+                                             std::string const& value);
 
   std::string FindMSBuildCommand() override;
   std::string FindDevEnvCommand() override;
@@ -76,5 +91,11 @@ private:
   class Factory17;
   friend class Factory17;
   mutable cmVSSetupAPIHelper vsSetupAPIHelper;
+
+  bool ParseGeneratorInstance(std::string const& is, cmMakefile* mf);
+  void SetVSVersionVar(cmMakefile* mf);
+
+  std::string GeneratorInstance;
+  std::string GeneratorInstanceVersion;
   cm::optional<std::string> LastGeneratorInstanceString;
 };

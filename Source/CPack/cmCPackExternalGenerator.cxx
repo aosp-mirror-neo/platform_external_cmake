@@ -15,8 +15,8 @@
 
 #include "cmCPackComponentGroup.h"
 #include "cmCPackLog.h"
+#include "cmList.h"
 #include "cmMakefile.h"
-#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmValue.h"
 
@@ -63,7 +63,7 @@ int cmCPackExternalGenerator::PackageFiles()
 
   cmValue packageScript = this->GetOption("CPACK_EXTERNAL_PACKAGE_SCRIPT");
   if (cmNonempty(packageScript)) {
-    if (!cmSystemTools::FileIsFullPath(packageScript)) {
+    if (!cmSystemTools::FileIsFullPath(*packageScript)) {
       cmCPackLogger(
         cmCPackLog::LOG_ERROR,
         "CPACK_EXTERNAL_PACKAGE_SCRIPT does not contain a full file path"
@@ -71,15 +71,15 @@ int cmCPackExternalGenerator::PackageFiles()
       return 0;
     }
 
-    bool res = this->MakefileMap->ReadListFile(packageScript);
+    bool res = this->MakefileMap->ReadListFile(*packageScript);
 
-    if (cmSystemTools::GetErrorOccuredFlag() || !res) {
+    if (cmSystemTools::GetErrorOccurredFlag() || !res) {
       return 0;
     }
 
     cmValue builtPackages = this->GetOption("CPACK_EXTERNAL_BUILT_PACKAGES");
     if (builtPackages) {
-      cmExpandList(builtPackages, this->packageFileNames, false);
+      cmExpandList(builtPackages, this->packageFileNames);
     }
   }
 

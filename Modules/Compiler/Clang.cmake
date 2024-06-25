@@ -17,6 +17,7 @@ set(__pch_header_OBJCXX "objective-c++-header")
 
 if("x${CMAKE_C_SIMULATE_ID}" STREQUAL "xMSVC"
     OR "x${CMAKE_CXX_SIMULATE_ID}" STREQUAL "xMSVC"
+    OR "x${CMAKE_CUDA_SIMULATE_ID}" STREQUAL "xMSVC"
     OR "x${CMAKE_Fortran_SIMULATE_ID}" STREQUAL "xMSVC")
   macro(__compiler_clang lang)
   endmacro()
@@ -44,7 +45,7 @@ else()
     set(CMAKE_${lang}_LINKER_WRAPPER_FLAG "-Xlinker" " ")
     set(CMAKE_${lang}_LINKER_WRAPPER_FLAG_SEP)
 
-    if(CMAKE_${lang}_COMPILER_TARGET)
+    if(CMAKE_${lang}_COMPILER_TARGET AND "${lang}" STREQUAL "CXX")
       if(CMAKE_${lang}_COMPILER_VERSION VERSION_LESS 3.4.0)
         list(APPEND CMAKE_${lang}_COMPILER_PREDEFINES_COMMAND "-target" "${CMAKE_${lang}_COMPILER_TARGET}")
       else()
@@ -94,11 +95,11 @@ else()
     endif()
 
     set(CMAKE_${lang}_ARCHIVE_CREATE_IPO
-      "\"${__ar}\" cr <TARGET> <LINK_FLAGS> <OBJECTS>"
+      "\"${__ar}\" qc <TARGET> <LINK_FLAGS> <OBJECTS>"
     )
 
     set(CMAKE_${lang}_ARCHIVE_APPEND_IPO
-      "\"${__ar}\" r <TARGET> <LINK_FLAGS> <OBJECTS>"
+      "\"${__ar}\" q <TARGET> <LINK_FLAGS> <OBJECTS>"
     )
 
     set(CMAKE_${lang}_ARCHIVE_FINISH_IPO
@@ -114,6 +115,18 @@ else()
     endif()
     set(CMAKE_${lang}_COMPILE_OPTIONS_USE_PCH -Xclang -include-pch -Xclang <PCH_FILE> -Xclang -include -Xclang <PCH_HEADER>)
     set(CMAKE_${lang}_COMPILE_OPTIONS_CREATE_PCH -Xclang -emit-pch -Xclang -include -Xclang <PCH_HEADER> -x ${__pch_header_${lang}})
+
+    # '-fcolor-diagnostics' introduced since Clang 2.6
+    if(CMAKE_${lang}_COMPILER_VERSION VERSION_GREATER_EQUAL 2.6)
+      # -fansi-escape-codes mentioned at https://releases.llvm.org/3.7.0/tools/clang/docs/UsersManual.html
+      if (CMAKE_HOST_WIN32 AND CMAKE_${lang}_COMPILER_VERSION VERSION_GREATER_EQUAL 3.7)
+        set(CMAKE_${lang}_COMPILE_OPTIONS_COLOR_DIAGNOSTICS -fansi-escape-codes -fcolor-diagnostics)
+        set(CMAKE_${lang}_COMPILE_OPTIONS_COLOR_DIAGNOSTICS_OFF -fno-color-diagnostics)
+      else()
+        set(CMAKE_${lang}_COMPILE_OPTIONS_COLOR_DIAGNOSTICS -fcolor-diagnostics)
+        set(CMAKE_${lang}_COMPILE_OPTIONS_COLOR_DIAGNOSTICS_OFF -fno-color-diagnostics)
+      endif()
+    endif()
   endmacro()
 endif()
 
@@ -167,10 +180,22 @@ macro(__compiler_clang_cxx_standards lang)
 
     unset(_clang_version_std17)
 
-    if(NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS 12.0)
+    set(_clang_version_std23 17.0)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+      set(_clang_version_std23 18.0)
+    endif()
+
+    if(NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS "${_clang_version_std23}")
+      set(CMAKE_${lang}23_STANDARD_COMPILE_OPTION "-std=c++23")
+      set(CMAKE_${lang}23_EXTENSION_COMPILE_OPTION "-std=gnu++23")
+      set(CMAKE_${lang}26_STANDARD_COMPILE_OPTION "-std=c++26")
+      set(CMAKE_${lang}26_EXTENSION_COMPILE_OPTION "-std=gnu++26")
+    elseif(NOT CMAKE_${lang}_COMPILER_VERSION VERSION_LESS 12.0)
       set(CMAKE_${lang}23_STANDARD_COMPILE_OPTION "-std=c++2b")
       set(CMAKE_${lang}23_EXTENSION_COMPILE_OPTION "-std=gnu++2b")
     endif()
+
+    unset(_clang_version_std23)
 
     if("x${CMAKE_${lang}_SIMULATE_ID}" STREQUAL "xMSVC")
       # The MSVC standard library requires C++14, and MSVC itself has no
@@ -249,6 +274,7 @@ macro(__compiler_clang_cxx_standards lang)
         cxx_std_17
         cxx_std_20
         cxx_std_23
+        cxx_std_26
         )
       _record_compiler_features(${lang} "" CMAKE_${lang}_COMPILE_FEATURES)
     endmacro()

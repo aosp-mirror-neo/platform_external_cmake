@@ -1,7 +1,7 @@
 #
 # Wrapping
 #
-cmake_minimum_required (VERSION 2.8.12)
+cmake_minimum_required (VERSION 3.5)
 project (CustomCommand)
 
 add_subdirectory(GeneratedHeader)
@@ -214,11 +214,13 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/generated_extern.cxx
 
 add_executable(CustomCommandUsingTargetTest main.cxx ${CMAKE_CURRENT_BINARY_DIR}/generated_extern.cxx )
 
+add_executable(CustomCommandUsingTargetTestAlias ALIAS CustomCommandUsingTargetTest )
+
 add_custom_target(RunTarget
   COMMAND generator_extern ${CMAKE_CURRENT_BINARY_DIR}/run_target.cxx
   )
 
-add_custom_command(TARGET CustomCommandUsingTargetTest POST_BUILD
+add_custom_command(TARGET CustomCommandUsingTargetTestAlias POST_BUILD
                    COMMAND dummy_generator ${CMAKE_CURRENT_BINARY_DIR}/generated_dummy.cxx)
 
 add_subdirectory(GeneratorInExtraDir)

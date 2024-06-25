@@ -3,7 +3,7 @@ ctest_test
 
 Perform the :ref:`CTest Test Step` as a :ref:`Dashboard Client`.
 
-::
+.. code-block:: cmake
 
   ctest_test([BUILD <build-dir>] [APPEND]
              [START <start-number>]
@@ -13,10 +13,12 @@ Perform the :ref:`CTest Test Step` as a :ref:`Dashboard Client`.
              [INCLUDE <include-regex>]
              [EXCLUDE_LABEL <label-exclude-regex>]
              [INCLUDE_LABEL <label-include-regex>]
+             [EXCLUDE_FROM_FILE <filename>]
+             [INCLUDE_FROM_FILE <filename>]
              [EXCLUDE_FIXTURE <regex>]
              [EXCLUDE_FIXTURE_SETUP <regex>]
              [EXCLUDE_FIXTURE_CLEANUP <regex>]
-             [PARALLEL_LEVEL <level>]
+             [PARALLEL_LEVEL [<level>]]
              [RESOURCE_SPEC_FILE <file>]
              [TEST_LOAD <threshold>]
              [SCHEDULE_RANDOM <ON|OFF>]
@@ -30,7 +32,7 @@ Perform the :ref:`CTest Test Step` as a :ref:`Dashboard Client`.
              )
 
 ..
-   _note: If updating the argument list here, please also update the argument
+   NOTE If updating the argument list here, please also update the argument
    list documentation for :command:`ctest_memcheck` as well.
 
 Run tests in the project build tree and store results in
@@ -72,6 +74,16 @@ The options are:
   Specify a regular expression matching test labels to include.
   Tests not matching this expression are excluded.
 
+``EXCLUDE_FROM_FILE <filename>``
+  .. versionadded:: 3.29
+
+  Do NOT run tests listed with their exact name in the given file.
+
+``INCLUDE_FROM_FILE <filename>``
+  .. versionadded:: 3.29
+
+  Only run the tests listed with their exact name in the given file.
+
 ``EXCLUDE_FIXTURE <regex>``
   .. versionadded:: 3.7
 
@@ -92,9 +104,14 @@ The options are:
 
   Same as ``EXCLUDE_FIXTURE`` except only matching cleanup tests are excluded.
 
-``PARALLEL_LEVEL <level>``
-  Specify a positive number representing the number of tests to
-  be run in parallel.
+``PARALLEL_LEVEL [<level>]``
+  Run tests in parallel, limited to a given level of parallelism.
+
+  .. versionadded:: 3.29
+
+    The ``<level>`` may be omitted, or ``0``, to let ctest use a default
+    level of parallelism, or unbounded parallelism, respectively, as
+    documented by the :option:`ctest --parallel` option.
 
 ``RESOURCE_SPEC_FILE <file>``
   .. versionadded:: 3.16
@@ -109,8 +126,9 @@ The options are:
   While running tests in parallel, try not to start tests when they
   may cause the CPU load to pass above a given threshold.  If not
   specified the :variable:`CTEST_TEST_LOAD` variable will be checked,
-  and then the ``--test-load`` command-line argument to :manual:`ctest(1)`.
-  See also the ``TestLoad`` setting in the :ref:`CTest Test Step`.
+  and then the :option:`--test-load <ctest --test-load>` command-line
+  argument to :manual:`ctest(1)`. See also the ``TestLoad`` setting
+  in the :ref:`CTest Test Step`.
 
 ``REPEAT <mode>:<n>``
   .. versionadded:: 3.17
@@ -172,8 +190,13 @@ The options are:
   affected.  Summary info detailing the percentage of passing tests is also
   unaffected by the ``QUIET`` option.
 
-See also the :variable:`CTEST_CUSTOM_MAXIMUM_PASSED_TEST_OUTPUT_SIZE`
-and :variable:`CTEST_CUSTOM_MAXIMUM_FAILED_TEST_OUTPUT_SIZE` variables.
+See also the :variable:`CTEST_CUSTOM_MAXIMUM_PASSED_TEST_OUTPUT_SIZE`,
+:variable:`CTEST_CUSTOM_MAXIMUM_FAILED_TEST_OUTPUT_SIZE` and
+:variable:`CTEST_CUSTOM_TEST_OUTPUT_TRUNCATION` variables, along with their
+corresponding :manual:`ctest(1)` command line options
+:option:`--test-output-size-passed <ctest --test-output-size-passed>`,
+:option:`--test-output-size-failed <ctest --test-output-size-failed>`, and
+:option:`--test-output-truncation <ctest --test-output-truncation>`.
 
 .. _`Additional Test Measurements`:
 
@@ -235,7 +258,7 @@ The following example demonstrates how to upload test images to CDash.
      "/dir/to/valid_img.gif</CTestMeasurementFile>" << std::endl;
 
    std::cout <<
-     "<CTestMeasurementFile type=\"image/png\" name=\"AlgoResult\"> <<
+     "<CTestMeasurementFile type=\"image/png\" name=\"AlgoResult\">" <<
      "/dir/to/img.png</CTestMeasurementFile>"
      << std::endl;
 

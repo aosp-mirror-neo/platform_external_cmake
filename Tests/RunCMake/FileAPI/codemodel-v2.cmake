@@ -14,6 +14,9 @@ add_library(c_static_lib STATIC empty.c)
 add_executable(c_static_exe empty.c)
 target_link_libraries(c_static_exe PRIVATE c_static_lib)
 
+add_library(c_subdir STATIC)
+add_subdirectory(subdir)
+
 add_subdirectory(cxx)
 add_subdirectory(alias)
 add_subdirectory(object)
@@ -22,6 +25,8 @@ add_subdirectory(interface)
 add_subdirectory(custom)
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/../FileAPIExternalSource" "${CMAKE_CURRENT_BINARY_DIR}/../FileAPIExternalBuild")
 add_subdirectory(dir)
+add_subdirectory(fileset)
+add_subdirectory(framework)
 
 set_property(TARGET c_shared_lib PROPERTY LIBRARY_OUTPUT_DIRECTORY lib)
 set_property(TARGET c_shared_lib PROPERTY RUNTIME_OUTPUT_DIRECTORY lib)

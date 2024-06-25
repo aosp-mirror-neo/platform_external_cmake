@@ -8,7 +8,7 @@ target_compile_features(tutorial_compiler_flags INTERFACE cxx_std_11)
 
 # add compiler warning flags just when building this project via
 # the BUILD_INTERFACE genex
-set(gcc_like_cxx "$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU>")
+set(gcc_like_cxx "$<COMPILE_LANG_AND_ID:CXX,ARMClang,AppleClang,Clang,GNU,LCC>")
 set(msvc_cxx "$<COMPILE_LANG_AND_ID:CXX,MSVC>")
 target_compile_options(tutorial_compiler_flags INTERFACE
   "$<${gcc_like_cxx}:$<BUILD_INTERFACE:-Wall;-Wextra;-Wshadow;-Wformat=2;-Wunused>>"
@@ -37,7 +37,7 @@ add_subdirectory(MathFunctions)
 
 # add the executable
 add_executable(Tutorial tutorial.cxx)
-target_link_libraries(Tutorial PUBLIC MathFunctions)
+target_link_libraries(Tutorial PUBLIC MathFunctions tutorial_compiler_flags)
 
 # add the binary tree to the search path for include files
 # so that we will find TutorialConfig.h
@@ -80,6 +80,7 @@ do_test(Tutorial 25 "25 is 5")
 do_test(Tutorial -25 "-25 is (-nan|nan|0)")
 do_test(Tutorial 0.0001 "0.0001 is 0.01")
 
+# setup installer
 include(InstallRequiredSystemLibraries)
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/License.txt")
 set(CPACK_PACKAGE_VERSION_MAJOR "${Tutorial_VERSION_MAJOR}")
@@ -93,10 +94,10 @@ install(EXPORT MathFunctionsTargets
 )
 
 include(CMakePackageConfigHelpers)
-# generate the config file that is includes the exports
+# generate the config file that includes the exports
 configure_package_config_file(${CMAKE_CURRENT_SOURCE_DIR}/Config.cmake.in
   "${CMAKE_CURRENT_BINARY_DIR}/MathFunctionsConfig.cmake"
-  INSTALL_DESTINATION "lib/cmake/example"
+  INSTALL_DESTINATION "lib/cmake/MathFunctions"
   NO_SET_AND_CHECK_MACRO
   NO_CHECK_REQUIRED_COMPONENTS_MACRO
   )
@@ -115,7 +116,7 @@ install(FILES
   )
 
 # generate the export targets for the build tree
-# needs to be after the install(TARGETS ) command
+# needs to be after the install(TARGETS) command
 export(EXPORT MathFunctionsTargets
   FILE "${CMAKE_CURRENT_BINARY_DIR}/MathFunctionsTargets.cmake"
 )

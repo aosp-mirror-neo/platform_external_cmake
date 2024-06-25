@@ -58,17 +58,21 @@ if(NOT CMAKE_ASM${ASM_DIALECT}_COMPILER_ID)
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_GNU "--version")
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_GNU "(GNU assembler)|(GCC)|(Free Software Foundation)")
 
+  list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS AppleClang )
+  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_AppleClang "--version")
+  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_AppleClang "(Apple (clang|LLVM) version)")
+
   list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS Clang )
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_Clang "--version")
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_Clang "(clang version)")
 
-  list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS AppleClang )
-  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_AppleClang "--version")
-  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_AppleClang "(Apple LLVM version)")
-
   list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS ARMClang )
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_ARMClang "--version")
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_ARMClang "armclang")
+
+  list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS OrangeC )
+  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_OrangeC "--version")
+  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_OrangeC "occ \\(OrangeC\\) Version")
 
   list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS HP )
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_HP "-V")
@@ -98,13 +102,17 @@ if(NOT CMAKE_ASM${ASM_DIALECT}_COMPILER_ID)
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_TI "-h")
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_TI "Texas Instruments")
 
+  list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS TIClang )
+  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_TIClang "--version")
+  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_TIClang "(TI (.*) Clang Compiler)")
+
   list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS IAR)
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_IAR )
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_IAR "IAR Assembler")
 
   list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS ARMCC)
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_ARMCC )
-  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_ARMCC "(ARM Compiler)|(ARM Assembler)")
+  set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_REGEX_ARMCC "(ARM Compiler)|(ARM Assembler)|(Arm Compiler)")
 
   list(APPEND CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDORS NASM)
   set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_VENDOR_FLAGS_NASM "-v")
@@ -129,14 +137,13 @@ if(NOT CMAKE_ASM${ASM_DIALECT}_COMPILER_ID)
   if("x${CMAKE_ASM${ASM_DIALECT}_COMPILER_ID}" STREQUAL "xIAR")
     # primary necessary to detect architecture, so the right archiver and linker can be picked
     # eg. "IAR Assembler V8.10.1.12857/W32 for ARM" or "IAR Assembler V4.11.1.4666 for Renesas RX"
-    # Cut out identification first, newline handling is a pain
+    # Earlier versions did not provide `--version`, so grep the full output to extract Assembler ID string
     string(REGEX MATCH "IAR Assembler[^\r\n]*" _compileid "${CMAKE_ASM${ASM_DIALECT}_COMPILER_ID_OUTPUT}")
     if("${_compileid}" MATCHES "V([0-9]+\\.[0-9]+\\.[0-9]+)")
       set(CMAKE_ASM${ASM_DIALECT}_COMPILER_VERSION ${CMAKE_MATCH_1})
     endif()
-    string(REGEX MATCHALL "([A-Za-z0-9-]+)" _all_compileid_matches "${_compileid}")
-    if(_all_compileid_matches)
-      list(GET _all_compileid_matches "-1" CMAKE_ASM${ASM_DIALECT}_COMPILER_ARCHITECTURE_ID)
+    if("${_compileid}" MATCHES "for.*(MSP430|8051|ARM|AVR|RH850|RISC-?V|RL78|RX|STM8|V850)")
+      set(CMAKE_ASM${ASM_DIALECT}_COMPILER_ARCHITECTURE_ID ${CMAKE_MATCH_1})
     endif()
   elseif("x${CMAKE_ASM${ASM_DIALECT}_COMPILER_ID}" STREQUAL "xClang")
     # Test whether an MSVC-like command-line option works.

@@ -212,7 +212,7 @@ same as the Google Test name (i.e. ``suite.testcase``); see also
     discovery.  Note that the expression is a wildcard-based format that
     matches against the original test names as used by gtest.  For type or
     value-parameterized tests, these names may be different to the potentially
-    pretty-printed test names that ``ctest`` uses.
+    pretty-printed test names that :program:`ctest` uses.
 
   ``NO_PRETTY_TYPES``
     By default, the type index of type-parameterized tests is replaced by the
@@ -348,7 +348,7 @@ function(gtest_add_tests)
   unset(testList)
 
   set(gtest_case_name_regex ".*\\( *([A-Za-z_0-9]+) *, *([A-Za-z_0-9]+) *\\).*")
-  set(gtest_test_type_regex "(TYPED_TEST|TEST_?[FP]?)")
+  set(gtest_test_type_regex "(TYPED_TEST|TEST)_?[FP]?")
 
   foreach(source IN LISTS ARGS_SOURCES)
     if(NOT ARGS_SKIP_DEPENDENCY)
@@ -361,7 +361,9 @@ function(gtest_add_tests)
 
       # Parameterized tests have a different signature for the filter
       if("x${test_type}" STREQUAL "xTEST_P")
-        string(REGEX REPLACE ${gtest_case_name_regex}  "*/\\1.\\2/*" gtest_test_name ${hit})
+        string(REGEX REPLACE ${gtest_case_name_regex} "*/\\1.\\2/*" gtest_test_name ${hit})
+      elseif("x${test_type}" STREQUAL "xTYPED_TEST_P")
+        string(REGEX REPLACE ${gtest_case_name_regex} "*/\\1/*.\\2" gtest_test_name ${hit})
       elseif("x${test_type}" STREQUAL "xTEST_F" OR "x${test_type}" STREQUAL "xTEST")
         string(REGEX REPLACE ${gtest_case_name_regex} "\\1.\\2" gtest_test_name ${hit})
       elseif("x${test_type}" STREQUAL "xTYPED_TEST")
@@ -402,6 +404,12 @@ function(gtest_add_tests)
                  COMMAND ${ARGS_TARGET}
                    --gtest_filter=${gtest_test_name}
                    ${ARGS_EXTRA_ARGS}
+        )
+        # Makes sure a skipped GTest is reported as so by CTest
+        set_tests_properties(
+          ${ctest_test_name}
+          PROPERTIES
+          SKIP_REGULAR_EXPRESSION "\\[  SKIPPED \\]"
         )
         list(APPEND testList ${ctest_test_name})
       endif()
@@ -467,10 +475,29 @@ function(gtest_discover_tests TARGET)
   set(ctest_file_base "${CMAKE_CURRENT_BINARY_DIR}/${TARGET}[${counter}]")
   set(ctest_include_file "${ctest_file_base}_include.cmake")
   set(ctest_tests_file "${ctest_file_base}_tests.cmake")
-  get_property(crosscompiling_emulator
+  get_property(test_launcher
     TARGET ${TARGET}
-    PROPERTY CROSSCOMPILING_EMULATOR
+    PROPERTY TEST_LAUNCHER
   )
+  cmake_policy(GET CMP0158 _CMP0158
+    PARENT_SCOPE # undocumented, do not use outside of CMake
+  )
+  if(NOT _CMP0158 OR _CMP0158 STREQUAL "OLD" OR _CMP0158 STREQUAL "NEW" AND CMAKE_CROSSCOMPILING)
+    get_property(crosscompiling_emulator
+      TARGET ${TARGET}
+      PROPERTY CROSSCOMPILING_EMULATOR
+    )
+  endif()
+
+  if(test_launcher AND crosscompiling_emulator)
+    set(test_executor "${test_launcher}" "${crosscompiling_emulator}")
+  elseif(test_launcher)
+    set(test_executor "${test_launcher}")
+  elseif(crosscompiling_emulator)
+    set(test_executor "${crosscompiling_emulator}")
+  else()
+    set(test_executor "")
+  endif()
 
   if(_DISCOVERY_MODE STREQUAL "POST_BUILD")
     add_custom_command(
@@ -479,7 +506,7 @@ function(gtest_discover_tests TARGET)
       COMMAND "${CMAKE_COMMAND}"
               -D "TEST_TARGET=${TARGET}"
               -D "TEST_EXECUTABLE=$<TARGET_FILE:${TARGET}>"
-              -D "TEST_EXECUTOR=${crosscompiling_emulator}"
+              -D "TEST_EXECUTOR=${test_executor}"
               -D "TEST_WORKING_DIR=${_WORKING_DIRECTORY}"
               -D "TEST_EXTRA_ARGS=${_EXTRA_ARGS}"
               -D "TEST_PROPERTIES=${_PROPERTIES}"
@@ -492,7 +519,7 @@ function(gtest_discover_tests TARGET)
               -D "CTEST_FILE=${ctest_tests_file}"
               -D "TEST_DISCOVERY_TIMEOUT=${_DISCOVERY_TIMEOUT}"
               -D "TEST_XML_OUTPUT_DIR=${_XML_OUTPUT_DIR}"
-              -P "${_GOOGLETEST_DISCOVER_TESTS_SCRIPT}"
+              -P "${CMAKE_ROOT}/Modules/GoogleTestAddTests.cmake"
       VERBATIM
     )
 
@@ -518,10 +545,10 @@ function(gtest_discover_tests TARGET)
       "  if(NOT EXISTS \"${ctest_tests_file}\" OR"                                 "\n"
       "     NOT \"${ctest_tests_file}\" IS_NEWER_THAN \"$<TARGET_FILE:${TARGET}>\" OR\n"
       "     NOT \"${ctest_tests_file}\" IS_NEWER_THAN \"\${CMAKE_CURRENT_LIST_FILE}\")\n"
-      "    include(\"${_GOOGLETEST_DISCOVER_TESTS_SCRIPT}\")"                      "\n"
+      "    include(\"${CMAKE_ROOT}/Modules/GoogleTestAddTests.cmake\")"            "\n"
       "    gtest_discover_tests_impl("                                             "\n"
       "      TEST_EXECUTABLE"        " [==[" "$<TARGET_FILE:${TARGET}>"   "]==]"   "\n"
-      "      TEST_EXECUTOR"          " [==[" "${crosscompiling_emulator}" "]==]"   "\n"
+      "      TEST_EXECUTOR"          " [==[" "${test_executor}"           "]==]"   "\n"
       "      TEST_WORKING_DIR"       " [==[" "${_WORKING_DIRECTORY}"      "]==]"   "\n"
       "      TEST_EXTRA_ARGS"        " [==[" "${_EXTRA_ARGS}"             "]==]"   "\n"
       "      TEST_PROPERTIES"        " [==[" "${_PROPERTIES}"             "]==]"   "\n"
@@ -564,10 +591,6 @@ function(gtest_discover_tests TARGET)
 endfunction()
 
 ###############################################################################
-
-set(_GOOGLETEST_DISCOVER_TESTS_SCRIPT
-  ${CMAKE_CURRENT_LIST_DIR}/GoogleTestAddTests.cmake
-)
 
 # Restore project's policies
 cmake_policy(POP)

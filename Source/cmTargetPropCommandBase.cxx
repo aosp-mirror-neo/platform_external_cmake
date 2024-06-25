@@ -23,7 +23,7 @@ void cmTargetPropCommandBase::SetError(std::string const& e)
 
 bool cmTargetPropCommandBase::HandleArguments(
   std::vector<std::string> const& args, const std::string& prop,
-  ArgumentFlags flags)
+  unsigned int flags)
 {
   if (args.size() < 2) {
     this->SetError("called with incorrect number of arguments");
@@ -155,10 +155,10 @@ bool cmTargetPropCommandBase::ProcessContentArgs(
       return false;
     }
   }
-  return this->PopulateTargetProperies(scope, content, prepend, system);
+  return this->PopulateTargetProperties(scope, content, prepend, system);
 }
 
-bool cmTargetPropCommandBase::PopulateTargetProperies(
+bool cmTargetPropCommandBase::PopulateTargetProperties(
   const std::string& scope, const std::vector<std::string>& content,
   bool prepend, bool system)
 {

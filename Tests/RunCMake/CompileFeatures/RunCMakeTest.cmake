@@ -35,11 +35,13 @@ elseif (cxx_std_98 IN_LIST CXX_FEATURES AND cxx_std_11 IN_LIST CXX_FEATURES)
 endif()
 
 configure_file("${RunCMake_SOURCE_DIR}/CMakeLists.txt" "${RunCMake_BINARY_DIR}/CMakeLists.txt" COPYONLY)
+file(READ "${RunCMake_SOURCE_DIR}/CMP0128Common.cmake" cmp0128_common)
 
 function(test_build)
   set(test ${name}-${lang})
 
-  configure_file("${RunCMake_SOURCE_DIR}/${name}.cmake" "${RunCMake_BINARY_DIR}/${test}.cmake" @ONLY)
+  file(READ "${RunCMake_SOURCE_DIR}/${name}.cmake" cmake)
+  file(CONFIGURE OUTPUT "${RunCMake_BINARY_DIR}/${test}.cmake" CONTENT "${cmake}${cmp0128_common}" @ONLY)
   if(EXISTS "${RunCMake_SOURCE_DIR}/${name}-build-check.cmake")
     configure_file("${RunCMake_SOURCE_DIR}/${name}-build-check.cmake" "${RunCMake_BINARY_DIR}/${test}-build-check.cmake" @ONLY)
   endif()
@@ -60,7 +62,7 @@ macro(mangle_flags variable)
 
   if(RunCMake_GENERATOR MATCHES "Visual Studio" AND MSVC_TOOLSET_VERSION GREATER_EQUAL 141)
     string(REPLACE "-" "/" result "${result}")
-  elseif(RunCMake_GENERATOR STREQUAL "Xcode" AND CMAKE_XCODE_BUILD_SYSTEM GREATER_EQUAL 12)
+  elseif(RunCMake_GENERATOR STREQUAL "Xcode" AND XCODE_VERSION VERSION_LESS 15.3 AND CMAKE_XCODE_BUILD_SYSTEM GREATER_EQUAL 12)
     string(REPLACE "=" [[\\=]] result "${result}")
   endif()
 
@@ -68,7 +70,20 @@ macro(mangle_flags variable)
   list(APPEND flags "${result}")
 endmacro()
 
-function(test_extensions_opposite)
+function(test_cmp0128_old_same_standard)
+  set(flag "${${lang}${${lang}_STANDARD_DEFAULT}_EXT_FLAG}")
+
+  if(NOT flag)
+    return()
+  endif()
+
+  mangle_flags(flag)
+
+  set(name CMP0128OldSameStandard)
+  test_build(--verbose)
+endfunction()
+
+function(test_cmp0128_new_extensions_opposite)
   if(extensions_opposite)
     set(flag_ext "_EXT")
   endif()
@@ -83,16 +98,16 @@ function(test_extensions_opposite)
 
   # Make sure we enable/disable extensions when:
   # 1. LANG_STANDARD is unset.
-  set(name ExtensionsStandardUnset)
+  set(name CMP0128NewExtensionsStandardUnset)
   set(RunCMake_TEST_OPTIONS -DCMAKE_POLICY_DEFAULT_CMP0128=NEW)
   test_build(--verbose)
 
   # 2. LANG_STANDARD matches CMAKE_LANG_STANDARD_DEFAULT.
-  set(name ExtensionsStandardDefault)
+  set(name CMP0128NewExtensionsStandardDefault)
   test_build(--verbose)
 endfunction()
 
-function(test_no_unnecessary_flag)
+function(test_cmp0128_new_no_unnecessary_flag)
   set(standard_flag "${${lang}${${lang}_STANDARD_DEFAULT}_FLAG}")
   set(extension_flag "${${lang}${${lang}_STANDARD_DEFAULT}_EXT_FLAG}")
 
@@ -103,7 +118,7 @@ function(test_no_unnecessary_flag)
   mangle_flags(standard_flag)
   mangle_flags(extension_flag)
 
-  set(name NoUnnecessaryFlag)
+  set(name CMP0128NewNoUnnecessaryFlag)
   set(RunCMake_TEST_OPTIONS -DCMAKE_POLICY_DEFAULT_CMP0128=NEW)
   test_build(--verbose)
 endfunction()
@@ -115,7 +130,7 @@ endfunction()
 
 function(test_cmp0128_warn_unset)
   # For compilers that had CMAKE_<LANG>_EXTENSION_COMPILE_OPTION (only IAR)
-  # there is no behavioural change and thus no warning.
+  # there is no behavioral change and thus no warning.
   if(NOT "${${lang}_EXT_FLAG}" STREQUAL "")
     return()
   endif()
@@ -144,8 +159,9 @@ function(test_lang lang ext)
     set(extensions_opposite ON)
   endif()
 
-  test_extensions_opposite()
-  test_no_unnecessary_flag()
+  test_cmp0128_new_extensions_opposite()
+  test_cmp0128_new_no_unnecessary_flag()
+  test_cmp0128_old_same_standard()
   test_cmp0128_warn_match()
   test_cmp0128_warn_unset()
 endfunction()

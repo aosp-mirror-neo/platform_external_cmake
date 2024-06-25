@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 
 include(RunCMake)
 
@@ -7,6 +7,10 @@ run_cmake_command(InvalidArg1 ${CMAKE_COMMAND} -invalid)
 run_cmake_command(InvalidArg2 ${CMAKE_COMMAND} --invalid)
 run_cmake_command(Wizard ${CMAKE_COMMAND} -i)
 run_cmake_command(C-no-arg ${CMAKE_COMMAND} -B DummyBuildDir -C)
+run_cmake_command(C-no-arg2 ${CMAKE_COMMAND} -B DummyBuildDir -C -T)
+set(RunCMake_TEST_RAW_ARGS [[-C ""]])
+run_cmake_command(C-no-arg3 ${CMAKE_COMMAND} -B DummyBuildDir)
+unset(RunCMake_TEST_RAW_ARGS)
 run_cmake_command(C-no-file ${CMAKE_COMMAND} -B DummyBuildDir -C nosuchcachefile.txt)
 run_cmake_command(Cno-file ${CMAKE_COMMAND} -B DummyBuildDir -Cnosuchcachefile.txt)
 run_cmake_command(cache-no-file ${CMAKE_COMMAND} nosuchsubdir/CMakeCache.txt)
@@ -43,15 +47,22 @@ run_cmake_command(E___run_co_compile-no-iwyu ${CMAKE_COMMAND} -E __run_co_compil
 run_cmake_command(E___run_co_compile-bad-iwyu ${CMAKE_COMMAND} -E __run_co_compile --iwyu=iwyu-does-not-exist -- command-does-not-exist)
 run_cmake_command(E___run_co_compile-no--- ${CMAKE_COMMAND} -E __run_co_compile --iwyu=iwyu-does-not-exist command-does-not-exist)
 run_cmake_command(E___run_co_compile-no-cc ${CMAKE_COMMAND} -E __run_co_compile --iwyu=iwyu-does-not-exist --)
+run_cmake_command(E___run_co_compile-tidy-remove-fixes ${CMAKE_COMMAND} -E __run_co_compile "--tidy=${CMAKE_COMMAND}\\;-E\\;true\\;--export-fixes=${RunCMake_BINARY_DIR}/tidy-fixes.yaml" -- ${CMAKE_COMMAND} -E true)
 
 run_cmake_command(G_no-arg ${CMAKE_COMMAND} -B DummyBuildDir -G)
 run_cmake_command(G_bad-arg ${CMAKE_COMMAND} -B DummyBuildDir -G NoSuchGenerator)
 run_cmake_command(P_no-arg ${CMAKE_COMMAND} -P)
 run_cmake_command(P_no-file ${CMAKE_COMMAND} -P nosuchscriptfile.cmake)
-run_cmake_command(P_arbitrary_args ${CMAKE_COMMAND} -P "${RunCMake_SOURCE_DIR}/P_arbitrary_args.cmake" -- -DFOO)
+run_cmake_command(P_args ${CMAKE_COMMAND} -P "${RunCMake_SOURCE_DIR}/P_args.cmake" relative/path "${RunCMake_SOURCE_DIR}")
+run_cmake_command(P_arbitrary_args ${CMAKE_COMMAND} -P "${RunCMake_SOURCE_DIR}/P_arbitrary_args.cmake" -- -DFOO -S -B --fresh --version)
+run_cmake_command(P_P_in_arbitrary_args ${CMAKE_COMMAND} -P "${RunCMake_SOURCE_DIR}/P_arbitrary_args.cmake" -- -P "${RunCMake_SOURCE_DIR}/non_existing.cmake")
+run_cmake_command(P_P_in_arbitrary_args_2 ${CMAKE_COMMAND} -P "${RunCMake_SOURCE_DIR}/P_arbitrary_args.cmake" -- -P -o)
+run_cmake_command(P_fresh ${CMAKE_COMMAND} -P "${RunCMake_SOURCE_DIR}/P_fresh.cmake" --fresh)
 
 run_cmake_command(build-no-dir
   ${CMAKE_COMMAND} --build)
+run_cmake_command(build-no-dir2
+  ${CMAKE_COMMAND} --build --target=invalid)
 run_cmake_command(build-no-cache
   ${CMAKE_COMMAND} --build ${RunCMake_SOURCE_DIR})
 run_cmake_command(build-unknown-command-short
@@ -114,6 +125,17 @@ run_cmake_command(cache-bad-entry
 run_cmake_command(cache-empty-entry
   ${CMAKE_COMMAND} --build ${RunCMake_SOURCE_DIR}/cache-empty-entry/)
 
+run_cmake_command(DebuggerCapabilityInspect ${CMAKE_COMMAND} -E capabilities)
+get_property(CMake_ENABLE_DEBUGGER DIRECTORY PROPERTY CMake_ENABLE_DEBUGGER)
+if(CMake_ENABLE_DEBUGGER)
+  run_cmake_with_options(DebuggerArgMissingPipe --debugger-pipe)
+  run_cmake_with_options(DebuggerArgMissingDapLog --debugger-dap-log)
+else()
+  run_cmake_with_options(DebuggerNotSupported --debugger)
+  run_cmake_with_options(DebuggerNotSupportedPipe --debugger-pipe pipe)
+  run_cmake_with_options(DebuggerNotSupportedDapLog --debugger-dap-log dap-log)
+endif()
+
 function(run_ExplicitDirs)
   set(RunCMake_TEST_NO_CLEAN 1)
   set(RunCMake_TEST_NO_SOURCE_DIR 1)
@@ -128,41 +150,101 @@ project(ExplicitDirsMissing LANGUAGES NONE)
 ]=])
   set(RunCMake_TEST_SOURCE_DIR "${source_dir}")
   set(RunCMake_TEST_BINARY_DIR "${source_dir}")
-  run_cmake_with_options(no-S-B -DFOO=BAR)
+  run_cmake_with_options(ExplicitDirs-no-S-B -DFOO=BAR)
+
+  file(WRITE ${source_dir}/CMakeLists.txt [=[
+cmake_minimum_required(VERSION 3.13)
+project(ExplicitDirsMissing LANGUAGES NONE)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
+  message(FATAL_ERROR "CWD used as binary dir")
+endif()
+message(STATUS "CMAKE_SOURCE_DIR='${CMAKE_SOURCE_DIR}'")
+message(STATUS "CMAKE_BINARY_DIR='${CMAKE_BINARY_DIR}'")
+]=])
+
+  file(REMOVE_RECURSE "${source_dir}/build")
+  # Test with a setup where binary_dir won't be created by `run_cmake_with_options`
+  run_cmake_with_options(ExplicitDirs-S-arg-build-dir-not-created -S ${source_dir} build/)
+  run_cmake_with_options(ExplicitDirs-S-arg-reverse-build-dir-not-created build/ -S${source_dir} )
+
+  file(REMOVE_RECURSE "${source_dir}/build")
+  file(MAKE_DIRECTORY "${source_dir}/build")
+  run_cmake_with_options(ExplicitDirs-S-arg-build-dir-empty -S ${source_dir} build/)
 
   set(source_dir ${RunCMake_SOURCE_DIR}/ExplicitDirs)
   set(binary_dir ${RunCMake_BINARY_DIR}/ExplicitDirs-build)
+  set(working_dir ${RunCMake_BINARY_DIR}/ExplicitDirs-cwd)
 
   set(RunCMake_TEST_SOURCE_DIR "${source_dir}")
   set(RunCMake_TEST_BINARY_DIR "${binary_dir}")
 
+  file(MAKE_DIRECTORY "${working_dir}")
+  set(RunCMake_TEST_COMMAND_WORKING_DIRECTORY "${working_dir}")
+
   file(REMOVE_RECURSE "${binary_dir}")
-  run_cmake_with_options(S-arg -S ${source_dir} ${binary_dir})
-  run_cmake_with_options(S-arg-reverse-order ${binary_dir} -S${source_dir} )
-  run_cmake_with_options(S-no-arg -S )
-  run_cmake_with_options(S-no-arg2 -S -T)
-  run_cmake_with_options(S-B -S ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-arg -S ${source_dir} ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-arg-reverse-order ${binary_dir} -S${source_dir} )
+  run_cmake_with_options(ExplicitDirs-S-no-arg -S )
+  run_cmake_with_options(ExplicitDirs-S-no-arg2 -S -T)
+  run_cmake_with_raw_args(ExplicitDirs-S-no-arg3 [[-S ""]])
+  run_cmake_with_options(ExplicitDirs-S-B -S ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-B-extra-path -S ${source_dir} -B ${binary_dir} /extra/path/)
+  run_cmake_with_raw_args(ExplicitDirs-S-B-non-path "-S \"${source_dir}\" -B \"${binary_dir}\" \"\"")
+  run_cmake_with_raw_args(ExplicitDirs-S-B-non-path2 "-S \"${source_dir}\" \"\" -B \"${binary_dir}\"")
+
+  file(REMOVE_RECURSE "${binary_dir}/other_dir")
+  file(MAKE_DIRECTORY "${binary_dir}/other_dir")
+  file(WRITE "${binary_dir}/other_dir/CMakeLists.txt" [=[ ]=])
+  run_cmake_with_options(ExplicitDirs-S-S-same -S ${source_dir} -S ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-S-differs -S ${binary_dir}/other_dir -S ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-implicit-same -S ${source_dir} ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-implicit-differs -S ${binary_dir}/other_dir ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-implicit-differs2 ${binary_dir}/other_dir -S ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-implicit-differs3 ${binary_dir}/other_dir ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-S-Sdiffers -S ${binary_dir}/other_dir1 -S ${binary_dir}/other_dir2 -S ${source_dir} -B ${binary_dir})
+  run_cmake_with_options(ExplicitDirs-S-S-Simplicit ${binary_dir}/other_dir1 ${binary_dir}/other_dir2 ${source_dir} -B ${binary_dir})
 
   # make sure that -B can explicitly construct build directories
   file(REMOVE_RECURSE "${binary_dir}")
-  run_cmake_with_options(B-arg -B ${binary_dir} ${source_dir})
+  run_cmake_with_options(ExplicitDirs-B-arg -B ${binary_dir} ${source_dir})
   file(REMOVE_RECURSE "${binary_dir}")
-  run_cmake_with_options(B-arg-reverse-order ${source_dir} -B${binary_dir})
-  run_cmake_with_options(B-no-arg -B )
-  run_cmake_with_options(B-no-arg2 -B -T)
+  run_cmake_with_options(ExplicitDirs-B-arg-reverse-order ${source_dir} -B${binary_dir})
+  run_cmake_with_options(ExplicitDirs-B-no-arg -B )
+  run_cmake_with_options(ExplicitDirs-B-no-arg2 -B -T)
+  run_cmake_with_raw_args(ExplicitDirs-B-no-arg3 [[-B ""]])
   file(REMOVE_RECURSE "${binary_dir}")
-  run_cmake_with_options(B-S -B${binary_dir} -S${source_dir})
+  run_cmake_with_options(ExplicitDirs-B-S -B${binary_dir} -S${source_dir})
+  run_cmake_with_options(ExplicitDirs-B-S-extra-path -B${binary_dir} -S${source_dir} /extra/path/)
+
+  unset(RunCMake_TEST_COMMAND_WORKING_DIRECTORY)
 
   message("copied to ${RunCMake_TEST_BINARY_DIR}/initial-cache.txt")
   file(COPY ${RunCMake_SOURCE_DIR}/C_buildsrcdir/initial-cache.txt DESTINATION ${RunCMake_TEST_BINARY_DIR})
 
   # CMAKE_BINARY_DIR should be determined by -B if specified, and CMAKE_SOURCE_DIR determined by -S if specified.
   # Path to initial-cache.txt is relative to the $PWD, which is normally set to ${RunCMake_TEST_BINARY_DIR}.
-  run_cmake_with_options(C_buildsrcdir -B DummyBuildDir -S ${RunCMake_SOURCE_DIR}/C_buildsrcdir/src -C initial-cache.txt)
+  run_cmake_with_options(ExplicitDirs-C_buildsrcdir -B DummyBuildDir -S ${RunCMake_SOURCE_DIR}/C_buildsrcdir/src -C initial-cache.txt)
   # Test that full path works, too.
-  run_cmake_with_options(C_buildsrcdir -B DummyBuildDir -S ${RunCMake_SOURCE_DIR}/C_buildsrcdir/src -C ${RunCMake_TEST_BINARY_DIR}/initial-cache.txt)
+  run_cmake_with_options(ExplicitDirs-C_buildsrcdir -B DummyBuildDir -S ${RunCMake_SOURCE_DIR}/C_buildsrcdir/src -C ${RunCMake_TEST_BINARY_DIR}/initial-cache.txt)
+  run_cmake_with_options(ExplicitDirs-C_buildsrcdir -B DummyBuildDir ${RunCMake_SOURCE_DIR}/C_buildsrcdir/src -C ${RunCMake_TEST_BINARY_DIR}/initial-cache.txt)
 endfunction()
 run_ExplicitDirs()
+
+function(run_Fresh)
+  set(RunCMake_TEST_BINARY_DIR "${RunCMake_BINARY_DIR}/Fresh-build")
+
+  set(RunCMake_TEST_VARIANT_DESCRIPTION "-empty")
+  run_cmake_with_options(Fresh --fresh -DFIRST=ON)
+  set(RunCMake_TEST_NO_CLEAN 1)
+
+  set(RunCMake_TEST_VARIANT_DESCRIPTION "-reconfig")
+  run_cmake_with_options(Fresh --fresh)
+
+  set(RunCMake_TEST_VARIANT_DESCRIPTION "-src-from-cache")
+  set(RunCMake_TEST_NO_SOURCE_DIR 1)
+  run_cmake_with_options(Fresh --fresh "${RunCMake_TEST_BINARY_DIR}")
+endfunction()
+run_Fresh()
 
 function(run_Toolchain)
   set(RunCMake_TEST_NO_SOURCE_DIR 1)
@@ -183,7 +265,7 @@ function(run_Toolchain)
 set(CMAKE_SYSTEM_NAME Linux)
 set(toolchain_file binary_dir)
 ]=])
-  run_cmake_with_options(toolchain-valid-rel-build-path ${CMAKE_COMMAND} -S ${source_dir} -B ${binary_dir} --toolchain toolchain.cmake)
+  run_cmake_with_options(toolchain-valid-rel-build-path -S ${source_dir} -B ${binary_dir} --toolchain toolchain.cmake)
 endfunction()
 run_Toolchain()
 
@@ -247,8 +329,14 @@ function(run_BuildDir)
     run_cmake_command(BuildDir--build-jobs-no-number-trailing--target ${CMAKE_COMMAND} -E chdir ..
       ${CMAKE_COMMAND} --build BuildDir-build -j --target CustomTarget)
     if(RunCMake_GENERATOR MATCHES "Unix Makefiles" OR RunCMake_GENERATOR MATCHES "Ninja")
+      set(_backup_lang "$ENV{LANG}")
+      set(_backup_lc_messages "$ENV{LC_MESSAGES}")
+      set(ENV{LANG} "C")
+      set(ENV{LC_MESSAGES} "C")
       run_cmake_command(BuildDir--build-jobs-no-number-trailing--invalid-target ${CMAKE_COMMAND} -E chdir ..
         ${CMAKE_COMMAND} --build BuildDir-build -j --target invalid-target)
+      set(ENV{LANG} "${_backup_lang}")
+      set(ENV{LC_MESSAGES} "${_backup_lc_messages}")
     endif()
     run_cmake_command(BuildDir--build--parallel-no-number ${CMAKE_COMMAND} -E chdir ..
       ${CMAKE_COMMAND} --build BuildDir-build --parallel)
@@ -275,6 +363,13 @@ function(run_EnvironmentGenerator)
   run_cmake_command(Envgen-ninja ${CMAKE_COMMAND} -G)
   set(ENV{CMAKE_GENERATOR} "NoSuchGenerator")
   run_cmake_command(Envgen-bad ${CMAKE_COMMAND} -G)
+  unset(ENV{CMAKE_GENERATOR})
+
+  # Honor CMAKE_GENERATOR env var in --help output
+  set(ENV{CMAKE_GENERATOR} "Ninja Multi-Config")
+  run_cmake_command(Envgen-ninja-multi-help ${CMAKE_COMMAND} --help)
+  set(ENV{CMAKE_GENERATOR} "NoSuchGenerator")
+  run_cmake_command(Envgen-bad-help ${CMAKE_COMMAND} --help)
   unset(ENV{CMAKE_GENERATOR})
 
   if(RunCMake_GENERATOR MATCHES "Visual Studio.*")
@@ -364,6 +459,15 @@ elseif(RunCMake_GENERATOR MATCHES "Ninja Multi-Config|Visual Studio|Xcode")
   run_EnvironmentConfigTypes()
 endif()
 
+function(run_EnvironmentInstallPrefix)
+  set(ENV{CMAKE_INSTALL_PREFIX} "${RunCMake_BINARY_DIR}/install_prefix_set_via_env_var")
+  run_cmake(EnvInstallPrefix)
+  run_cmake_with_options(EnvInstallPrefixOverrideWithVar -DCMAKE_INSTALL_PREFIX=${RunCMake_BINARY_DIR}/install_prefix_set_via_var)
+  run_cmake_with_options(EnvInstallPrefixOverrideWithCmdLineOpt --install-prefix ${RunCMake_BINARY_DIR}/install_prefix_set_cmd_line_opt)
+  unset(ENV{CMAKE_INSTALL_PREFIX})
+endfunction()
+run_EnvironmentInstallPrefix()
+
 function(run_EnvironmentToolchain)
   set(ENV{CMAKE_TOOLCHAIN_FILE} "${RunCMake_SOURCE_DIR}/EnvToolchain-toolchain.cmake")
   run_cmake(EnvToolchainAbsolute)
@@ -390,6 +494,14 @@ function(run_EnvironmentToolchain)
   unset(RunCMake_TEST_NO_CLEAN)
 endfunction()
 run_EnvironmentToolchain()
+
+function(run_EnvironmentColor)
+  set(ENV{CMAKE_COLOR_DIAGNOSTICS} "ON")
+  run_cmake(EnvColorOn)
+  unset(ENV{CMAKE_COLOR_DIAGNOSTICS})
+  run_cmake(EnvColorDefault)
+endfunction()
+run_EnvironmentColor()
 
 if(RunCMake_GENERATOR STREQUAL "Ninja")
   # Use a single build tree for a few tests without cleaning.
@@ -487,12 +599,27 @@ run_cmake_command(E_copy-three-source-files-target-is-file
   ${CMAKE_COMMAND} -E copy ${in}/f1.txt ${in}/f2.txt ${in}/f3.txt ${out}/f1.txt)
 run_cmake_command(E_copy-two-good-and-one-bad-source-files-target-is-directory
   ${CMAKE_COMMAND} -E copy ${in}/f1.txt ${in}/not_existing_file.bad ${in}/f3.txt ${out})
+run_cmake_command(E_copy-t-argument
+  ${CMAKE_COMMAND} -E copy ${in}/f1.txt -t ${out} ${in}/f3.txt)
+run_cmake_command(E_copy-t-argument-target-is-file
+  ${CMAKE_COMMAND} -E copy ${in}/f1.txt -t ${out}/f1.txt ${in}/f3.txt)
+run_cmake_command(E_copy-t-argument-no-source-files
+  ${CMAKE_COMMAND} -E copy -t ${out})
 run_cmake_command(E_copy_if_different-one-source-directory-target-is-directory
   ${CMAKE_COMMAND} -E copy_if_different ${in}/f1.txt ${out})
 run_cmake_command(E_copy_if_different-three-source-files-target-is-directory
   ${CMAKE_COMMAND} -E copy_if_different ${in}/f1.txt ${in}/f2.txt ${in}/f3.txt ${out})
 run_cmake_command(E_copy_if_different-three-source-files-target-is-file
   ${CMAKE_COMMAND} -E copy_if_different ${in}/f1.txt ${in}/f2.txt ${in}/f3.txt ${out}/f1.txt)
+unset(in)
+unset(out)
+
+set(in ${RunCMake_SOURCE_DIR}/copy_input)
+set(out ${RunCMake_BINARY_DIR}/copy_directory_different_output)
+file(REMOVE_RECURSE "${out}")
+file(MAKE_DIRECTORY ${out})
+run_cmake_command(E_copy_directory_if_different
+  ${CMAKE_COMMAND} -E copy_directory_if_different ${in} ${out})
 unset(in)
 unset(out)
 
@@ -651,16 +778,89 @@ file(WRITE "${out}/empty_file.txt" "")
 file(WRITE "${out}/unicode_file.txt" "àéùç - 한국어") # Korean in Korean
 run_cmake_command(E_cat_good_cat
   ${CMAKE_COMMAND} -E cat "${out}/first_file.txt" "${out}/second_file.txt" "${out}/empty_file.txt" "${out}/unicode_file.txt")
-unset(out)
 
 run_cmake_command(E_cat_good_binary_cat
   ${CMAKE_COMMAND} -E cat "${RunCMake_SOURCE_DIR}/E_cat_binary_files/binary.obj" "${RunCMake_SOURCE_DIR}/E_cat_binary_files/binary.obj")
+
+# To test whether the double dash (--) works, we need to control the working directory
+# in order to be able to pass a relative path that starts with a dash.
+file(WRITE "${out}/-file-starting-with-dash.txt" "file starting with dash, not an option\n")
+set(RunCMake_TEST_COMMAND_WORKING_DIRECTORY "${out}")
+run_cmake_command(E_cat-with-double-dash ${CMAKE_COMMAND} -E cat -- "-file-starting-with-dash.txt")
+run_cmake_command(E_cat-without-double-dash ${CMAKE_COMMAND} -E cat "-file-starting-with-dash.txt")
+unset(RunCMake_TEST_COMMAND_WORKING_DIRECTORY)
+unset(out)
+
+run_cmake_command(E_cat-stdin ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_cat-stdin.cmake)
+
+# Unset environment variables that are used for testing cmake -E
+unset(ENV{TEST_ENV})
+unset(ENV{TEST_ENV_EXPECTED})
 
 run_cmake_command(E_env-no-command0 ${CMAKE_COMMAND} -E env)
 run_cmake_command(E_env-no-command1 ${CMAKE_COMMAND} -E env TEST_ENV=1)
 run_cmake_command(E_env-bad-arg1 ${CMAKE_COMMAND} -E env -bad-arg1)
 run_cmake_command(E_env-set   ${CMAKE_COMMAND} -E env TEST_ENV=1 ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-set.cmake)
 run_cmake_command(E_env-unset ${CMAKE_COMMAND} -E env TEST_ENV=1 ${CMAKE_COMMAND} -E env --unset=TEST_ENV ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-unset.cmake)
+run_cmake_command(E_env-stdin ${CMAKE_COMMAND} -DPRINT_STDIN_EXE=${PRINT_STDIN_EXE} -P ${RunCMake_SOURCE_DIR}/E_env-stdin.cmake)
+
+# To test whether the double dash (--) works for the env command, we need a command that e.g. contains an equals sign (=)
+# and would normally be interpreted as an NAME=VALUE environment variable.
+# Ensuring such a command is done by simply copying the trivial exit_code executable with a different name.
+cmake_path(GET EXIT_CODE_EXE FILENAME exit_code)
+file(COPY_FILE "${EXIT_CODE_EXE}" "${RunCMake_BINARY_DIR}/env=${exit_code}")
+run_cmake_command(E_env-with-double-dash ${CMAKE_COMMAND} -E env TEST_ENV=1 -- "${RunCMake_BINARY_DIR}/env=${exit_code}" zero_exit)
+run_cmake_command(E_env-without-double-dash ${CMAKE_COMMAND} -E env TEST_ENV=1 "${RunCMake_BINARY_DIR}/env=${exit_code}" zero_exit)
+
+## Tests of env --modify
+# Repeat the same tests as above
+run_cmake_command(E_env_modify-set   ${CMAKE_COMMAND} -E env --modify TEST_ENV=set:1 ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-set.cmake)
+run_cmake_command(E_env_modify-unset ${CMAKE_COMMAND} -E env --modify TEST_ENV=set:1 ${CMAKE_COMMAND} -E env --modify TEST_ENV=unset: ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-unset.cmake)
+run_cmake_command(E_env_modify-with-double-dash ${CMAKE_COMMAND} -E env --modify TEST_ENV=set:1 -- "${RunCMake_BINARY_DIR}/env=${exit_code}" zero_exit)
+run_cmake_command(E_env_modify-without-double-dash ${CMAKE_COMMAND} -E env --modify TEST_ENV=set:1 "${RunCMake_BINARY_DIR}/env=${exit_code}" zero_exit)
+
+# Test environment modification commands
+run_cmake_command(E_env_modify-reset
+                  ${CMAKE_COMMAND} -E env TEST_ENV=expected
+                  ${CMAKE_COMMAND} -E env TEST_ENV_EXPECTED=expected TEST_ENV=bad_value --modify TEST_ENV=reset:
+                  ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-equal.cmake)
+
+run_cmake_command(E_env_modify-reset-to-unset
+                  ${CMAKE_COMMAND} -E env --unset=TEST_ENV --unset=TEST_ENV_EXPECTED
+                  ${CMAKE_COMMAND} -E env TEST_ENV=bad_value --modify TEST_ENV=reset:
+                  ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-equal.cmake)
+
+run_cmake_command(E_env_modify-string
+                  ${CMAKE_COMMAND} -E env TEST_ENV_EXPECTED=expected
+                  --modify TEST_ENV=unset:
+                  --modify TEST_ENV=string_append:ect
+                  --modify TEST_ENV=string_prepend:exp
+                  --modify TEST_ENV=string_append:ed
+                  ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-equal.cmake)
+
+if (WIN32)
+  set(SEP "\\;")
+else ()
+  set(SEP ":")
+endif ()
+
+run_cmake_command(E_env_modify-path_list
+                  ${CMAKE_COMMAND} -E env "TEST_ENV_EXPECTED=exp${SEP}ect${SEP}ed"
+                  --modify TEST_ENV=unset:
+                  --modify TEST_ENV=path_list_append:ect
+                  --modify TEST_ENV=path_list_prepend:exp
+                  --modify TEST_ENV=path_list_append:ed
+                  ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-equal.cmake)
+
+run_cmake_command(E_env_modify-cmake_list
+                  ${CMAKE_COMMAND} -E env "TEST_ENV_EXPECTED=exp\\;ect\\;ed"
+                  --modify TEST_ENV=unset:
+                  --modify TEST_ENV=cmake_list_append:ect
+                  --modify TEST_ENV=cmake_list_prepend:exp
+                  --modify TEST_ENV=cmake_list_append:ed
+                  ${CMAKE_COMMAND} -P ${RunCMake_SOURCE_DIR}/E_env-equal.cmake)
+
+run_cmake_command(E_env_modify-bad-operation ${CMAKE_COMMAND} -E env --modify TEST_ENV=unknown:)
 
 run_cmake_command(E_md5sum-dir ${CMAKE_COMMAND} -E md5sum .)
 run_cmake_command(E_sha1sum-dir ${CMAKE_COMMAND} -E sha1sum .)
@@ -790,6 +990,7 @@ unset(RunCMake_TEST_OPTIONS)
 
 set(RunCMake_TEST_OPTIONS --trace)
 run_cmake(trace)
+run_cmake(trace-try_compile)
 unset(RunCMake_TEST_OPTIONS)
 
 set(RunCMake_TEST_OPTIONS --trace-expand)
@@ -802,6 +1003,7 @@ unset(RunCMake_TEST_OPTIONS)
 
 set(RunCMake_TEST_OPTIONS --trace-redirect=${RunCMake_BINARY_DIR}/redirected.trace)
 run_cmake(trace-redirect)
+run_cmake(trace-try_compile-redirect)
 unset(RunCMake_TEST_OPTIONS)
 
 set(RunCMake_TEST_OPTIONS --trace-redirect=/no/such/file.txt)
@@ -828,6 +1030,8 @@ set(RunCMake_TEST_OPTIONS --debug-trycompile)
 run_cmake(debug-trycompile)
 unset(RunCMake_TEST_OPTIONS)
 
+run_cmake(trycompile-clean)
+
 function(run_cmake_depends)
   set(RunCMake_TEST_SOURCE_DIR "${RunCMake_SOURCE_DIR}/cmake_depends")
   set(RunCMake_TEST_BINARY_DIR "${RunCMake_BINARY_DIR}/cmake_depends-build")
@@ -845,8 +1049,8 @@ set(CMAKE_DEPENDS_CHECK_C
 set(CMAKE_RELATIVE_PATH_TOP_SOURCE \"${RunCMake_TEST_SOURCE_DIR}\")
 set(CMAKE_RELATIVE_PATH_TOP_BINARY \"${RunCMake_TEST_BINARY_DIR}\")
 ")
-  run_cmake_command(cmake_depends ${CMAKE_COMMAND} -E cmake_depends
-    "Unix Makefiles"
+  run_cmake_command(cmake_depends ${CMAKE_COMMAND} -E env VERBOSE=1
+    ${CMAKE_COMMAND} -E cmake_depends "Unix Makefiles"
     ${RunCMake_TEST_SOURCE_DIR} ${RunCMake_TEST_SOURCE_DIR}
     ${RunCMake_TEST_BINARY_DIR} ${RunCMake_TEST_BINARY_DIR}
     ${RunCMake_TEST_BINARY_DIR}/CMakeFiles/DepTarget.dir/DependInfo.cmake
@@ -920,9 +1124,18 @@ set(RunCMake_TEST_OPTIONS --profiling-format=google-trace --profiling-output=${P
 run_cmake(ProfilingTest)
 unset(RunCMake_TEST_OPTIONS)
 
-if(RunCMake_GENERATOR MATCHES "^Visual Studio 10 2010")
-  run_cmake_with_options(DeprecateVS10-WARN-ON -DCMAKE_WARN_VS10=ON)
-  unset(ENV{CMAKE_WARN_VS10})
-  run_cmake(DeprecateVS10-WARN-ON)
-  run_cmake_with_options(DeprecateVS10-WARN-OFF -DCMAKE_WARN_VS10=OFF)
+if(RunCMake_GENERATOR MATCHES "^Visual Studio 9 2008")
+  run_cmake_with_options(DeprecateVS9-WARN-ON -DCMAKE_WARN_VS9=ON)
+  unset(ENV{CMAKE_WARN_VS9})
+  run_cmake(DeprecateVS9-WARN-ON)
+  run_cmake_with_options(DeprecateVS9-WARN-OFF -DCMAKE_WARN_VS9=OFF)
 endif()
+
+if(RunCMake_GENERATOR MATCHES "^Visual Studio 12 2013")
+  run_cmake_with_options(DeprecateVS12-WARN-ON -DCMAKE_WARN_VS12=ON)
+  unset(ENV{CMAKE_WARN_VS12})
+  run_cmake(DeprecateVS12-WARN-ON)
+  run_cmake_with_options(DeprecateVS12-WARN-OFF -DCMAKE_WARN_VS12=OFF)
+endif()
+
+run_cmake_with_options(help-arbitrary "--help" "CMAKE_CXX_IGNORE_EXTENSIONS")

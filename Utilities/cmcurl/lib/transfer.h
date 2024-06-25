@@ -7,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 1998 - 2021, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -20,11 +20,14 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 
 #define Curl_headersep(x) ((((x)==':') || ((x)==';')))
 char *Curl_checkheaders(const struct Curl_easy *data,
-                        const char *thisheader);
+                        const char *thisheader,
+                        const size_t thislen);
 
 void Curl_init_CONNECT(struct Curl_easy *data);
 
@@ -42,12 +45,9 @@ typedef enum {
 
 CURLcode Curl_follow(struct Curl_easy *data, char *newurl,
                      followtype type);
-CURLcode Curl_readwrite(struct connectdata *conn,
-                        struct Curl_easy *data, bool *done,
-                        bool *comeback);
+CURLcode Curl_readwrite(struct Curl_easy *data, bool *done);
 int Curl_single_getsock(struct Curl_easy *data,
                         struct connectdata *conn, curl_socket_t *socks);
-CURLcode Curl_readrewind(struct Curl_easy *data);
 CURLcode Curl_fillreadbuffer(struct Curl_easy *data, size_t bytes,
                              size_t *nreadp);
 CURLcode Curl_retry_request(struct Curl_easy *data, char **url);
@@ -56,6 +56,23 @@ CURLcode Curl_get_upload_buffer(struct Curl_easy *data);
 
 CURLcode Curl_done_sending(struct Curl_easy *data,
                            struct SingleRequest *k);
+
+/**
+ * Write the transfer raw response bytes, as received from the connection.
+ * Will handle all passed bytes or return an error. By default, this will
+ * write the bytes as BODY to the client. Protocols may provide a
+ * "write_resp" callback in their handler to add specific treatment. E.g.
+ * HTTP parses response headers and passes them differently to the client.
+ * @param data     the transfer
+ * @param buf      the raw response bytes
+ * @param blen     the amount of bytes in `buf`
+ * @param is_eos   TRUE iff the connection indicates this to be the last
+ *                 bytes of the response
+ * @param done     on returnm, TRUE iff the response is complete
+ */
+CURLcode Curl_xfer_write_resp(struct Curl_easy *data,
+                              char *buf, size_t blen,
+                              bool is_eos, bool *done);
 
 /* This sets up a forthcoming transfer */
 void

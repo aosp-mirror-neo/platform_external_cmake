@@ -16,14 +16,14 @@ static int CCONV InitialPass(void* inf, void* mf, int argc, char* argv[])
 {
   char* file;
   char* str;
-  char* srcs;
-  const char* cstr;
+  const char* srcs;
+  char* cstr;
   char buffer[1024];
   void* source_file;
   char* args[2];
-  char* ccArgs[4];
-  char* ccDep[1];
-  char* ccOut[1];
+  const char* ccArgs[4];
+  const char* ccDep[1];
+  const char* ccOut[1];
   cmLoadedCommandInfo* info = (cmLoadedCommandInfo*)inf;
 
   cmVTKWrapTclData* cdata =
@@ -75,10 +75,10 @@ static int CCONV InitialPass(void* inf, void* mf, int argc, char* argv[])
   info->CAPI->DisplaySatus(mf, info->CAPI->GetStartOutputDirectory(mf));
   info->CAPI->DisplaySatus(mf, info->CAPI->GetCurrentDirectory(mf));
   info->CAPI->DisplaySatus(mf, info->CAPI->GetCurrentOutputDirectory(mf));
-  sprintf(buffer, "Cache version: %d.%d, CMake version: %d.%d",
-          info->CAPI->GetCacheMajorVersion(mf),
-          info->CAPI->GetCacheMinorVersion(mf),
-          info->CAPI->GetMajorVersion(mf), info->CAPI->GetMinorVersion(mf));
+  snprintf(
+    buffer, sizeof(buffer), "Cache version: %d.%d, CMake version: %d.%d",
+    info->CAPI->GetCacheMajorVersion(mf), info->CAPI->GetCacheMinorVersion(mf),
+    info->CAPI->GetMajorVersion(mf), info->CAPI->GetMinorVersion(mf));
   info->CAPI->DisplaySatus(mf, buffer);
   if (info->CAPI->CommandExists(mf, "SET")) {
     info->CAPI->DisplaySatus(mf, "Command SET exists");
@@ -91,10 +91,12 @@ static int CCONV InitialPass(void* inf, void* mf, int argc, char* argv[])
 
   source_file = info->CAPI->CreateNewSourceFile(mf);
   cstr = info->CAPI->SourceFileGetSourceName(source_file);
-  sprintf(buffer, "Should be empty (source file name): [%s]", cstr);
+  snprintf(buffer, sizeof(buffer), "Should be empty (source file name): [%s]",
+           cstr);
   info->CAPI->DisplaySatus(mf, buffer);
   cstr = info->CAPI->SourceFileGetFullPath(source_file);
-  sprintf(buffer, "Should be empty (source file full path): [%s]", cstr);
+  snprintf(buffer, sizeof(buffer),
+           "Should be empty (source file full path): [%s]", cstr);
   info->CAPI->DisplaySatus(mf, buffer);
   info->CAPI->DefineSourceFileProperty(mf, "SOME_PROPERTY", "unused old prop",
                                        "This property is no longer used", 0);
@@ -106,7 +108,8 @@ static int CCONV InitialPass(void* inf, void* mf, int argc, char* argv[])
                                        "This property is for testing.", 0);
   info->CAPI->SourceFileSetProperty(source_file, "SOME_PROPERTY2", "HERE");
   cstr = info->CAPI->SourceFileGetProperty(source_file, "ABSTRACT");
-  sprintf(buffer, "Should be 0 (source file abstract property): [%p]", cstr);
+  snprintf(buffer, sizeof(buffer),
+           "Should be 0 (source file abstract property): [%p]", cstr);
   info->CAPI->DisplaySatus(mf, buffer);
 
   info->CAPI->DestroySourceFile(source_file);
@@ -145,7 +148,10 @@ static int CCONV InitialPass(void* inf, void* mf, int argc, char* argv[])
   if (info->CAPI->GetTotalArgumentSize(2, args) != 13) {
     return 0;
   }
-  info->CAPI->ExecuteCommand(mf, "SET", 2, args);
+
+  ccArgs[0] = "TEST_EXEC";
+  ccArgs[1] = "TRUE";
+  info->CAPI->ExecuteCommand(mf, "SET", 2, ccArgs);
 
   /* make sure we can find the source file */
   if (!info->CAPI->GetSource(mf, argv[1])) {

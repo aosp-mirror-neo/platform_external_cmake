@@ -80,77 +80,6 @@ std::vector<std::string> cmTokenize(cm::string_view str, cm::string_view sep)
   return tokens;
 }
 
-void cmExpandList(cm::string_view arg, std::vector<std::string>& argsOut,
-                  bool emptyArgs)
-{
-  // If argument is empty, it is an empty list.
-  if (!emptyArgs && arg.empty()) {
-    return;
-  }
-
-  // if there are no ; in the name then just copy the current string
-  if (arg.find(';') == cm::string_view::npos) {
-    argsOut.emplace_back(arg);
-    return;
-  }
-
-  std::string newArg;
-  // Break the string at non-escaped semicolons not nested in [].
-  int squareNesting = 0;
-  cm::string_view::iterator last = arg.begin();
-  cm::string_view::iterator const cend = arg.end();
-  for (cm::string_view::iterator c = last; c != cend; ++c) {
-    switch (*c) {
-      case '\\': {
-        // We only want to allow escaping of semicolons.  Other
-        // escapes should not be processed here.
-        cm::string_view::iterator cnext = c + 1;
-        if ((cnext != cend) && *cnext == ';') {
-          newArg.append(last, c);
-          // Skip over the escape character
-          last = cnext;
-          c = cnext;
-        }
-      } break;
-      case '[': {
-        ++squareNesting;
-      } break;
-      case ']': {
-        --squareNesting;
-      } break;
-      case ';': {
-        // Break the string here if we are not nested inside square
-        // brackets.
-        if (squareNesting == 0) {
-          newArg.append(last, c);
-          // Skip over the semicolon
-          last = c + 1;
-          if (!newArg.empty() || emptyArgs) {
-            // Add the last argument if the string is not empty.
-            argsOut.push_back(newArg);
-            newArg.clear();
-          }
-        }
-      } break;
-      default: {
-        // Just append this character.
-      } break;
-    }
-  }
-  newArg.append(last, cend);
-  if (!newArg.empty() || emptyArgs) {
-    // Add the last argument if the string is not empty.
-    argsOut.push_back(std::move(newArg));
-  }
-}
-
-std::vector<std::string> cmExpandedList(cm::string_view arg, bool emptyArgs)
-{
-  std::vector<std::string> argsOut;
-  cmExpandList(arg, argsOut, emptyArgs);
-  return argsOut;
-}
-
 namespace {
 template <std::size_t N, typename T>
 inline void MakeDigits(cm::string_view& view, char (&digits)[N],
@@ -203,17 +132,45 @@ cmAlphaNum::cmAlphaNum(double val)
   MakeDigits(this->View_, this->Digits_, "%g", val);
 }
 
-std::string cmCatViews(std::initializer_list<cm::string_view> views)
+std::string cmCatViews(
+  std::initializer_list<std::pair<cm::string_view, std::string*>> views)
 {
-  std::size_t total_size = 0;
-  for (cm::string_view const& view : views) {
-    total_size += view.size();
+  std::size_t totalSize = 0;
+  std::string* rvalueString = nullptr;
+  std::size_t rvalueStringLength = 0;
+  std::size_t rvalueStringOffset = 0;
+  for (auto const& view : views) {
+    // Find the rvalue string with the largest capacity.
+    if (view.second &&
+        (!rvalueString ||
+         view.second->capacity() > rvalueString->capacity())) {
+      rvalueString = view.second;
+      rvalueStringLength = rvalueString->length();
+      rvalueStringOffset = totalSize;
+    }
+    totalSize += view.first.size();
   }
 
-  std::string result(total_size, '\0');
-  std::string::iterator sit = result.begin();
-  for (cm::string_view const& view : views) {
-    sit = std::copy_n(view.data(), view.size(), sit);
+  std::string result;
+  std::string::size_type initialLen = 0;
+  if (rvalueString && rvalueString->capacity() >= totalSize) {
+    result = std::move(*rvalueString);
+  } else {
+    rvalueString = nullptr;
+  }
+  result.resize(totalSize);
+  if (rvalueString && rvalueStringOffset > 0) {
+    std::copy_backward(result.begin(), result.begin() + rvalueStringLength,
+                       result.begin() + rvalueStringOffset +
+                         rvalueStringLength);
+  }
+  std::string::iterator sit = result.begin() + initialLen;
+  for (auto const& view : views) {
+    if (rvalueString && view.second == rvalueString) {
+      sit += rvalueStringLength;
+    } else {
+      sit = std::copy_n(view.first.data(), view.first.size(), sit);
+    }
   }
   return result;
 }
@@ -248,6 +205,38 @@ bool cmStrToULong(const char* str, unsigned long* value)
 bool cmStrToULong(std::string const& str, unsigned long* value)
 {
   return cmStrToULong(str.c_str(), value);
+}
+
+bool cmStrToLongLong(const char* str, long long* value)
+{
+  errno = 0;
+  char* endp;
+  *value = strtoll(str, &endp, 10);
+  return (*endp == '\0') && (endp != str) && (errno == 0);
+}
+
+bool cmStrToLongLong(std::string const& str, long long* value)
+{
+  return cmStrToLongLong(str.c_str(), value);
+}
+
+bool cmStrToULongLong(const char* str, unsigned long long* value)
+{
+  errno = 0;
+  char* endp;
+  while (cmIsSpace(*str)) {
+    ++str;
+  }
+  if (*str == '-') {
+    return false;
+  }
+  *value = strtoull(str, &endp, 10);
+  return (*endp == '\0') && (endp != str) && (errno == 0);
+}
+
+bool cmStrToULongLong(std::string const& str, unsigned long long* value)
+{
+  return cmStrToULongLong(str.c_str(), value);
 }
 
 template <typename Range>

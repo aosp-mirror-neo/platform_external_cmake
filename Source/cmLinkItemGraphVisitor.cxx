@@ -82,7 +82,7 @@ bool cmLinkItemGraphVisitor::ItemVisited(cmLinkItem const& item)
 bool cmLinkItemGraphVisitor::LinkVisited(cmLinkItem const& depender,
                                          cmLinkItem const& dependee)
 {
-  auto const link = std::make_pair<>(depender.AsStr(), dependee.AsStr());
+  auto const link = std::make_pair(depender.AsStr(), dependee.AsStr());
 
   bool const linkVisited =
     this->VisitedLinks.find(link) != this->VisitedLinks.cend();
@@ -98,8 +98,8 @@ void cmLinkItemGraphVisitor::GetDependencies(cmGeneratorTarget const& target,
                                              std::string const& config,
                                              DependencyMap& dependencies)
 {
-  const auto* implementationLibraries =
-    target.GetLinkImplementationLibraries(config);
+  const auto* implementationLibraries = target.GetLinkImplementationLibraries(
+    config, cmGeneratorTarget::LinkInterfaceFor::Link);
   if (implementationLibraries != nullptr) {
     for (auto const& lib : implementationLibraries->Libraries) {
       auto const& name = lib.AsStr();
@@ -107,8 +107,8 @@ void cmLinkItemGraphVisitor::GetDependencies(cmGeneratorTarget const& target,
     }
   }
 
-  const auto* interfaceLibraries =
-    target.GetLinkInterfaceLibraries(config, &target, true);
+  const auto* interfaceLibraries = target.GetLinkInterfaceLibraries(
+    config, &target, cmGeneratorTarget::LinkInterfaceFor::Usage);
   if (interfaceLibraries != nullptr) {
     for (auto const& lib : interfaceLibraries->Libraries) {
       auto const& name = lib.AsStr();

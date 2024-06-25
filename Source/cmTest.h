@@ -4,10 +4,12 @@
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
 #include "cmListFileCache.h"
+#include "cmPolicies.h"
 #include "cmPropertyMap.h"
 #include "cmValue.h"
 
@@ -34,8 +36,11 @@ public:
   std::vector<std::string> const& GetCommand() const { return this->Command; }
 
   //! Set/Get a property of this source file
-  void SetProperty(const std::string& prop, const char* value);
   void SetProperty(const std::string& prop, cmValue value);
+  void SetProperty(const std::string& prop, std::nullptr_t)
+  {
+    this->SetProperty(prop, cmValue{ nullptr });
+  }
   void SetProperty(const std::string& prop, const std::string& value)
   {
     this->SetProperty(prop, cmValue(value));
@@ -56,6 +61,12 @@ public:
   bool GetOldStyle() const { return this->OldStyle; }
   void SetOldStyle(bool b) { this->OldStyle = b; }
 
+  /** Get/Set if CMP0158 policy is NEW */
+  bool GetCMP0158IsNew() const
+  {
+    return this->PolicyStatusCMP0158 == cmPolicies::NEW;
+  }
+
   /** Set/Get whether lists in command lines should be expanded. */
   bool GetCommandExpandLists() const;
   void SetCommandExpandLists(bool b);
@@ -64,10 +75,11 @@ private:
   cmPropertyMap Properties;
   std::string Name;
   std::vector<std::string> Command;
-  bool CommandExpandLists;
+  bool CommandExpandLists = false;
 
   bool OldStyle;
 
   cmMakefile* Makefile;
   cmListFileBacktrace Backtrace;
+  cmPolicies::PolicyStatus PolicyStatusCMP0158;
 };

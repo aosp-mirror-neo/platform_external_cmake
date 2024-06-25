@@ -24,12 +24,24 @@ set(CMAKE_DL_LIBS "dl")
 set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".so" ".a")
 
-set(CMAKE_AUTOGEN_ORIGIN_DEPENDS ON)
-set(CMAKE_AUTOMOC_COMPILER_PREDEFINES ON)
+# Define feature "DEFAULT" as supported. This special feature generates the
+# default option to link a library
+# This feature is intended to be used in LINK_LIBRARY_OVERRIDE and
+# LINK_LIBRARY_OVERRIDE_<LIBRARY> target properties
+set(CMAKE_LINK_LIBRARY_USING_DEFAULT_SUPPORTED TRUE)
+
+if(NOT DEFINED CMAKE_AUTOGEN_ORIGIN_DEPENDS)
+  set(CMAKE_AUTOGEN_ORIGIN_DEPENDS ON)
+endif()
+if(NOT DEFINED CMAKE_AUTOMOC_COMPILER_PREDEFINES)
+  set(CMAKE_AUTOMOC_COMPILER_PREDEFINES ON)
+endif()
 if(NOT DEFINED CMAKE_AUTOMOC_PATH_PREFIX)
   set(CMAKE_AUTOMOC_PATH_PREFIX OFF)
 endif()
-set(CMAKE_AUTOMOC_MACRO_NAMES "Q_OBJECT" "Q_GADGET" "Q_NAMESPACE" "Q_NAMESPACE_EXPORT")
+if(NOT DEFINED CMAKE_AUTOMOC_MACRO_NAMES)
+  set(CMAKE_AUTOMOC_MACRO_NAMES "Q_OBJECT" "Q_GADGET" "Q_NAMESPACE" "Q_NAMESPACE_EXPORT")
+endif()
 
 # basically all general purpose OSs support shared libs
 set_property(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS TRUE)
@@ -41,11 +53,16 @@ set (CMAKE_SKIP_INSTALL_RPATH "NO" CACHE BOOL
 
 set(CMAKE_VERBOSE_MAKEFILE FALSE CACHE BOOL "If this value is on, makefiles will be generated without the .SILENT directive, and all commands will be echoed to the console during the make.  This is useful for debugging only. With Visual Studio IDE projects all commands are done without /nologo.")
 
+if(DEFINED ENV{CMAKE_COLOR_DIAGNOSTICS} AND NOT DEFINED CACHE{CMAKE_COLOR_DIAGNOSTICS})
+  set(CMAKE_COLOR_DIAGNOSTICS $ENV{CMAKE_COLOR_DIAGNOSTICS} CACHE BOOL "Enable colored diagnostics throughout.")
+endif()
+
 if(CMAKE_GENERATOR MATCHES "Make")
-  set(CMAKE_COLOR_MAKEFILE ON CACHE BOOL
-    "Enable/Disable color output during build."
-    )
+  if(NOT DEFINED CMAKE_COLOR_DIAGNOSTICS)
+    set(CMAKE_COLOR_MAKEFILE ON CACHE BOOL "Enable/Disable color output during build.")
+  endif()
   mark_as_advanced(CMAKE_COLOR_MAKEFILE)
+
   if(DEFINED CMAKE_RULE_MESSAGES)
     set_property(GLOBAL PROPERTY RULE_MESSAGES ${CMAKE_RULE_MESSAGES})
   endif()
@@ -160,20 +177,27 @@ endfunction()
 # was initialized by the block below.  This is useful for user
 # projects to change the default prefix while still allowing the
 # command line to override it.
-if(NOT DEFINED CMAKE_INSTALL_PREFIX)
+if(NOT DEFINED CMAKE_INSTALL_PREFIX AND
+   NOT DEFINED ENV{CMAKE_INSTALL_PREFIX})
   set(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT 1)
 endif()
 
-# Choose a default install prefix for this platform.
-if(CMAKE_HOST_UNIX)
-  set(CMAKE_INSTALL_PREFIX "/usr/local"
+if(DEFINED ENV{CMAKE_INSTALL_PREFIX})
+  set(CMAKE_INSTALL_PREFIX "$ENV{CMAKE_INSTALL_PREFIX}"
     CACHE PATH "Install path prefix, prepended onto install directories.")
 else()
-  GetDefaultWindowsPrefixBase(CMAKE_GENERIC_PROGRAM_FILES)
-  set(CMAKE_INSTALL_PREFIX
-    "${CMAKE_GENERIC_PROGRAM_FILES}/${PROJECT_NAME}"
-    CACHE PATH "Install path prefix, prepended onto install directories.")
-  set(CMAKE_GENERIC_PROGRAM_FILES)
+  # If CMAKE_INSTALL_PREFIX env variable is not set,
+  # choose a default install prefix for this platform.
+  if(CMAKE_HOST_UNIX)
+    set(CMAKE_INSTALL_PREFIX "/usr/local"
+      CACHE PATH "Install path prefix, prepended onto install directories.")
+  else()
+    GetDefaultWindowsPrefixBase(CMAKE_GENERIC_PROGRAM_FILES)
+    set(CMAKE_INSTALL_PREFIX
+      "${CMAKE_GENERIC_PROGRAM_FILES}/${PROJECT_NAME}"
+      CACHE PATH "Install path prefix, prepended onto install directories.")
+    set(CMAKE_GENERIC_PROGRAM_FILES)
+  endif()
 endif()
 
 # Set a variable which will be used as component name in install() commands

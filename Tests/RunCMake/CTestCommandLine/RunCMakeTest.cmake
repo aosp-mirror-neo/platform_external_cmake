@@ -3,9 +3,6 @@ include(RunCTest)
 
 set(RunCMake_TEST_TIMEOUT 60)
 
-unset(ENV{CTEST_PARALLEL_LEVEL})
-unset(ENV{CTEST_OUTPUT_ON_FAILURE})
-
 run_cmake_command(repeat-opt-bad1
   ${CMAKE_CTEST_COMMAND} --repeat until-pass
   )
@@ -84,6 +81,38 @@ subdirs()
   run_cmake_command(BadCTestTestfile ${CMAKE_CTEST_COMMAND})
 endfunction()
 run_BadCTestTestfile()
+
+function(run_Subdirectories)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/Subdirectories)
+  set(RunCMake_TEST_NO_CLEAN 1)
+  file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}/add_subdirectory")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}/add_subdirectory/sub")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}/subdirs")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}/subdirs/sub")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
+add_subdirectory(add_subdirectory)
+subdirs(subdirs)
+")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/add_subdirectory/CTestTestfile.cmake" "
+add_test(add_subdirectory \"${CMAKE_COMMAND}\" -E echo add_subdirectory)
+add_subdirectory(sub)
+")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/add_subdirectory/sub/CTestTestfile.cmake" "
+add_test(add_subdirectory.sub \"${CMAKE_COMMAND}\" -E echo add_subdirectory.sub)
+")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/subdirs/CTestTestfile.cmake" "
+add_test(subdirs \"${CMAKE_COMMAND}\" -E echo subdirs)
+subdirs(sub)
+")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/subdirs/sub/CTestTestfile.cmake" "
+add_test(subdirs.sub \"${CMAKE_COMMAND}\" -E echo subdirs.sub)
+")
+
+  run_cmake_command(Subdirectories ${CMAKE_CTEST_COMMAND} -N)
+endfunction()
+run_Subdirectories()
 
 function(run_MergeOutput)
   set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/MergeOutput)
@@ -178,6 +207,28 @@ set_tests_properties(test1 PROPERTIES SKIP_REGULAR_EXPRESSION \"test1\")
 endfunction()
 run_SkipRegexFoundTest()
 
+
+function(run_TestsFromFileTest case)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/TestsFromFile-${case})
+  set(RunCMake_TEST_NO_CLEAN 1)
+  file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
+add_test(Test1 \"${CMAKE_COMMAND}\" -E echo \"test1\")
+add_test(Test2 \"${CMAKE_COMMAND}\" -E echo \"test2\")
+add_test(Test11 \"${CMAKE_COMMAND}\" -E echo \"test11\")
+")
+  run_cmake_command(TestsFromFile-${case} ${CMAKE_CTEST_COMMAND} ${ARGN})
+endfunction()
+run_TestsFromFileTest(include --tests-from-file ${RunCMake_SOURCE_DIR}/TestsFromFile-TestList.txt)
+run_TestsFromFileTest(exclude --exclude-from-file ${RunCMake_SOURCE_DIR}/TestsFromFile-TestList.txt)
+run_TestsFromFileTest(include-empty --tests-from-file ${RunCMake_SOURCE_DIR}/TestsFromFile-TestList-empty.txt)
+run_TestsFromFileTest(exclude-empty --exclude-from-file ${RunCMake_SOURCE_DIR}/TestsFromFile-TestList-empty.txt)
+run_TestsFromFileTest(include-missing --tests-from-file ${RunCMake_SOURCE_DIR}/TestsFromFile-TestList-missing.txt)
+run_TestsFromFileTest(exclude-missing --exclude-from-file ${RunCMake_SOURCE_DIR}/TestsFromFile-TestList-missing.txt)
+
+
 function(run_SerialFailed)
   set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/SerialFailed)
   set(RunCMake_TEST_NO_CLEAN 1)
@@ -193,6 +244,44 @@ add_test(Echo \"${CMAKE_COMMAND}\" -E echo \"EchoTest\")
 endfunction()
 run_SerialFailed()
 
+function(run_Parallel case)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/Parallel-${case})
+  set(RunCMake_TEST_NO_CLEAN 1)
+  file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
+foreach(i RANGE 1 6)
+  add_test(test\${i} \"${CMAKE_COMMAND}\" -E true)
+endforeach()
+")
+  run_cmake_command(Parallel-${case} ${CMAKE_CTEST_COMMAND} ${ARGN})
+endfunction()
+# Spoof a number of processors to make these tests predictable.
+set(ENV{__CTEST_FAKE_PROCESSOR_COUNT_FOR_TESTING} 1)
+run_Parallel(bad --parallel bad)
+run_Parallel(j-bad -j bad)
+set(RunCMake_TEST_RAW_ARGS [[--parallel ""]])
+run_Parallel(empty) # With 1 processor, defaults to 2.
+unset(RunCMake_TEST_RAW_ARGS)
+run_Parallel(j -j) # With 1 processor, defaults to 2.
+run_Parallel(0 -j0)
+run_Parallel(4 --parallel 4)
+run_Parallel(N --parallel -N)
+set(ENV{CTEST_PARALLEL_LEVEL} bad)
+run_Parallel(env-bad)
+if(CMAKE_HOST_WIN32)
+  set(ENV{CTEST_PARALLEL_LEVEL} " ")
+else()
+  set(ENV{CTEST_PARALLEL_LEVEL} "")
+endif()
+run_Parallel(env-empty) # With 1 processor, defaults to 2.
+set(ENV{CTEST_PARALLEL_LEVEL} 0)
+run_Parallel(env-0)
+set(ENV{CTEST_PARALLEL_LEVEL} 3)
+run_Parallel(env-3)
+unset(ENV{CTEST_PARALLEL_LEVEL})
+unset(ENV{__CTEST_FAKE_PROCESSOR_COUNT_FOR_TESTING)
+
 function(run_TestLoad name load)
   set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/TestLoad)
   set(RunCMake_TEST_NO_CLEAN 1)
@@ -200,19 +289,22 @@ function(run_TestLoad name load)
   file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
   file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
   add_test(TestLoad1 \"${CMAKE_COMMAND}\" -E echo \"test of --test-load\")
+  set_tests_properties(TestLoad1 PROPERTIES PROCESSORS 2)
   add_test(TestLoad2 \"${CMAKE_COMMAND}\" -E echo \"test of --test-load\")
+  set_tests_properties(TestLoad2 PROPERTIES PROCESSORS 2)
 ")
-  run_cmake_command(${name} ${CMAKE_CTEST_COMMAND} -VV -j2 --test-load ${load})
+  run_cmake_command(${name} ${CMAKE_CTEST_COMMAND} -VV -j8 --test-load ${load})
 endfunction()
 
 # Tests for the --test-load feature of ctest
 #
 # Spoof a load average value to make these tests more reliable.
-set(ENV{__CTEST_FAKE_LOAD_AVERAGE_FOR_TESTING} 5)
+set(ENV{__CTEST_FAKE_LOAD_AVERAGE_FOR_TESTING} 7)
 
 # Verify that new tests are not started when the load average exceeds
 # our threshold and that they then run once the load average drops.
-run_TestLoad(test-load-wait 3)
+run_TestLoad(test-load-wait0 5)
+run_TestLoad(test-load-wait1 8)
 
 # Verify that warning message is displayed but tests still start when
 # an invalid argument is given.
@@ -220,7 +312,7 @@ run_TestLoad(test-load-invalid 'two')
 
 # Verify that new tests are started when the load average falls below
 # our threshold.
-run_TestLoad(test-load-pass 10)
+run_TestLoad(test-load-pass 12)
 
 unset(ENV{__CTEST_FAKE_LOAD_AVERAGE_FOR_TESTING})
 
@@ -241,6 +333,28 @@ function(run_TestOutputSize)
     )
 endfunction()
 run_TestOutputSize()
+
+# Test --test-output-truncation
+function(run_TestOutputTruncation mode expected)
+  set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/TestOutputTruncation_${mode})
+  set(RunCMake_TEST_NO_CLEAN 1)
+  set(TRUNCATED_OUTPUT ${expected})  # used in TestOutputTruncation-check.cmake
+  file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+  file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+  file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
+  add_test(Truncation_${mode} \"${CMAKE_COMMAND}\" -E echo 123456789)
+")
+  run_cmake_command(TestOutputTruncation_${mode}
+    ${CMAKE_CTEST_COMMAND} -M Experimental -T Test
+                           --no-compress-output
+                           --test-output-size-passed 5
+                           --test-output-truncation ${mode}
+    )
+endfunction()
+run_TestOutputTruncation("head" "\\.\\.\\.6789")
+run_TestOutputTruncation("middle" "12\\.\\.\\..*\\.\\.\\.89")
+run_TestOutputTruncation("tail" "12345\\.\\.\\.")
+run_TestOutputTruncation("bad" "")
 
 # Test --stop-on-failure
 function(run_stop_on_failure)
@@ -289,14 +403,14 @@ endfunction()
 run_TestStdin()
 
 function(show_only_json_check_python v)
-  if(RunCMake_TEST_FAILED OR NOT PYTHON_EXECUTABLE)
+  if(RunCMake_TEST_FAILED OR NOT Python_EXECUTABLE)
     return()
   endif()
   set(json_file "${RunCMake_TEST_BINARY_DIR}/ctest.json")
   file(WRITE "${json_file}" "${actual_stdout}")
   set(actual_stdout "" PARENT_SCOPE)
   execute_process(
-    COMMAND ${PYTHON_EXECUTABLE} "${RunCMake_SOURCE_DIR}/show-only_json-v${v}_check.py" "${json_file}"
+    COMMAND ${Python_EXECUTABLE} "${RunCMake_SOURCE_DIR}/show-only_json-v${v}_check.py" "${json_file}"
     RESULT_VARIABLE result
     OUTPUT_VARIABLE output
     ERROR_VARIABLE output
@@ -338,6 +452,14 @@ function(run_NoTests)
   run_cmake_command(no-tests_error ${CMAKE_CTEST_COMMAND} --no-tests=error)
   run_cmake_command(no-tests_bad ${CMAKE_CTEST_COMMAND} --no-tests=bad)
   run_cmake_command(no-tests_legacy ${CMAKE_CTEST_COMMAND})
+
+  run_cmake_command(no-tests_env_ignore ${CMAKE_COMMAND} -E env CTEST_NO_TESTS_ACTION=ignore ${CMAKE_CTEST_COMMAND})
+  run_cmake_command(no-tests_env_error ${CMAKE_COMMAND} -E env CTEST_NO_TESTS_ACTION=error ${CMAKE_CTEST_COMMAND})
+  run_cmake_command(no-tests_env_bad ${CMAKE_COMMAND} -E env CTEST_NO_TESTS_ACTION=bad ${CMAKE_CTEST_COMMAND})
+  run_cmake_command(no-tests_env_empty_legacy ${CMAKE_COMMAND} -E env CTEST_NO_TESTS_ACTION= ${CMAKE_CTEST_COMMAND})
+
+  run_cmake_command(no-tests_env_bad_with_cli_error ${CMAKE_COMMAND} -E env CTEST_NO_TESTS_ACTION=bad ${CMAKE_CTEST_COMMAND} --no-tests=error)
+
   file(WRITE "${RunCMake_TEST_BINARY_DIR}/NoTestsScript.cmake" "
     set(CTEST_COMMAND \"${CMAKE_CTEST_COMMAND}\")
     set(CTEST_SOURCE_DIRECTORY \"${RunCMake_SOURCE_DIR}\")
@@ -413,10 +535,39 @@ add_test(test1 \"${CMAKE_COMMAND}\" -E false)
 add_test(test2 \"${CMAKE_COMMAND}\" -E echo \"hello world\")
 add_test(test3 \"${CMAKE_COMMAND}\" -E true)
 set_tests_properties(test3 PROPERTIES  DISABLED \"ON\")
-add_test(test4 \"${CMAKE_COMMAND}/doesnt_exist\")
+add_test(test4 \"${CMAKE_CURRENT_SOURCE_DIR}/does_not_exist\")
 add_test(test5 \"${CMAKE_COMMAND}\" -E echo \"please skip\")
 set_tests_properties(test5 PROPERTIES  SKIP_REGULAR_EXPRESSION \"please skip\")
 ")
   run_cmake_command(output-junit ${CMAKE_CTEST_COMMAND} --output-junit "${RunCMake_TEST_BINARY_DIR}/junit.xml")
 endfunction()
 run_output_junit()
+
+if(WIN32)
+  block()
+    set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/TimeoutSignalWindows)
+    set(RunCMake_TEST_NO_CLEAN 1)
+    file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+    file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+    file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
+add_test(test1 \"${CMAKE_COMMAND}\" -E true)
+set_tests_properties(test1 PROPERTIES TIMEOUT_SIGNAL_NAME SIGUSR1)
+set_tests_properties(test1 PROPERTIES TIMEOUT_SIGNAL_GRACE_PERIOD 1)
+")
+    run_cmake_command(TimeoutSignalWindows ${CMAKE_CTEST_COMMAND})
+  endblock()
+else()
+  block()
+    set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/TimeoutSignalBad)
+    set(RunCMake_TEST_NO_CLEAN 1)
+    file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+    file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+    file(WRITE "${RunCMake_TEST_BINARY_DIR}/CTestTestfile.cmake" "
+add_test(test1 \"${CMAKE_COMMAND}\" -E true)
+set_tests_properties(test1 PROPERTIES TIMEOUT_SIGNAL_NAME NOTASIG)
+set_tests_properties(test1 PROPERTIES TIMEOUT_SIGNAL_GRACE_PERIOD 0)
+set_tests_properties(test1 PROPERTIES TIMEOUT_SIGNAL_GRACE_PERIOD 1000)
+")
+    run_cmake_command(TimeoutSignalBad ${CMAKE_CTEST_COMMAND})
+  endblock()
+endif()

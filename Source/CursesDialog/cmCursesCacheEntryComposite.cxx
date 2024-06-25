@@ -15,9 +15,9 @@
 #include "cmCursesPathWidget.h"
 #include "cmCursesStringWidget.h"
 #include "cmCursesWidget.h"
+#include "cmList.h"
 #include "cmState.h"
 #include "cmStateTypes.h"
-#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmValue.h"
 
@@ -76,7 +76,7 @@ cmCursesCacheEntryComposite::cmCursesCacheEntryComposite(
       if (stringsProp) {
         auto ow =
           cm::make_unique<cmCursesOptionsWidget>(this->EntryWidth, 1, 1, 1);
-        for (std::string const& opt : cmExpandedList(*stringsProp)) {
+        for (auto const& opt : cmList{ *stringsProp }) {
           ow->AddOption(opt);
         }
         ow->SetOption(*value);

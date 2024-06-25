@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.5...3.25) # Enable CMP0091 and CMP0141.
 project(FortranOnly Fortran)
 message("CTEST_FULL_OUTPUT ")
 
@@ -56,8 +56,6 @@ add_custom_target(checksayhello ALL
   )
 add_dependencies(checksayhello sayhello)
 
-set(err_log ${CMAKE_BINARY_DIR}/CMakeFiles/CMakeError.log)
-file(REMOVE "${err_log}")
 include(CheckFortranSourceCompiles)
 unset(HAVE_PRINT CACHE)
 CHECK_Fortran_SOURCE_COMPILES([[
@@ -66,10 +64,24 @@ CHECK_Fortran_SOURCE_COMPILES([[
       END
 ]] HAVE_PRINT)
 if(NOT HAVE_PRINT)
-  if(EXISTS "${err_log}")
-    file(READ "${err_log}" err)
+  set(configure_log "${CMAKE_BINARY_DIR}/CMakeFiles/CMakeConfigureLog.yaml")
+  if(EXISTS "${configure_log}")
+    file(READ "${configure_log}" log_content)
+  else()
+    set(log_content "")
   endif()
-  string(REPLACE "\n" "\n  " err "  ${err}")
+  if(log_content MATCHES [[(  -
+    kind: "try_compile-v1"(
++    [^
+]+)+
+    checks:
+      - "Performing Test HAVE_PRINT"(
++    [^
+]+)+)]])
+    set(err "${CMAKE_MATCH_1}")
+  else()
+    set(err "")
+  endif()
   message(SEND_ERROR "CHECK_Fortran_SOURCE_COMPILES for HAVE_PRINT failed:\n"
     "${err}")
 endif()
@@ -129,18 +141,27 @@ if(CMAKE_Fortran_COMPILE_OPTIONS_PREPROCESS_ON AND
   add_executable(preprocess_target preprocess2.f)
   set_property(TARGET preprocess_target PROPERTY Fortran_PREPROCESS ON)
 
+  if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    # gfortran might report spurious warnings if we include the
+    # preprocessing flags at the compilation stage
+    target_compile_options(preprocess_target PRIVATE -Wall -Werror)
+  endif()
+
   # Test that we can preprocess a single source file
   add_executable(preprocess_source preprocess3.f)
   set_property(SOURCE preprocess3.f PROPERTY Fortran_PREPROCESS ON)
 endif()
 
-# Test that neither the compiler nor CMake performs unnecessary preprocessing.
-add_library(no_preprocess_target_lower STATIC no_preprocess_target_lower.f)
-target_compile_options(no_preprocess_target_lower PRIVATE -DINTEGER=nonsense)
-set_property(TARGET no_preprocess_target_lower PROPERTY Fortran_PREPROCESS OFF)
-add_library(no_preprocess_source_lower STATIC no_preprocess_source_lower.f)
-target_compile_options(no_preprocess_source_lower PRIVATE -DINTEGER=nonsense)
-set_property(SOURCE no_preprocess_source_lower.f PROPERTY Fortran_PREPROCESS OFF)
+# LCC < 1.24 has no way to disable Fortran preprocessor
+if(NOT CMAKE_Fortran_COMPILER_ID STREQUAL "LCC" OR CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL "1.24.00")
+  # Test that neither the compiler nor CMake performs unnecessary preprocessing.
+  add_library(no_preprocess_target_lower STATIC no_preprocess_target_lower.f)
+  target_compile_options(no_preprocess_target_lower PRIVATE -DINTEGER=nonsense)
+  set_property(TARGET no_preprocess_target_lower PROPERTY Fortran_PREPROCESS OFF)
+  add_library(no_preprocess_source_lower STATIC no_preprocess_source_lower.f)
+  target_compile_options(no_preprocess_source_lower PRIVATE -DINTEGER=nonsense)
+  set_property(SOURCE no_preprocess_source_lower.f PROPERTY Fortran_PREPROCESS OFF)
+endif()
 
 # Test that we can explicitly not preprocess a target or source.
 # This will not work on certain compilers due to either missing a
@@ -148,8 +169,11 @@ set_property(SOURCE no_preprocess_source_lower.f PROPERTY Fortran_PREPROCESS OFF
 # extensions like '.F' and '.fpp'.
 if(CMAKE_Fortran_COMPILE_OPTIONS_PREPROCESS_OFF AND
     NOT CMAKE_Fortran_COMPILER_ID MATCHES "(Flang|NAG|PGI|NVHPC|SunPro|XL)")
+
+  set(CMAKE_Fortran_PREPROCESS OFF)
   add_library(no_preprocess_target STATIC no_preprocess_target_upper.F)
   target_compile_options(no_preprocess_target PRIVATE -DINTEGER=nonsense)
+  unset(CMAKE_Fortran_PREPROCESS)
 
   add_library(no_preprocess_source STATIC no_preprocess_source_upper.F)
   target_compile_options(no_preprocess_source PRIVATE -DINTEGER=nonsense)
@@ -160,6 +184,5 @@ if(CMAKE_Fortran_COMPILE_OPTIONS_PREPROCESS_OFF AND
     target_sources(no_preprocess_source PRIVATE no_preprocess_source_fpp.fpp)
   endif()
 
-  set_property(TARGET no_preprocess_target PROPERTY Fortran_PREPROCESS OFF)
   set_property(SOURCE no_preprocess_source_upper.F no_preprocess_source_fpp.fpp PROPERTY Fortran_PREPROCESS OFF)
 endif()

@@ -24,9 +24,11 @@
 #include "cm_sys_stat.h"
 
 #include "cmAlgorithms.h"
-#include "cmCustomCommandTypes.h"
+#include "cmCustomCommand.h"
+#include "cmFindPackageStack.h"
+#include "cmFunctionBlocker.h"
 #include "cmListFileCache.h"
-#include "cmMessageType.h"
+#include "cmMessageType.h" // IWYU pragma: keep
 #include "cmNewLineStyle.h"
 #include "cmPolicies.h"
 #include "cmSourceFileLocationKind.h"
@@ -42,15 +44,16 @@
 #  include "cmSourceGroup.h"
 #endif
 
+enum class cmCustomCommandType;
+enum class cmObjectLibraryCommands;
+
 class cmCompiledGeneratorExpression;
 class cmCustomCommandLines;
 class cmExecutionStatus;
 class cmExpandedCommandArgument;
 class cmExportBuildFileGenerator;
-class cmFunctionBlocker;
 class cmGeneratorExpressionEvaluationFile;
 class cmGlobalGenerator;
-class cmImplicitDependsList;
 class cmInstallGenerator;
 class cmLocalGenerator;
 class cmMessenger;
@@ -140,13 +143,47 @@ public:
   bool EnforceUniqueName(std::string const& name, std::string& msg,
                          bool isCustom = false) const;
 
-  using GeneratorAction =
-    std::function<void(cmLocalGenerator&, const cmListFileBacktrace&)>;
+  class GeneratorAction
+  {
+    using ActionT =
+      std::function<void(cmLocalGenerator&, const cmListFileBacktrace&)>;
+    using CCActionT =
+      std::function<void(cmLocalGenerator&, const cmListFileBacktrace&,
+                         std::unique_ptr<cmCustomCommand> cc)>;
+
+  public:
+    GeneratorAction(ActionT&& action)
+      : Action(std::move(action))
+    {
+    }
+
+    GeneratorAction(std::unique_ptr<cmCustomCommand> tcc, CCActionT&& action)
+      : CCAction(std::move(action))
+      , cc(std::move(tcc))
+    {
+    }
+
+    void operator()(cmLocalGenerator& lg, const cmListFileBacktrace& lfbt);
+
+  private:
+    ActionT Action;
+
+    // FIXME: Use std::variant
+    CCActionT CCAction;
+    std::unique_ptr<cmCustomCommand> cc;
+  };
 
   /**
    * Register an action that is executed during Generate
    */
-  void AddGeneratorAction(GeneratorAction action);
+  void AddGeneratorAction(GeneratorAction&& action);
+
+  /// Helper to insert the constructor GeneratorAction(args...)
+  template <class... Args>
+  void AddGeneratorAction(Args&&... args)
+  {
+    AddGeneratorAction(GeneratorAction(std::move(args)...));
+  }
 
   /**
    * Perform generate actions, Library dependency analysis etc before output of
@@ -165,15 +202,9 @@ public:
    * Dispatch adding a custom PRE_BUILD, PRE_LINK, or POST_BUILD command to a
    * target.
    */
-  cmTarget* AddCustomCommandToTarget(
-    const std::string& target, const std::vector<std::string>& byproducts,
-    const std::vector<std::string>& depends,
-    const cmCustomCommandLines& commandLines, cmCustomCommandType type,
-    const char* comment, const char* workingDir,
-    cmPolicies::PolicyStatus cmp0116, bool escapeOldStyle = true,
-    bool uses_terminal = false, const std::string& depfile = "",
-    const std::string& job_pool = "", bool command_expand_lists = false,
-    bool stdPipesUTF8 = false);
+  cmTarget* AddCustomCommandToTarget(const std::string& target,
+                                     cmCustomCommandType type,
+                                     std::unique_ptr<cmCustomCommand> cc);
 
   /**
    * Called for each file with custom command.
@@ -184,33 +215,14 @@ public:
    * Dispatch adding a custom command to a source file.
    */
   void AddCustomCommandToOutput(
-    const std::string& output, const std::vector<std::string>& depends,
-    const std::string& main_dependency,
-    const cmCustomCommandLines& commandLines, const char* comment,
-    const char* workingDir, cmPolicies::PolicyStatus cmp0116,
-    const CommandSourceCallback& callback = nullptr, bool replace = false,
-    bool escapeOldStyle = true, bool uses_terminal = false,
-    bool command_expand_lists = false, const std::string& depfile = "",
-    const std::string& job_pool = "", bool stdPipesUTF8 = false);
-  void AddCustomCommandToOutput(
-    const std::vector<std::string>& outputs,
-    const std::vector<std::string>& byproducts,
-    const std::vector<std::string>& depends,
-    const std::string& main_dependency,
-    const cmImplicitDependsList& implicit_depends,
-    const cmCustomCommandLines& commandLines, const char* comment,
-    const char* workingDir, cmPolicies::PolicyStatus cmp0116,
-    const CommandSourceCallback& callback = nullptr, bool replace = false,
-    bool escapeOldStyle = true, bool uses_terminal = false,
-    bool command_expand_lists = false, const std::string& depfile = "",
-    const std::string& job_pool = "", bool stdPipesUTF8 = false);
+    std::unique_ptr<cmCustomCommand> cc,
+    const CommandSourceCallback& callback = nullptr, bool replace = false);
   void AddCustomCommandOldStyle(const std::string& target,
                                 const std::vector<std::string>& outputs,
                                 const std::vector<std::string>& depends,
                                 const std::string& source,
                                 const cmCustomCommandLines& commandLines,
-                                const char* comment,
-                                cmPolicies::PolicyStatus cmp0116);
+                                const char* comment);
   void AppendCustomCommandToOutput(
     const std::string& output, const std::vector<std::string>& depends,
     const cmImplicitDependsList& implicit_depends,
@@ -232,10 +244,13 @@ public:
 
   std::pair<cmTarget&, bool> CreateNewTarget(
     const std::string& name, cmStateEnums::TargetType type,
-    cmTarget::PerConfig perConfig = cmTarget::PerConfig::Yes);
+    cmTarget::PerConfig perConfig = cmTarget::PerConfig::Yes,
+    cmTarget::Visibility vis = cmTarget::Visibility::Normal);
 
   cmTarget* AddNewTarget(cmStateEnums::TargetType type,
                          const std::string& name);
+  cmTarget* AddSynthesizedTarget(cmStateEnums::TargetType type,
+                                 const std::string& name);
 
   /** Create a target instance for the utility.  */
   cmTarget* AddNewUtilityTarget(const std::string& utilityName,
@@ -252,21 +267,16 @@ public:
    * Dispatch adding a utility to the build.  A utility target is a command
    * that is run every time the target is built.
    */
-  cmTarget* AddUtilityCommand(
-    const std::string& utilityName, bool excludeFromAll,
-    const char* workingDir, const std::vector<std::string>& byproducts,
-    const std::vector<std::string>& depends,
-    const cmCustomCommandLines& commandLines, cmPolicies::PolicyStatus cmp0116,
-    bool escapeOldStyle = true, const char* comment = nullptr,
-    bool uses_terminal = false, bool command_expand_lists = false,
-    const std::string& job_pool = "", bool stdPipesUTF8 = false);
+  cmTarget* AddUtilityCommand(const std::string& utilityName,
+                              bool excludeFromAll,
+                              std::unique_ptr<cmCustomCommand> cc);
 
   /**
    * Add a subdirectory to the build.
    */
   void AddSubDirectory(const std::string& fullSrcDir,
                        const std::string& fullBinDir, bool excludeFromAll,
-                       bool immediate);
+                       bool immediate, bool system);
 
   void Configure();
 
@@ -295,14 +305,23 @@ public:
    */
   void AddDefinitionBool(const std::string& name, bool);
   //! Add a definition to this makefile and the global cmake cache.
-  void AddCacheDefinition(const std::string& name, const char* value,
-                          const char* doc, cmStateEnums::CacheEntryType type,
+  void AddCacheDefinition(const std::string& name, cmValue value, cmValue doc,
+                          cmStateEnums::CacheEntryType type,
                           bool force = false);
-  void AddCacheDefinition(const std::string& name, const std::string& value,
-                          const char* doc, cmStateEnums::CacheEntryType type,
+  void AddCacheDefinition(const std::string& name, cmValue value,
+                          const std::string& doc,
+                          cmStateEnums::CacheEntryType type,
                           bool force = false)
   {
-    this->AddCacheDefinition(name, value.c_str(), doc, type, force);
+    this->AddCacheDefinition(name, value, cmValue{ doc }, type, force);
+  }
+  void AddCacheDefinition(const std::string& name, const std::string& value,
+                          const std::string& doc,
+                          cmStateEnums::CacheEntryType type,
+                          bool force = false)
+  {
+    this->AddCacheDefinition(name, cmValue{ value }, cmValue{ doc }, type,
+                             force);
   }
 
   /**
@@ -372,6 +391,20 @@ public:
   };
   friend class PolicyPushPop;
 
+  /** Helper class to push and pop variables scopes automatically. */
+  class VariablePushPop
+  {
+  public:
+    VariablePushPop(cmMakefile* m);
+    ~VariablePushPop();
+
+    VariablePushPop(VariablePushPop const&) = delete;
+    VariablePushPop& operator=(VariablePushPop const&) = delete;
+
+  private:
+    cmMakefile* Makefile;
+  };
+
   /**
    * Determine if the given context, name pair has already been reported
    * in context of CMP0054.
@@ -404,7 +437,7 @@ public:
    */
   void SetIncludeRegularExpression(const std::string& regex)
   {
-    this->SetProperty("INCLUDE_REGULAR_EXPRESSION", regex.c_str());
+    this->SetProperty("INCLUDE_REGULAR_EXPRESSION", regex);
   }
   const std::string& GetIncludeRegularExpression() const
   {
@@ -497,8 +530,6 @@ public:
   const std::string& GetRequiredDefinition(const std::string& name) const;
   bool IsDefinitionSet(const std::string&) const;
   bool IsNormalDefinitionSet(const std::string&) const;
-  bool GetDefExpandList(const std::string& name, std::vector<std::string>& out,
-                        bool emptyArgs = false) const;
   /**
    * Get the list of all variables in the current space. If argument
    * cacheonly is specified and is greater than 0, then only cache
@@ -533,6 +564,8 @@ public:
     AppleTVSimulator,
     WatchOS,
     WatchSimulator,
+    XROS,
+    XRSimulator,
   };
 
   /** What SDK type points CMAKE_OSX_SYSROOT to? */
@@ -540,6 +573,13 @@ public:
 
   /** Return whether the target platform is Apple iOS.  */
   bool PlatformIsAppleEmbedded() const;
+
+  /** Return whether the target platform is an Apple simulator.  */
+  bool PlatformIsAppleSimulator() const;
+
+  /** Return whether the target platform supports generation of text base stubs
+     (.tbd file) describing exports (Apple specific). */
+  bool PlatformSupportsAppleTextStubs() const;
 
   /** Retrieve soname flag for the specified language if supported */
   const char* GetSONameFlag(const std::string& language) const;
@@ -621,6 +661,11 @@ public:
   cmListFileBacktrace GetBacktrace() const;
 
   /**
+   * Get the current stack of find_package calls.
+   */
+  cmFindPackageStack GetFindPackageStack() const;
+
+  /**
    * Get the vector of  files created by this makefile
    */
   const std::vector<std::string>& GetOutputFiles() const
@@ -670,11 +715,18 @@ public:
                     bool copyonly, bool atOnly, bool escapeQuotes,
                     mode_t permissions = 0, cmNewLineStyle = cmNewLineStyle());
 
+  enum class CommandMissingFromStack
+  {
+    No,
+    Yes,
+  };
+
   /**
    * Print a command's invocation
    */
-  void PrintCommandTrace(cmListFileFunction const& lff,
-                         cm::optional<std::string> const& deferId = {}) const;
+  void PrintCommandTrace(
+    cmListFileFunction const& lff, cmListFileBacktrace const& bt,
+    CommandMissingFromStack missing = CommandMissingFromStack::No) const;
 
   /**
    * Set a callback that is invoked whenever ExecuteCommand is called.
@@ -771,8 +823,11 @@ public:
                              std::string& debugBuffer) const;
 
   //! Set/Get a property of this directory
-  void SetProperty(const std::string& prop, const char* value);
   void SetProperty(const std::string& prop, cmValue value);
+  void SetProperty(const std::string& prop, std::nullptr_t)
+  {
+    this->SetProperty(prop, cmValue{ nullptr });
+  }
   void SetProperty(const std::string& prop, const std::string& value)
   {
     this->SetProperty(prop, cmValue(value));
@@ -821,7 +876,7 @@ public:
 
   private:
     cmMakefile* Makefile;
-    bool ReportError;
+    bool ReportError = true;
   };
 
   class MacroPushPop
@@ -838,7 +893,7 @@ public:
 
   private:
     cmMakefile* Makefile;
-    bool ReportError;
+    bool ReportError = true;
   };
 
   void PushFunctionScope(std::string const& fileName,
@@ -850,10 +905,53 @@ public:
   void PushScope();
   void PopScope();
   void RaiseScope(const std::string& var, const char* value);
+  void RaiseScope(const std::string& var, cmValue value)
+  {
+    this->RaiseScope(var, value.GetCStr());
+  }
+  void RaiseScope(const std::vector<std::string>& variables);
 
   // push and pop loop scopes
   void PushLoopBlockBarrier();
   void PopLoopBlockBarrier();
+
+  bool IsImportedTargetGlobalScope() const;
+
+  enum class ImportedTargetScope
+  {
+    Local,
+    Global,
+  };
+
+  /** Helper class to manage whether imported packages
+   * should be globally scoped based off the find package command
+   */
+  class SetGlobalTargetImportScope
+  {
+  public:
+    SetGlobalTargetImportScope(cmMakefile* mk, ImportedTargetScope const scope)
+      : Makefile(mk)
+    {
+      if (scope == ImportedTargetScope::Global &&
+          !this->Makefile->IsImportedTargetGlobalScope()) {
+        this->Makefile->CurrentImportedTargetScope = scope;
+        this->Set = true;
+      } else {
+        this->Set = false;
+      }
+    }
+    ~SetGlobalTargetImportScope()
+    {
+      if (this->Set) {
+        this->Makefile->CurrentImportedTargetScope =
+          ImportedTargetScope::Local;
+      }
+    }
+
+  private:
+    cmMakefile* Makefile;
+    bool Set;
+  };
 
   /** Helper class to push and pop scopes automatically.  */
   class ScopePushPop
@@ -875,6 +973,7 @@ public:
   };
 
   void IssueMessage(MessageType t, std::string const& text) const;
+  Message::LogLevel GetCurrentLogLevel() const;
 
   /** Set whether or not to report a CMP0000 violation.  */
   void SetCheckCMP0000(bool b) { this->CheckCMP0000 = b; }
@@ -927,13 +1026,39 @@ public:
   // searches
   std::deque<std::vector<std::string>> FindPackageRootPathStack;
 
-  void MaybeWarnCMP0074(std::string const& pkg);
+  class FindPackageStackRAII
+  {
+    cmMakefile* Makefile;
+
+  public:
+    FindPackageStackRAII(cmMakefile* mf, std::string const& pkg);
+    ~FindPackageStackRAII();
+  };
+
+  class DebugFindPkgRAII
+  {
+    cmMakefile* Makefile;
+    bool OldValue;
+
+  public:
+    DebugFindPkgRAII(cmMakefile* mf, std::string const& pkg);
+    ~DebugFindPkgRAII();
+  };
+
+  bool GetDebugFindPkgMode() const;
+
+  void MaybeWarnCMP0074(std::string const& rootVar, cmValue rootDef,
+                        cm::optional<std::string> const& rootEnv);
+  void MaybeWarnCMP0144(std::string const& rootVAR, cmValue rootDEF,
+                        cm::optional<std::string> const& rootENV);
   void MaybeWarnUninitialized(std::string const& variable,
                               const char* sourceFilename) const;
   bool IsProjectFile(const char* filename) const;
 
-  int GetRecursionDepth() const;
-  void SetRecursionDepth(int recursionDepth);
+  size_t GetRecursionDepthLimit() const;
+
+  size_t GetRecursionDepth() const;
+  void SetRecursionDepth(size_t recursionDepth);
 
   std::string NewDeferId() const;
   bool DeferCall(std::string id, std::string fileName, cmListFileFunction lff);
@@ -999,7 +1124,7 @@ protected:
 private:
   cmStateSnapshot StateSnapshot;
   cmListFileBacktrace Backtrace;
-  int RecursionDepth;
+  size_t RecursionDepth = 0;
 
   struct DeferCommand
   {
@@ -1100,9 +1225,16 @@ private:
   std::vector<BT<GeneratorAction>> GeneratorActions;
   bool GeneratorActionsInvoked = false;
 
+  cmFindPackageStack FindPackageStack;
+  unsigned int FindPackageStackNextIndex = 0;
+
+  bool DebugFindPkg = false;
+
   bool CheckSystemVars;
   bool CheckCMP0000;
   std::set<std::string> WarnedCMP0074;
+  std::set<std::string> WarnedCMP0144;
   bool IsSourceFileTryCompile;
   mutable bool SuppressSideEffects;
+  ImportedTargetScope CurrentImportedTargetScope = ImportedTargetScope::Local;
 };

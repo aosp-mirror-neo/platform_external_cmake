@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include <cm/optional>
 #include <cmext/algorithm>
 
 #include "cmListFileCache.h"
@@ -17,6 +18,7 @@
 #include "cmTargetLinkLibraryType.h"
 
 class cmGeneratorTarget;
+class cmSourceFile;
 
 // Basic information about each link item.
 class cmLinkItem
@@ -24,11 +26,20 @@ class cmLinkItem
   std::string String;
 
 public:
+  // default feature: link library without decoration
+  static const std::string DEFAULT;
+
   cmLinkItem();
-  cmLinkItem(std::string s, bool c, cmListFileBacktrace bt);
-  cmLinkItem(cmGeneratorTarget const* t, bool c, cmListFileBacktrace bt);
+  cmLinkItem(std::string s, bool c, cmListFileBacktrace bt,
+             std::string feature = DEFAULT);
+  cmLinkItem(cmGeneratorTarget const* t, bool c, cmListFileBacktrace bt,
+             std::string feature = DEFAULT);
   std::string const& AsStr() const;
   cmGeneratorTarget const* Target = nullptr;
+  // The source file representing the external object (used when linking
+  // `$<TARGET_OBJECTS>`)
+  cmSourceFile const* ObjectSource = nullptr;
+  std::string Feature;
   bool Cross = false;
   cmListFileBacktrace Backtrace;
   friend bool operator<(cmLinkItem const& l, cmLinkItem const& r);
@@ -40,8 +51,8 @@ class cmLinkImplItem : public cmLinkItem
 {
 public:
   cmLinkImplItem();
-  cmLinkImplItem(cmLinkItem item, bool fromGenex);
-  bool FromGenex = false;
+  cmLinkImplItem(cmLinkItem item, bool checkCMP0027);
+  bool CheckCMP0027 = false;
 };
 
 /** The link implementation specifies the direct library
@@ -69,6 +80,12 @@ struct cmLinkInterfaceLibraries
 
   // Object files listed in the interface.
   std::vector<cmLinkItem> Objects;
+
+  // Items to be included as if directly linked by the head target.
+  std::vector<cmLinkItem> HeadInclude;
+
+  // Items to be excluded from direct linking by the head target.
+  std::vector<cmLinkItem> HeadExclude;
 
   // Whether the list depends on a genex referencing the head target.
   bool HadHeadSensitiveCondition = false;
@@ -150,3 +167,6 @@ inline cmTargetLinkLibraryType CMP0003_ComputeLinkType(
   // The current configuration is not a debug configuration.
   return OPTIMIZED_LibraryType;
 }
+
+// Parse LINK_LIBRARY genex markers.
+cm::optional<std::string> ParseLinkFeature(std::string const& item);

@@ -16,14 +16,19 @@ endif()
 
 # Whenever needed, override this default behavior using CMAKE_IAR_CXX_FLAG in your toolchain file.
 if(NOT CMAKE_IAR_CXX_FLAG)
+  cmake_policy(PUSH)
+  cmake_policy(SET CMP0057 NEW) # if IN_LIST
+
   set(_CMAKE_IAR_MODERNCXX_LIST 14 17)
   if(${CMAKE_CXX_STANDARD_COMPUTED_DEFAULT} IN_LIST _CMAKE_IAR_MODERNCXX_LIST OR
      ("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "ARM" AND ${CMAKE_CXX_STANDARD_COMPUTED_DEFAULT} EQUAL 98))
-    string(PREPEND CMAKE_CXX_FLAGS "--c++ ")
+    set(CMAKE_IAR_CXX_FLAG --c++)
   else()
-    string(PREPEND CMAKE_CXX_FLAGS "--eec++ ")
+    set(CMAKE_IAR_CXX_FLAG --eec++)
   endif()
   unset(_CMAKE_IAR_MODERNCXX_LIST)
+
+  cmake_policy(POP)
 endif()
 
 set(CMAKE_CXX_STANDARD_COMPILE_OPTION "")
@@ -63,7 +68,8 @@ elseif("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "RISCV")
 
 elseif("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "AVR")
   __compiler_iar_xlink(CXX)
-  __compiler_check_default_language_standard(CXX 7.10 98)
+  __compiler_check_default_language_standard(CXX 7.10 98 8.10 17)
+  set(CMAKE_CXX_OUTPUT_EXTENSION ".r90")
 
 elseif("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "MSP430")
   __compiler_iar_xlink(CXX)
@@ -73,12 +79,12 @@ elseif("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "MSP430")
 elseif("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "V850")
   __compiler_iar_xlink(CXX)
   __compiler_check_default_language_standard(CXX 1.10 98)
-  set(CMAKE_C_OUTPUT_EXTENSION ".r85")
+  set(CMAKE_CXX_OUTPUT_EXTENSION ".r85")
 
 elseif("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "8051")
   __compiler_iar_xlink(CXX)
   __compiler_check_default_language_standard(CXX 6.10 98)
-  set(CMAKE_C_OUTPUT_EXTENSION ".r51")
+  set(CMAKE_CXX_OUTPUT_EXTENSION ".r51")
 
 elseif("${CMAKE_CXX_COMPILER_ARCHITECTURE_ID}" STREQUAL "STM8")
   __compiler_iar_ilink(CXX)

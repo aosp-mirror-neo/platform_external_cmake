@@ -4,11 +4,10 @@
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
+#include <cstring>
 #include <memory>
 #include <ostream>
 #include <string>
-
-#include <string.h>
 
 #define cmCPack_Log(ctSelf, logType, msg)                                     \
   do {                                                                        \
@@ -30,7 +29,7 @@ public:
   cmCPackLog(const cmCPackLog&) = delete;
   cmCPackLog& operator=(const cmCPackLog&) = delete;
 
-  enum __log_tags
+  enum cm_log_tags
   {
     NOTAG = 0,
     LOG_OUTPUT = 0x1,
@@ -129,7 +128,7 @@ public:
   }
 
   const char* Data;
-  size_t Length;
+  std::streamsize Length;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const cmCPackLogWrite& c)

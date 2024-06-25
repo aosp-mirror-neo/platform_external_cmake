@@ -17,6 +17,7 @@
 #include "cmDefinitions.h"
 #include "cmExecutionStatus.h"
 #include "cmGlobVerificationManager.h"
+#include "cmList.h"
 #include "cmListFileCache.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
@@ -101,11 +102,13 @@ cmStateEnums::CacheEntryType cmState::StringToCacheEntryType(
 bool cmState::StringToCacheEntryType(const std::string& s,
                                      cmStateEnums::CacheEntryType& type)
 {
-  for (size_t i = 0; i < cmCacheEntryTypes.size(); ++i) {
-    if (s == cmCacheEntryTypes[i]) {
-      type = static_cast<cmStateEnums::CacheEntryType>(i);
-      return true;
-    }
+  // NOLINTNEXTLINE(readability-qualified-auto)
+  auto const entry =
+    std::find(cmCacheEntryTypes.begin(), cmCacheEntryTypes.end(), s);
+  if (entry != cmCacheEntryTypes.end()) {
+    type = static_cast<cmStateEnums::CacheEntryType>(
+      entry - cmCacheEntryTypes.begin());
+    return true;
   }
   return false;
 }
@@ -207,7 +210,7 @@ bool cmState::GetCacheEntryPropertyAsBool(std::string const& key,
 }
 
 void cmState::AddCacheEntry(const std::string& key, cmValue value,
-                            const char* helpString,
+                            const std::string& helpString,
                             cmStateEnums::CacheEntryType type)
 {
   this->CacheManager->AddCacheEntry(key, value, helpString, type);
@@ -228,22 +231,22 @@ std::string const& cmState::GetGlobVerifyStamp() const
   return this->GlobVerificationManager->GetVerifyStamp();
 }
 
-bool cmState::SaveVerificationScript(const std::string& path)
+bool cmState::SaveVerificationScript(const std::string& path,
+                                     cmMessenger* messenger)
 {
-  return this->GlobVerificationManager->SaveVerificationScript(path);
+  return this->GlobVerificationManager->SaveVerificationScript(path,
+                                                               messenger);
 }
 
-void cmState::AddGlobCacheEntry(bool recurse, bool listDirectories,
-                                bool followSymlinks,
-                                const std::string& relative,
-                                const std::string& expression,
-                                const std::vector<std::string>& files,
-                                const std::string& variable,
-                                cmListFileBacktrace const& backtrace)
+void cmState::AddGlobCacheEntry(
+  bool recurse, bool listDirectories, bool followSymlinks,
+  const std::string& relative, const std::string& expression,
+  const std::vector<std::string>& files, const std::string& variable,
+  cmListFileBacktrace const& backtrace, cmMessenger* messenger)
 {
   this->GlobVerificationManager->AddCacheEntry(
     recurse, listDirectories, followSymlinks, relative, expression, files,
-    variable, backtrace);
+    variable, backtrace, messenger);
 }
 
 void cmState::RemoveCacheEntry(std::string const& key)
@@ -281,7 +284,7 @@ cmStateSnapshot cmState::Reset()
     it->CompileOptions.clear();
     it->LinkOptions.clear();
     it->LinkDirectories.clear();
-    it->DirectoryEnd = pos;
+    it->CurrentScope = pos;
     it->NormalTargetNames.clear();
     it->ImportedTargetNames.clear();
     it->Properties.Clear();
@@ -327,10 +330,12 @@ cmStateSnapshot cmState::Reset()
 void cmState::DefineProperty(const std::string& name,
                              cmProperty::ScopeType scope,
                              const std::string& ShortDescription,
-                             const std::string& FullDescription, bool chained)
+                             const std::string& FullDescription, bool chained,
+                             const std::string& initializeFromVariable)
 {
   this->PropertyDefinitions.DefineProperty(name, scope, ShortDescription,
-                                           FullDescription, chained);
+                                           FullDescription, chained,
+                                           initializeFromVariable);
 }
 
 cmPropertyDefinition const* cmState::GetPropertyDefinition(
@@ -442,17 +447,23 @@ void cmState::AddFlowControlCommand(std::string const& name,
 void cmState::AddDisallowedCommand(std::string const& name,
                                    BuiltinCommand command,
                                    cmPolicies::PolicyID policy,
-                                   const char* message)
+                                   const char* message,
+                                   const char* additionalWarning)
 {
   this->AddBuiltinCommand(
     name,
-    [command, policy, message](const std::vector<cmListFileArgument>& args,
-                               cmExecutionStatus& status) -> bool {
+    [command, policy, message,
+     additionalWarning](const std::vector<cmListFileArgument>& args,
+                        cmExecutionStatus& status) -> bool {
       cmMakefile& mf = status.GetMakefile();
       switch (mf.GetPolicyStatus(policy)) {
-        case cmPolicies::WARN:
-          mf.IssueMessage(MessageType::AUTHOR_WARNING,
-                          cmPolicies::GetPolicyWarning(policy));
+        case cmPolicies::WARN: {
+          std::string warning = cmPolicies::GetPolicyWarning(policy);
+          if (additionalWarning) {
+            warning = cmStrCat(warning, '\n', additionalWarning);
+          }
+          mf.IssueMessage(MessageType::AUTHOR_WARNING, warning);
+        }
           CM_FALLTHROUGH;
         case cmPolicies::OLD:
           break;
@@ -501,7 +512,7 @@ bool cmState::AddScriptedCommand(std::string const& name, BT<Command> command,
       cmStrCat("Built-in flow control command \"", sName,
                "\" cannot be overridden."),
       command.Backtrace);
-    cmSystemTools::SetFatalErrorOccured();
+    cmSystemTools::SetFatalErrorOccurred();
     return false;
   }
 
@@ -560,7 +571,8 @@ void cmState::RemoveUserDefinedCommands()
   this->ScriptedCommands.clear();
 }
 
-void cmState::SetGlobalProperty(const std::string& prop, const char* value)
+void cmState::SetGlobalProperty(const std::string& prop,
+                                const std::string& value)
 {
   this->GlobalProperties.SetProperty(prop, value);
 }
@@ -579,10 +591,10 @@ cmValue cmState::GetGlobalProperty(const std::string& prop)
 {
   if (prop == "CACHE_VARIABLES") {
     std::vector<std::string> cacheKeys = this->GetCacheEntryKeys();
-    this->SetGlobalProperty("CACHE_VARIABLES", cmJoin(cacheKeys, ";").c_str());
+    this->SetGlobalProperty("CACHE_VARIABLES", cmList::to_string(cacheKeys));
   } else if (prop == "COMMANDS") {
     std::vector<std::string> commands = this->GetCommandNames();
-    this->SetGlobalProperty("COMMANDS", cmJoin(commands, ";").c_str());
+    this->SetGlobalProperty("COMMANDS", cmList::to_string(commands));
   } else if (prop == "IN_TRY_COMPILE") {
     this->SetGlobalProperty(
       "IN_TRY_COMPILE",
@@ -591,12 +603,11 @@ cmValue cmState::GetGlobalProperty(const std::string& prop)
     this->SetGlobalProperty("GENERATOR_IS_MULTI_CONFIG",
                             this->IsGeneratorMultiConfig ? "1" : "0");
   } else if (prop == "ENABLED_LANGUAGES") {
-    std::string langs;
-    langs = cmJoin(this->EnabledLanguages, ";");
-    this->SetGlobalProperty("ENABLED_LANGUAGES", langs.c_str());
+    auto langs = cmList::to_string(this->EnabledLanguages);
+    this->SetGlobalProperty("ENABLED_LANGUAGES", langs);
   } else if (prop == "CMAKE_ROLE") {
     std::string mode = this->GetModeString();
-    this->SetGlobalProperty("CMAKE_ROLE", mode.c_str());
+    this->SetGlobalProperty("CMAKE_ROLE", mode);
   }
 #define STRING_LIST_ELEMENT(F) ";" #F
   if (prop == "CMAKE_C_KNOWN_FEATURES") {
@@ -741,6 +752,16 @@ bool cmState::UseMSYSShell() const
   return this->MSYSShell;
 }
 
+void cmState::SetNinja(bool ninja)
+{
+  this->Ninja = ninja;
+}
+
+bool cmState::UseNinja() const
+{
+  return this->Ninja;
+}
+
 void cmState::SetNinjaMulti(bool ninjaMulti)
 {
   this->NinjaMulti = ninjaMulti;
@@ -784,6 +805,8 @@ std::string cmState::ModeToString(cmState::Mode mode)
       return "CTEST";
     case CPack:
       return "CPACK";
+    case Help:
+      return "HELP";
     case Unknown:
       return "UNKNOWN";
   }
@@ -817,7 +840,7 @@ cmStateSnapshot cmState::CreateBaseSnapshot()
   pos->CompileOptionsPosition = 0;
   pos->LinkOptionsPosition = 0;
   pos->LinkDirectoriesPosition = 0;
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->Policies = this->PolicyStack.Root();
   pos->PolicyRoot = this->PolicyStack.Root();
   pos->PolicyScope = this->PolicyStack.Root();
@@ -844,7 +867,7 @@ cmStateSnapshot cmState::CreateBuildsystemDirectorySnapshot(
     originSnapshot.Position->BuildSystemDirectory);
   pos->ExecutionListFile =
     this->ExecutionListFiles.Push(originSnapshot.Position->ExecutionListFile);
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->Policies = originSnapshot.Position->Policies;
   pos->PolicyRoot = originSnapshot.Position->Policies;
   pos->PolicyScope = originSnapshot.Position->Policies;
@@ -874,7 +897,7 @@ cmStateSnapshot cmState::CreateDeferCallSnapshot(
   pos->ExecutionListFile = this->ExecutionListFiles.Push(
     originSnapshot.Position->ExecutionListFile, fileName);
   assert(originSnapshot.Position->Vars.IsValid());
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->PolicyScope = originSnapshot.Position->Policies;
   return { this, pos };
 }
@@ -889,7 +912,7 @@ cmStateSnapshot cmState::CreateFunctionCallSnapshot(
   pos->Keep = false;
   pos->ExecutionListFile = this->ExecutionListFiles.Push(
     originSnapshot.Position->ExecutionListFile, fileName);
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->PolicyScope = originSnapshot.Position->Policies;
   assert(originSnapshot.Position->Vars.IsValid());
   cmLinkedTree<cmDefinitions>::iterator origin = originSnapshot.Position->Vars;
@@ -908,7 +931,7 @@ cmStateSnapshot cmState::CreateMacroCallSnapshot(
   pos->ExecutionListFile = this->ExecutionListFiles.Push(
     originSnapshot.Position->ExecutionListFile, fileName);
   assert(originSnapshot.Position->Vars.IsValid());
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->PolicyScope = originSnapshot.Position->Policies;
   return { this, pos };
 }
@@ -923,7 +946,7 @@ cmStateSnapshot cmState::CreateIncludeFileSnapshot(
   pos->ExecutionListFile = this->ExecutionListFiles.Push(
     originSnapshot.Position->ExecutionListFile, fileName);
   assert(originSnapshot.Position->Vars.IsValid());
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->PolicyScope = originSnapshot.Position->Policies;
   return { this, pos };
 }
@@ -936,6 +959,7 @@ cmStateSnapshot cmState::CreateVariableScopeSnapshot(
   pos->ScopeParent = originSnapshot.Position;
   pos->SnapshotType = cmStateEnums::VariableScopeType;
   pos->Keep = false;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->PolicyScope = originSnapshot.Position->Policies;
   assert(originSnapshot.Position->Vars.IsValid());
 
@@ -955,7 +979,7 @@ cmStateSnapshot cmState::CreateInlineListFileSnapshot(
   pos->Keep = true;
   pos->ExecutionListFile = this->ExecutionListFiles.Push(
     originSnapshot.Position->ExecutionListFile, fileName);
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->PolicyScope = originSnapshot.Position->Policies;
   return { this, pos };
 }
@@ -967,7 +991,7 @@ cmStateSnapshot cmState::CreatePolicyScopeSnapshot(
     this->SnapshotData.Push(originSnapshot.Position, *originSnapshot.Position);
   pos->SnapshotType = cmStateEnums::PolicyScopeType;
   pos->Keep = false;
-  pos->BuildSystemDirectory->DirectoryEnd = pos;
+  pos->BuildSystemDirectory->CurrentScope = pos;
   pos->PolicyScope = originSnapshot.Position->Policies;
   return { this, pos };
 }
@@ -987,7 +1011,7 @@ cmStateSnapshot cmState::Pop(cmStateSnapshot const& originSnapshot)
     prevPos->BuildSystemDirectory->LinkOptions.size();
   prevPos->LinkDirectoriesPosition =
     prevPos->BuildSystemDirectory->LinkDirectories.size();
-  prevPos->BuildSystemDirectory->DirectoryEnd = prevPos;
+  prevPos->BuildSystemDirectory->CurrentScope = prevPos;
 
   if (!pos->Keep && this->SnapshotData.IsLast(pos)) {
     if (pos->Vars != prevPos->Vars) {
@@ -1069,4 +1093,13 @@ bool cmState::ParseCacheEntry(const std::string& entry, std::string& var,
   }
 
   return flag;
+}
+
+cmState::Command cmState::GetDependencyProviderCommand(
+  cmDependencyProvider::Method method) const
+{
+  return (this->DependencyProvider &&
+          this->DependencyProvider->SupportsMethod(method))
+    ? this->GetCommand(this->DependencyProvider->GetCommand())
+    : Command{};
 }

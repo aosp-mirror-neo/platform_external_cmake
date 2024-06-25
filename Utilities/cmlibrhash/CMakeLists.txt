@@ -2,7 +2,7 @@ project(librhash C)
 
 # Disable warnings to avoid changing 3rd party code.
 if(CMAKE_C_COMPILER_ID MATCHES
-    "^(GNU|Clang|AppleClang|XLClang|XL|VisualAge|SunPro|HP|Intel|IntelLLVM|NVHPC)$")
+    "^(GNU|LCC|Clang|AppleClang|IBMClang|XLClang|XL|VisualAge|SunPro|HP|Intel|IntelLLVM|NVHPC)$")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -w")
 elseif(CMAKE_C_COMPILER_ID STREQUAL "PathScale")
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -woffall")
@@ -28,6 +28,7 @@ set(librhash_sources
   librhash/sha512.c
   librhash/sha512.h
   librhash/ustd.h
+  librhash/util.c
   librhash/util.h
   )
 
@@ -36,5 +37,6 @@ include_directories(
   )
 
 add_library(cmlibrhash ${librhash_sources})
+target_compile_definitions(cmlibrhash PRIVATE NO_IMPORT_EXPORT)
 
 install(FILES COPYING DESTINATION ${CMAKE_DOC_DIR}/cmlibrhash)

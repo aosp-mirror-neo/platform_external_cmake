@@ -5,7 +5,7 @@ Native build system toolset specification provided by user.
 
 Some CMake generators support a toolset specification to tell the
 native build system how to choose a compiler.  If the user specifies
-a toolset (e.g. via the :manual:`cmake(1)` ``-T`` option or via
+a toolset (e.g. via the :option:`cmake -T` option or via
 the :envvar:`CMAKE_GENERATOR_TOOLSET` environment variable) the value
 will be available in this variable.
 
@@ -47,6 +47,20 @@ Supported pairs are:
   toolkit VS integration globally installed.
   See the :variable:`CMAKE_VS_PLATFORM_TOOLSET_CUDA` and
   :variable:`CMAKE_VS_PLATFORM_TOOLSET_CUDA_CUSTOM_DIR` variables.
+
+``fortran=<compiler>``
+  .. versionadded:: 3.29
+
+  Specify the Fortran compiler to use, among those that have the required
+  Visual Studio Integration feature installed.  The value may be one of:
+
+  ``ifort``
+    Intel classic Fortran compiler.
+
+  ``ifx``
+    Intel oneAPI Fortran compiler.
+
+  See the :variable:`CMAKE_VS_PLATFORM_TOOLSET_FORTRAN` variable.
 
 ``host=<arch>``
   Specify the host tools architecture as ``x64`` or ``x86``.

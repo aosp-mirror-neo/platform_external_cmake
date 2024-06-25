@@ -20,7 +20,6 @@ cmInstallScriptGenerator::cmInstallScriptGenerator(
                        std::move(backtrace))
   , Script(std::move(script))
   , Code(code)
-  , AllowGenex(false)
 {
   // We need per-config actions if the script has generator expressions.
   if (cmGeneratorExpression::Find(this->Script) != std::string::npos) {
@@ -57,12 +56,12 @@ bool cmInstallScriptGenerator::Compute(cmLocalGenerator* lg)
 std::string cmInstallScriptGenerator::GetScript(
   std::string const& config) const
 {
-  std::string script;
+  std::string script = this->Script;
   if (this->AllowGenex && this->ActionsPerConfig) {
-    script = cmGeneratorExpression::Evaluate(this->Script,
-                                             this->LocalGenerator, config);
-  } else {
-    script = this->Script;
+    cmGeneratorExpression::ReplaceInstallPrefix(script,
+                                                "${CMAKE_INSTALL_PREFIX}");
+    script =
+      cmGeneratorExpression::Evaluate(script, this->LocalGenerator, config);
   }
   return script;
 }

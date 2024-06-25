@@ -2,9 +2,19 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #pragma once
 
+#include <iosfwd>
+#include <set>
+#include <string>
+#include <vector>
+
 #include <cm/optional>
 
 #include "cmGlobalVisualStudio71Generator.h"
+
+class cmGeneratorTarget;
+class cmMakefile;
+class cmake;
+struct cmIDEFlagTable;
 
 /** \class cmGlobalVisualStudio8Generator
  * \brief Write a Unix makefiles.
@@ -50,6 +60,9 @@ protected:
   cmGlobalVisualStudio8Generator(cmake* cm, const std::string& name,
                                  std::string const& platformInGeneratorName);
 
+  virtual bool ProcessGeneratorPlatformField(std::string const& key,
+                                             std::string const& value);
+
   void AddExtraIDETargets() override;
 
   std::string FindDevEnvCommand() override;
@@ -86,4 +99,7 @@ protected:
   cm::optional<std::string> DefaultTargetFrameworkVersion;
   cm::optional<std::string> DefaultTargetFrameworkIdentifier;
   cm::optional<std::string> DefaultTargetFrameworkTargetsVersion;
+
+private:
+  bool ParseGeneratorPlatform(std::string const& is, cmMakefile* mf);
 };

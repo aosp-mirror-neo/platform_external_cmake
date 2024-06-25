@@ -7,7 +7,7 @@
  *                            | (__| |_| |  _ <| |___
  *                             \___|\___/|_| \_\_____|
  *
- * Copyright (C) 2019 - 2021, Daniel Stenberg, <daniel@haxx.se>, et al.
+ * Copyright (C) Daniel Stenberg, <daniel@haxx.se>, et al.
  *
  * This software is licensed as described in the file COPYING, which
  * you should have received as part of this distribution. The terms
@@ -20,10 +20,31 @@
  * This software is distributed on an "AS IS" basis, WITHOUT WARRANTY OF ANY
  * KIND, either express or implied.
  *
+ * SPDX-License-Identifier: curl
+ *
  ***************************************************************************/
 
 #include "curl_setup.h"
+
+#ifdef HAVE_PIPE
+
+#define wakeup_write  write
+#define wakeup_read   read
+#define wakeup_close  close
+#define wakeup_create pipe
+
+#else /* HAVE_PIPE */
+
+#define wakeup_write     swrite
+#define wakeup_read      sread
+#define wakeup_close     sclose
+#define wakeup_create(p) Curl_socketpair(AF_UNIX, SOCK_STREAM, 0, p)
+
+#endif /* HAVE_PIPE */
+
 #ifndef HAVE_SOCKETPAIR
+#include <curl/curl.h>
+
 int Curl_socketpair(int domain, int type, int protocol,
                     curl_socket_t socks[2]);
 #else

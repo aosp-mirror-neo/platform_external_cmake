@@ -7,7 +7,7 @@ UseJava
 
 This file provides support for ``Java``.  It is assumed that
 :module:`FindJava` has already been loaded.  See :module:`FindJava` for
-information on how to load Java into your ``CMake`` project.
+information on how to load Java into your CMake project.
 
 Synopsis
 ^^^^^^^^
@@ -294,7 +294,7 @@ Header Generation
 
   .. deprecated:: 3.11
     This command will no longer be supported starting with version 10 of the JDK
-    due to the `suppression of javah tool <http://openjdk.java.net/jeps/313>`_.
+    due to the `suppression of javah tool <https://openjdk.org/jeps/313>`_.
     The :ref:`add_jar(GENERATE_NATIVE_HEADERS) <add_jar>` command should be
     used instead.
 
@@ -1521,7 +1521,7 @@ function (create_javah)
       "CLASSES;CLASSPATH;DEPENDS"
       ${ARGN})
 
-    # ckeck parameters
+    # check parameters
     if (NOT _create_javah_TARGET AND NOT _create_javah_GENERATED_FILES)
       message (FATAL_ERROR "create_javah: TARGET or GENERATED_FILES must be specified.")
     endif()

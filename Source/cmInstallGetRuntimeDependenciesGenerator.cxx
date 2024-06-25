@@ -15,9 +15,11 @@
 
 #include "cmGeneratorExpression.h"
 #include "cmInstallRuntimeDependencySet.h"
+#include "cmListFileCache.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
 #include "cmOutputConverter.h"
+#include "cmScriptGenerator.h"
 #include "cmStringAlgorithms.h"
 
 namespace {

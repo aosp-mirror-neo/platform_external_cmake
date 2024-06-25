@@ -4,6 +4,7 @@
 
 #include "cmDocumentationFormatter.h"
 #include "cmMessageMetadata.h"
+#include "cmMessageType.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
@@ -12,56 +13,48 @@
 #endif
 
 #include <sstream>
+#include <utility>
 
 #include "cmsys/Terminal.h"
 
+#ifdef CMake_ENABLE_DEBUGGER
+#  include "cmDebuggerAdapter.h"
+#endif
+
 MessageType cmMessenger::ConvertMessageType(MessageType t) const
 {
-  bool warningsAsErrors;
-
   if (t == MessageType::AUTHOR_WARNING || t == MessageType::AUTHOR_ERROR) {
-    warningsAsErrors = this->GetDevWarningsAsErrors();
-    if (warningsAsErrors && t == MessageType::AUTHOR_WARNING) {
-      t = MessageType::AUTHOR_ERROR;
-    } else if (!warningsAsErrors && t == MessageType::AUTHOR_ERROR) {
-      t = MessageType::AUTHOR_WARNING;
+    if (this->GetDevWarningsAsErrors()) {
+      return MessageType::AUTHOR_ERROR;
     }
-  } else if (t == MessageType::DEPRECATION_WARNING ||
-             t == MessageType::DEPRECATION_ERROR) {
-    warningsAsErrors = this->GetDeprecatedWarningsAsErrors();
-    if (warningsAsErrors && t == MessageType::DEPRECATION_WARNING) {
-      t = MessageType::DEPRECATION_ERROR;
-    } else if (!warningsAsErrors && t == MessageType::DEPRECATION_ERROR) {
-      t = MessageType::DEPRECATION_WARNING;
-    }
+    return MessageType::AUTHOR_WARNING;
   }
-
+  if (t == MessageType::DEPRECATION_WARNING ||
+      t == MessageType::DEPRECATION_ERROR) {
+    if (this->GetDeprecatedWarningsAsErrors()) {
+      return MessageType::DEPRECATION_ERROR;
+    }
+    return MessageType::DEPRECATION_WARNING;
+  }
   return t;
 }
 
 bool cmMessenger::IsMessageTypeVisible(MessageType t) const
 {
-  bool isVisible = true;
-
   if (t == MessageType::DEPRECATION_ERROR) {
-    if (!this->GetDeprecatedWarningsAsErrors()) {
-      isVisible = false;
-    }
-  } else if (t == MessageType::DEPRECATION_WARNING) {
-    if (this->GetSuppressDeprecatedWarnings()) {
-      isVisible = false;
-    }
-  } else if (t == MessageType::AUTHOR_ERROR) {
-    if (!this->GetDevWarningsAsErrors()) {
-      isVisible = false;
-    }
-  } else if (t == MessageType::AUTHOR_WARNING) {
-    if (this->GetSuppressDevWarnings()) {
-      isVisible = false;
-    }
+    return this->GetDeprecatedWarningsAsErrors();
+  }
+  if (t == MessageType::DEPRECATION_WARNING) {
+    return !this->GetSuppressDeprecatedWarnings();
+  }
+  if (t == MessageType::AUTHOR_ERROR) {
+    return this->GetDevWarningsAsErrors();
+  }
+  if (t == MessageType::AUTHOR_WARNING) {
+    return !this->GetSuppressDevWarnings();
   }
 
-  return isVisible;
+  return true;
 }
 
 static bool printMessagePreamble(MessageType t, std::ostream& msg)
@@ -102,15 +95,15 @@ static int getMessageColor(MessageType t)
   }
 }
 
-void printMessageText(std::ostream& msg, std::string const& text)
+static void printMessageText(std::ostream& msg, std::string const& text)
 {
   msg << ":\n";
   cmDocumentationFormatter formatter;
-  formatter.SetIndent("  ");
-  formatter.PrintFormatted(msg, text.c_str());
+  formatter.SetIndent(2u);
+  formatter.PrintFormatted(msg, text);
 }
 
-void displayMessage(MessageType t, std::ostringstream& msg)
+static void displayMessage(MessageType t, std::ostringstream& msg)
 {
   // Add a note about warning suppression.
   if (t == MessageType::AUTHOR_WARNING) {
@@ -142,7 +135,7 @@ void displayMessage(MessageType t, std::ostringstream& msg)
   md.desiredColor = getMessageColor(t);
   if (t == MessageType::FATAL_ERROR || t == MessageType::INTERNAL_ERROR ||
       t == MessageType::DEPRECATION_ERROR || t == MessageType::AUTHOR_ERROR) {
-    cmSystemTools::SetErrorOccured();
+    cmSystemTools::SetErrorOccurred();
     md.title = "Error";
     cmSystemTools::Message(msg.str(), md);
   } else {
@@ -151,23 +144,55 @@ void displayMessage(MessageType t, std::ostringstream& msg)
   }
 }
 
+namespace {
+void PrintCallStack(std::ostream& out, cmListFileBacktrace bt,
+                    cm::optional<std::string> const& topSource)
+{
+  // The call stack exists only if we have at least two calls on top
+  // of the bottom.
+  if (bt.Empty()) {
+    return;
+  }
+  bt = bt.Pop();
+  if (bt.Empty()) {
+    return;
+  }
+
+  bool first = true;
+  for (; !bt.Empty(); bt = bt.Pop()) {
+    cmListFileContext lfc = bt.Top();
+    if (lfc.Name.empty() &&
+        lfc.Line != cmListFileContext::DeferPlaceholderLine) {
+      // Skip this whole-file scope.  When we get here we already will
+      // have printed a more-specific context within the file.
+      continue;
+    }
+    if (first) {
+      first = false;
+      out << "Call Stack (most recent call first):\n";
+    }
+    if (topSource) {
+      lfc.FilePath = cmSystemTools::RelativeIfUnder(*topSource, lfc.FilePath);
+    }
+    out << "  " << lfc << "\n";
+  }
+}
+}
+
 void cmMessenger::IssueMessage(MessageType t, const std::string& text,
                                const cmListFileBacktrace& backtrace) const
 {
   bool force = false;
-  if (!force) {
-    // override the message type, if needed, for warnings and errors
-    MessageType override = this->ConvertMessageType(t);
-    if (override != t) {
-      t = override;
-      force = true;
-    }
+  // override the message type, if needed, for warnings and errors
+  MessageType override = this->ConvertMessageType(t);
+  if (override != t) {
+    t = override;
+    force = true;
   }
 
-  if (!force && !this->IsMessageTypeVisible(t)) {
-    return;
+  if (force || this->IsMessageTypeVisible(t)) {
+    this->DisplayMessage(t, text, backtrace);
   }
-  this->DisplayMessage(t, text, backtrace);
 }
 
 void cmMessenger::DisplayMessage(MessageType t, const std::string& text,
@@ -179,12 +204,38 @@ void cmMessenger::DisplayMessage(MessageType t, const std::string& text,
   }
 
   // Add the immediate context.
-  backtrace.PrintTitle(msg);
+  this->PrintBacktraceTitle(msg, backtrace);
 
   printMessageText(msg, text);
 
   // Add the rest of the context.
-  backtrace.PrintCallStack(msg);
+  PrintCallStack(msg, backtrace, this->TopSource);
 
   displayMessage(t, msg);
+
+#ifdef CMake_ENABLE_DEBUGGER
+  if (DebuggerAdapter != nullptr) {
+    DebuggerAdapter->OnMessageOutput(t, msg.str());
+  }
+#endif
+}
+
+void cmMessenger::PrintBacktraceTitle(std::ostream& out,
+                                      cmListFileBacktrace const& bt) const
+{
+  // The title exists only if we have a call on top of the bottom.
+  if (bt.Empty()) {
+    return;
+  }
+  cmListFileContext lfc = bt.Top();
+  if (this->TopSource) {
+    lfc.FilePath =
+      cmSystemTools::RelativeIfUnder(*this->TopSource, lfc.FilePath);
+  }
+  out << (lfc.Line ? " at " : " in ") << lfc;
+}
+
+void cmMessenger::SetTopSource(cm::optional<std::string> topSource)
+{
+  this->TopSource = std::move(topSource);
 }

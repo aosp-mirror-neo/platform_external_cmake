@@ -23,6 +23,7 @@
 
 #include "cmExecutionStatus.h"
 #include "cmFunctionBlocker.h"
+#include "cmList.h"
 #include "cmListFileCache.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
@@ -156,16 +157,16 @@ bool cmForEachFunctionBlocker::ReplayZipLists(
   auto& mf = inStatus.GetMakefile();
 
   // Expand the list of list-variables into a list of lists of strings
-  std::vector<std::vector<std::string>> values;
+  std::vector<cmList> values;
   values.reserve(this->Args.size() - this->IterationVarsCount);
   // Also track the longest list size
   std::size_t maxItems = 0u;
   for (auto const& var :
        cmMakeRange(this->Args).advance(this->IterationVarsCount)) {
-    std::vector<std::string> items;
+    cmList items;
     auto const& value = mf.GetSafeDefinition(var);
     if (!value.empty()) {
-      cmExpandList(value, items, true);
+      items.assign(value, cmList::EmptyElements::Yes);
     }
     maxItems = std::max(maxItems, items.size());
     values.emplace_back(std::move(items));
@@ -260,7 +261,7 @@ auto cmForEachFunctionBlocker::invoke(
     cmExecutionStatus status(mf);
     mf.ExecuteCommand(func, status);
     if (status.GetReturnInvoked()) {
-      inStatus.SetReturnInvoked();
+      inStatus.SetReturnInvoked(status.GetReturnVariables());
       result.Break = true;
       break;
     }
@@ -271,7 +272,12 @@ auto cmForEachFunctionBlocker::invoke(
     if (status.GetContinueInvoked()) {
       break;
     }
-    if (cmSystemTools::GetFatalErrorOccured()) {
+    if (status.HasExitCode()) {
+      inStatus.SetExitCode(status.GetExitCode());
+      result.Break = true;
+      break;
+    }
+    if (cmSystemTools::GetFatalErrorOccurred()) {
       result.Restore = false;
       result.Break = true;
       break;
@@ -344,7 +350,7 @@ bool HandleInMode(std::vector<std::string> const& args,
     } else if (doing == DoingLists) {
       auto const& value = makefile.GetSafeDefinition(arg);
       if (!value.empty()) {
-        cmExpandList(value, fb->Args, true);
+        cmExpandList(value, fb->Args, cmList::EmptyElements::Yes);
       }
 
     } else if (doing == DoingItems || doing == DoingZipLists) {
@@ -382,13 +388,13 @@ bool TryParseInteger(cmExecutionStatus& status, const std::string& str, int& i)
     std::ostringstream e;
     e << "Invalid integer: '" << str << "'";
     status.SetError(e.str());
-    cmSystemTools::SetFatalErrorOccured();
+    cmSystemTools::SetFatalErrorOccurred();
     return false;
   } catch (std::out_of_range&) {
     std::ostringstream e;
     e << "Integer out of range: '" << str << "'";
     status.SetError(e.str());
-    cmSystemTools::SetFatalErrorOccured();
+    cmSystemTools::SetFatalErrorOccurred();
     return false;
   }
 
@@ -452,7 +458,7 @@ bool cmForEachCommand(std::vector<std::string> const& args,
         status.SetError(
           cmStrCat("called with incorrect range specification: start ", start,
                    ", stop ", stop, ", step ", step));
-        cmSystemTools::SetFatalErrorOccured();
+        cmSystemTools::SetFatalErrorOccurred();
         return false;
       }
 
@@ -460,8 +466,8 @@ bool cmForEachCommand(std::vector<std::string> const& args,
       // in the `fb->Args` vector. The first item is the iteration variable
       // name...
       const std::size_t iter_cnt = 2u +
-        int(start < stop) * (stop - start) / std::abs(step) +
-        int(start > stop) * (start - stop) / std::abs(step);
+        static_cast<int>(start < stop) * (stop - start) / std::abs(step) +
+        static_cast<int>(start > stop) * (start - stop) / std::abs(step);
       fb->Args.resize(iter_cnt);
       fb->Args.front() = args.front();
       auto cc = start;

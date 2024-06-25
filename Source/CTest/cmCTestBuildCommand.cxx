@@ -3,11 +3,13 @@
 #include "cmCTestBuildCommand.h"
 
 #include <sstream>
+#include <utility>
 
 #include <cmext/string_view>
 
 #include "cmCTest.h"
 #include "cmCTestBuildHandler.h"
+#include "cmCommand.h"
 #include "cmGlobalGenerator.h"
 #include "cmMakefile.h"
 #include "cmMessageType.h"
@@ -17,6 +19,14 @@
 #include "cmake.h"
 
 class cmExecutionStatus;
+
+std::unique_ptr<cmCommand> cmCTestBuildCommand::Clone()
+{
+  auto ni = cm::make_unique<cmCTestBuildCommand>();
+  ni->CTest = this->CTest;
+  ni->CTestScriptHandler = this->CTestScriptHandler;
+  return std::unique_ptr<cmCommand>(std::move(ni));
+}
 
 void cmCTestBuildCommand::BindArguments()
 {
@@ -84,16 +94,12 @@ cmCTestGenericHandler* cmCTestBuildCommand::InitializeHandler()
           std::string e = cmStrCat("could not create generator named \"",
                                    *cmakeGeneratorName, '"');
           this->Makefile->IssueMessage(MessageType::FATAL_ERROR, e);
-          cmSystemTools::SetFatalErrorOccured();
+          cmSystemTools::SetFatalErrorOccurred();
           return nullptr;
         }
       }
       if (cmakeBuildConfiguration.empty()) {
-#ifdef CMAKE_INTDIR
-        cmakeBuildConfiguration = CMAKE_INTDIR;
-#else
         cmakeBuildConfiguration = "Debug";
-#endif
       }
 
       std::string dir = this->CTest->GetCTestConfiguration("BuildDirectory");

@@ -17,18 +17,18 @@
 
 #include <cm/optional>
 #include <cmext/algorithm>
+#include <cmext/string_view>
 
-#include "cm_codecvt.hxx"
-
+#include "cmBuildOptions.h"
 #include "cmCustomCommandLines.h"
 #include "cmDuration.h"
 #include "cmExportSet.h"
+#include "cmLocalGenerator.h"
 #include "cmStateSnapshot.h"
 #include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmTarget.h"
 #include "cmTargetDepend.h"
-#include "cmTransformDepfile.h"
 #include "cmValue.h"
 
 #if !defined(CMAKE_BOOTSTRAP)
@@ -39,15 +39,18 @@
 
 #define CMAKE_DIRECTORY_ID_SEP "::@"
 
+enum class cmDepfileFormat;
+enum class codecvt_Encoding;
+
 class cmDirectoryId;
 class cmExportBuildFileGenerator;
 class cmExternalMakefileProjectGenerator;
 class cmGeneratorTarget;
 class cmInstallRuntimeDependencySet;
 class cmLinkLineComputer;
-class cmLocalGenerator;
 class cmMakefile;
 class cmOutputConverter;
+class cmQtAutoGenGlobalInitializer;
 class cmSourceFile;
 class cmState;
 class cmStateDirectory;
@@ -82,6 +85,7 @@ struct GeneratedMakeCommand
   }
 
   std::string Printable() const { return cmJoin(this->PrimaryCommand, " "); }
+  std::string QuotedPrintable() const;
 
   std::vector<std::string> PrimaryCommand;
   bool RequiresOutputForward = false;
@@ -116,10 +120,7 @@ public:
   }
 
   /** Get encoding used by generator for makefile files */
-  virtual codecvt::Encoding GetMakefileEncoding() const
-  {
-    return codecvt::None;
-  }
+  virtual codecvt_Encoding GetMakefileEncoding() const;
 
 #if !defined(CMAKE_BOOTSTRAP)
   /** Get a JSON object describing the generator.  */
@@ -154,6 +155,20 @@ public:
   virtual void Configure();
 
   virtual bool InspectConfigTypeVariables() { return true; }
+
+  enum class CxxModuleSupportQuery
+  {
+    // Support is expected at the call site.
+    Expected,
+    // The call site is querying for support and handles problems by itself.
+    Inspect,
+  };
+  virtual bool CheckCxxModuleSupport(CxxModuleSupportQuery /*query*/)
+  {
+    return false;
+  }
+
+  virtual bool IsGNUMakeJobServerAware() const { return false; }
 
   bool Compute();
   virtual void AddExtraIDETargets() {}
@@ -228,9 +243,9 @@ public:
   int Build(
     int jobs, const std::string& srcdir, const std::string& bindir,
     const std::string& projectName,
-    std::vector<std::string> const& targetNames, std::string& output,
-    const std::string& makeProgram, const std::string& config, bool clean,
-    bool fast, bool verbose, cmDuration timeout,
+    std::vector<std::string> const& targetNames, std::ostream& ostr,
+    const std::string& makeProgram, const std::string& config,
+    const cmBuildOptions& buildOptions, bool verbose, cmDuration timeout,
     cmSystemTools::OutputOption outputflag = cmSystemTools::OUTPUT_NONE,
     std::vector<std::string> const& nativeOptions =
       std::vector<std::string>());
@@ -248,7 +263,8 @@ public:
   virtual std::vector<GeneratedMakeCommand> GenerateBuildCommand(
     const std::string& makeProgram, const std::string& projectName,
     const std::string& projectDir, std::vector<std::string> const& targetNames,
-    const std::string& config, bool fast, int jobs, bool verbose,
+    const std::string& config, int jobs, bool verbose,
+    const cmBuildOptions& buildOptions = cmBuildOptions(),
     std::vector<std::string> const& makeOptions = std::vector<std::string>());
 
   virtual void PrintBuildCommandAdvice(std::ostream& os, int jobs) const;
@@ -333,6 +349,8 @@ public:
   int GetLinkerPreference(const std::string& lang) const;
   //! What is the object file extension for a given source file?
   std::string GetLanguageOutputExtension(cmSourceFile const&) const;
+  //! What is the object file extension for a given language?
+  std::string GetLanguageOutputExtension(std::string const& lang) const;
 
   //! What is the configurations directory variable called?
   virtual const char* GetCMakeCFGIntDir() const { return "."; }
@@ -365,6 +383,83 @@ public:
   /** Determine if a name resolves to a framework on disk or a built target
       that is a framework. */
   bool NameResolvesToFramework(const std::string& libname) const;
+  /** Split a framework path to the directory and name of the framework as well
+   * as optional suffix.
+   * Returns std::nullopt if the path does not match with framework format
+   * when extendedFormat is true, required format is relaxed (i.e. extension
+   * `.framework' is optional). Used when FRAMEWORK link feature is
+   * specified */
+  struct FrameworkDescriptor
+  {
+    FrameworkDescriptor(std::string directory, std::string name)
+      : Directory(std::move(directory))
+      , Name(std::move(name))
+    {
+    }
+    FrameworkDescriptor(std::string directory, std::string version,
+                        std::string name)
+      : Directory(std::move(directory))
+      , Version(std::move(version))
+      , Name(std::move(name))
+    {
+    }
+    FrameworkDescriptor(std::string directory, std::string version,
+                        std::string name, std::string suffix)
+      : Directory(std::move(directory))
+      , Version(std::move(version))
+      , Name(std::move(name))
+      , Suffix(std::move(suffix))
+    {
+    }
+    std::string GetLinkName() const
+    {
+      return this->Suffix.empty() ? this->Name
+                                  : cmStrCat(this->Name, ',', this->Suffix);
+    }
+    std::string GetFullName() const
+    {
+      return cmStrCat(this->Name, ".framework/"_s, this->Name, this->Suffix);
+    }
+    std::string GetVersionedName() const
+    {
+      return this->Version.empty()
+        ? this->GetFullName()
+        : cmStrCat(this->Name, ".framework/Versions/"_s, this->Version, '/',
+                   this->Name, this->Suffix);
+    }
+    std::string GetFrameworkPath() const
+    {
+      return this->Directory.empty()
+        ? cmStrCat(this->Name, ".framework"_s)
+        : cmStrCat(this->Directory, '/', this->Name, ".framework"_s);
+    }
+    std::string GetFullPath() const
+    {
+      return this->Directory.empty()
+        ? this->GetFullName()
+        : cmStrCat(this->Directory, '/', this->GetFullName());
+    }
+    std::string GetVersionedPath() const
+    {
+      return this->Directory.empty()
+        ? this->GetVersionedName()
+        : cmStrCat(this->Directory, '/', this->GetVersionedName());
+    }
+
+    const std::string Directory;
+    const std::string Version;
+    const std::string Name;
+    const std::string Suffix;
+  };
+  enum class FrameworkFormat
+  {
+    Strict,
+    Relaxed,
+    Extended
+  };
+  cm::optional<FrameworkDescriptor> SplitFrameworkPath(
+    const std::string& path,
+    FrameworkFormat format = FrameworkFormat::Relaxed) const;
 
   cmMakefile* FindMakefile(const std::string& start_dir) const;
   cmLocalGenerator* FindLocalGenerator(cmDirectoryId const& id) const;
@@ -419,6 +514,11 @@ public:
   TargetDependSet const& GetTargetDirectDepends(
     const cmGeneratorTarget* target);
 
+  // Return true if target 'l' occurs before 'r' in a global ordering
+  // of targets that respects inter-target dependencies.
+  bool TargetOrderIndexLess(cmGeneratorTarget const* l,
+                            cmGeneratorTarget const* r) const;
+
   const std::map<std::string, std::vector<cmLocalGenerator*>>& GetProjectMap()
     const
   {
@@ -450,10 +550,13 @@ public:
 
   virtual bool IsNinja() const { return false; }
 
-  /** Return true if we know the exact location of object files.
-      If false, store the reason in the given string.
-      This is meaningful only after EnableLanguage has been called.  */
-  virtual bool HasKnownObjectFileLocation(std::string*) const { return true; }
+  /** Return true if we know the exact location of object files for the given
+     cmTarget. If false, store the reason in the given string. This is
+     meaningful only after EnableLanguage has been called.  */
+  virtual bool HasKnownObjectFileLocation(cmTarget const&, std::string*) const
+  {
+    return true;
+  }
 
   virtual bool UseFolderProperty() const;
 
@@ -476,6 +579,8 @@ public:
   {
     return cm::nullopt;
   }
+
+  virtual bool SupportsLinkerDependencyFile() const { return false; }
 
   std::string GetSharedLibFlagsForLanguage(std::string const& lang) const;
 
@@ -523,7 +628,7 @@ public:
 
   std::string MakeSilentFlag;
 
-  int RecursionDepth;
+  size_t RecursionDepth = 0;
 
   virtual void GetQtAutoGenConfigs(std::vector<std::string>& configs) const
   {
@@ -538,6 +643,15 @@ public:
 
   cmInstallRuntimeDependencySet* GetNamedRuntimeDependencySet(
     const std::string& name);
+
+  enum class StripCommandStyle
+  {
+    Default,
+    Apple,
+  };
+  StripCommandStyle GetStripCommandStyle(std::string const& strip);
+
+  virtual std::string& EncodeLiteral(std::string& lit) { return lit; }
 
 protected:
   // for a project collect all its targets by following depend
@@ -560,10 +674,11 @@ protected:
 
   virtual bool CheckALLOW_DUPLICATE_CUSTOM_TARGETS() const;
 
-  /// @brief Qt AUTOMOC/UIC/RCC target generation
-  /// @return true on success
-  bool QtAutoGen();
+  bool DiscoverSyntheticTargets();
 
+  bool AddHeaderSetVerification();
+
+  void CreateFileGenerateOutputs();
   bool AddAutomaticSources();
 
   std::string SelectMakeProgram(const std::string& makeProgram,
@@ -608,6 +723,11 @@ protected:
   cmake* CMakeInstance;
   std::vector<std::unique_ptr<cmMakefile>> Makefiles;
   LocalGeneratorVector LocalGenerators;
+
+#ifndef CMAKE_BOOTSTRAP
+  std::unique_ptr<cmQtAutoGenGlobalInitializer> QtAutoGen;
+#endif
+
   cmMakefile* CurrentConfigureMakefile;
   // map from project name to vector of local generators in that project
   std::map<std::string, std::vector<cmLocalGenerator*>> ProjectMap;
@@ -665,6 +785,10 @@ private:
   std::map<std::string, int> LanguageToLinkerPreference;
   std::map<std::string, std::string> LanguageToOriginalSharedLibFlags;
 
+#ifdef __APPLE__
+  std::map<std::string, StripCommandStyle> StripCommandStyleMap;
+#endif
+
   // Deferral id generation.
   size_t NextDeferId = 0;
 
@@ -680,10 +804,11 @@ private:
 
   void WriteSummary();
   void WriteSummary(cmGeneratorTarget* target);
-  void FinalizeTargetCompileInfo();
+  void FinalizeTargetConfiguration();
 
   virtual void ForceLinkerLanguages();
 
+  void CheckTargetLinkLibraries() const;
   bool CheckTargetsForMissingSources() const;
   bool CheckTargetsForType() const;
   bool CheckTargetsForPchCompilePdb() const;

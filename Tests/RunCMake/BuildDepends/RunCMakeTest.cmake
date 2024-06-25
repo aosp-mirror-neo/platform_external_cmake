@@ -60,13 +60,16 @@ set(run_BuildDepends_skip_step_3 1)
 
 run_BuildDepends(C-Exe)
 if(NOT RunCMake_GENERATOR STREQUAL "Xcode")
-  if(RunCMake_GENERATOR MATCHES "Visual Studio 10" OR
-      RunCMake_GENERATOR_TOOLSET MATCHES "^(v80|v90|v100)$")
+  if(RunCMake_GENERATOR_TOOLSET MATCHES "^(v80|v90|v100)$")
     # VS 10 forgets to re-link when a manifest changes
     set(run_BuildDepends_skip_step_2 1)
   endif()
   run_BuildDepends(C-Exe-Manifest)
   unset(run_BuildDepends_skip_step_2)
+endif()
+
+if(CMake_TEST_Fortran)
+  run_BuildDepends(FortranInclude)
 endif()
 
 run_BuildDepends(Custom-Symbolic-and-Byproduct)
@@ -159,6 +162,7 @@ endif()
 
 if ((RunCMake_GENERATOR STREQUAL "Unix Makefiles"
       AND (CMAKE_C_COMPILER_ID STREQUAL "GNU"
+        OR CMAKE_C_COMPILER_ID STREQUAL "LCC"
         OR CMAKE_C_COMPILER_ID STREQUAL "Clang"
         OR CMAKE_C_COMPILER_ID STREQUAL "AppleClang"))
     OR (RunCMake_GENERATOR STREQUAL "NMake Makefiles"
@@ -194,3 +198,15 @@ if(RunCMake_GENERATOR MATCHES "^Visual Studio 9 " OR
 endif()
 run_BuildDepends(CustomCommandUnityBuild)
 unset(run_BuildDepends_skip_step_2)
+
+if (RunCMake_GENERATOR MATCHES "Make|Ninja")
+  set(run_BuildDepends_skip_step_2 1)
+  run_BuildDepends(LinkDependsCheck)
+  include("${RunCMake_BINARY_DIR}/LinkDependsCheck-build/LinkDependsUseLinker.cmake")
+  if ((NOT DEFINED CMAKE_LINK_DEPENDS_USE_LINKER OR CMAKE_LINK_DEPENDS_USE_LINKER)
+      AND CMAKE_C_LINK_DEPENDS_USE_LINKER)
+    run_BuildDepends(LinkDependsExternalLibrary)
+    unset(run_BuildDepends_skip_step_2)
+    run_BuildDepends(LinkDepends)
+  endif()
+endif()

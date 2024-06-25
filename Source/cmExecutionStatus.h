@@ -5,6 +5,9 @@
 #include <cmConfigure.h> // IWYU pragma: keep
 
 #include <string>
+#include <vector>
+
+#include <cm/optional>
 
 class cmMakefile;
 
@@ -27,8 +30,21 @@ public:
   void SetError(std::string const& e) { this->Error = e; }
   std::string const& GetError() const { return this->Error; }
 
-  void SetReturnInvoked() { this->ReturnInvoked = true; }
+  void SetReturnInvoked()
+  {
+    this->Variables.clear();
+    this->ReturnInvoked = true;
+  }
+  void SetReturnInvoked(std::vector<std::string> variables)
+  {
+    this->Variables = std::move(variables);
+    this->ReturnInvoked = true;
+  }
   bool GetReturnInvoked() const { return this->ReturnInvoked; }
+  const std::vector<std::string>& GetReturnVariables() const
+  {
+    return this->Variables;
+  }
 
   void SetBreakInvoked() { this->BreakInvoked = true; }
   bool GetBreakInvoked() const { return this->BreakInvoked; }
@@ -39,6 +55,11 @@ public:
   void SetNestedError() { this->NestedError = true; }
   bool GetNestedError() const { return this->NestedError; }
 
+  void SetExitCode(int code) noexcept { this->ExitCode = code; }
+  bool HasExitCode() const noexcept { return this->ExitCode.has_value(); }
+  void CleanExitCode() noexcept { this->ExitCode.reset(); }
+  int GetExitCode() const noexcept { return this->ExitCode.value_or(-1); }
+
 private:
   cmMakefile& Makefile;
   std::string Error;
@@ -46,4 +67,6 @@ private:
   bool BreakInvoked = false;
   bool ContinueInvoked = false;
   bool NestedError = false;
+  cm::optional<int> ExitCode;
+  std::vector<std::string> Variables;
 };

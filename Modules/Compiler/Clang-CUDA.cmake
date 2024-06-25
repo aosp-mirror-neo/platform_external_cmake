@@ -18,8 +18,13 @@ __compiler_clang_cxx_standards(CUDA)
 
 set(CMAKE_CUDA_COMPILER_HAS_DEVICE_LINK_PHASE TRUE)
 set(_CMAKE_COMPILE_AS_CUDA_FLAG "-x cuda")
+set(_CMAKE_CUDA_WHOLE_FLAG "-c")
+set(_CMAKE_CUDA_RDC_FLAG "-fgpu-rdc")
 set(_CMAKE_CUDA_PTX_FLAG "--cuda-device-only -S")
-set(_CMAKE_CUDA_DEVICE_CODE "-fgpu-rdc -c")
+
+# Device linking is just regular linking so these are the same.
+set(CMAKE_CUDA_DEVICE_LINKER_WRAPPER_FLAG ${CMAKE_CUDA_LINKER_WRAPPER_FLAG})
+set(CMAKE_CUDA_DEVICE_LINKER_WRAPPER_FLAG_SEP ${CMAKE_CUDA_LINKER_WRAPPER_FLAG_SEP})
 
 # RulePlaceholderExpander expands crosscompile variables like sysroot and target only for CMAKE_<LANG>_COMPILER. Override the default.
 set(CMAKE_CUDA_LINK_EXECUTABLE "<CMAKE_CUDA_COMPILER> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>${__IMPLICIT_LINKS}")
@@ -29,6 +34,10 @@ set(CMAKE_CUDA_RUNTIME_LIBRARY_DEFAULT "STATIC")
 set(CMAKE_CUDA_RUNTIME_LIBRARY_LINK_OPTIONS_STATIC "cudadevrt;cudart_static")
 set(CMAKE_CUDA_RUNTIME_LIBRARY_LINK_OPTIONS_SHARED "cudadevrt;cudart")
 set(CMAKE_CUDA_RUNTIME_LIBRARY_LINK_OPTIONS_NONE   "")
+
+# Clang doesn't support CUDA device LTO
+set(_CMAKE_CUDA_IPO_SUPPORTED_BY_CMAKE NO)
+set(_CMAKE_CUDA_IPO_MAY_BE_SUPPORTED_BY_COMPILER NO)
 
 if(UNIX)
   list(APPEND CMAKE_CUDA_RUNTIME_LIBRARY_LINK_OPTIONS_STATIC "rt" "pthread" "dl")

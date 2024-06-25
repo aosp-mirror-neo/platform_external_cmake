@@ -24,6 +24,24 @@ add_library(toplib STATIC toplib.c)
 
 add_subdirectory(DepfileSubdir)
 
+set(TEST_SPACE 1)
+if(CMAKE_GENERATOR STREQUAL "Unix Makefiles")
+  execute_process(COMMAND "${CMAKE_MAKE_PROGRAM}" no_such_target --version RESULT_VARIABLE res OUTPUT_VARIABLE out ERROR_VARIABLE out)
+  if(NOT res EQUAL 0 OR NOT out MATCHES "GNU")
+    set(TEST_SPACE 0)
+  endif()
+endif()
+if(TEST_SPACE)
+  add_subdirectory(DepfileSubdirWithSpace)
+endif()
+
+add_custom_command(
+  OUTPUT toplib2.c
+  DEPFILE toplib2.c.d
+    COMMAND ${CMAKE_COMMAND} -DOUTFILE=toplib2.c -DINFILE=toplibdep2.txt -DDEPFILE=toplib2.c.d -P "${CMAKE_CURRENT_LIST_DIR}/WriteDepfile2.cmake"
+  )
+add_library(toplib2 STATIC toplib2.c)
+
 file(GENERATE OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/check-$<LOWER_CASE:$<CONFIG>>.cmake CONTENT "
 function(check_exists file)
   if(NOT EXISTS \"\${file}\")
@@ -43,6 +61,7 @@ set(check_pairs
   \"${CMAKE_BINARY_DIR}/topcc.c|${CMAKE_BINARY_DIR}/topccdep.txt\"
   \"$<TARGET_FILE:topexe>|${CMAKE_BINARY_DIR}/topexedep.txt\"
   \"$<TARGET_FILE:toplib>|${CMAKE_BINARY_DIR}/toplibdep.txt\"
+  \"$<TARGET_FILE:toplib2>|${CMAKE_BINARY_DIR}/toplibdep2.txt\"
   \"${CMAKE_BINARY_DIR}/DepfileSubdir/subcc.c|${CMAKE_BINARY_DIR}/DepfileSubdir/subccdep.txt\"
   \"$<TARGET_FILE:subexe>|${CMAKE_BINARY_DIR}/DepfileSubdir/subexedep.txt\"
   \"$<TARGET_FILE:sublib>|${CMAKE_BINARY_DIR}/DepfileSubdir/sublibdep.txt\"
@@ -53,6 +72,7 @@ if(check_step EQUAL 3)
     \"${CMAKE_BINARY_DIR}/step3.timestamp|${CMAKE_BINARY_DIR}/topcc.c\"
     \"${CMAKE_BINARY_DIR}/step3.timestamp|$<TARGET_FILE:topexe>\"
     \"${CMAKE_BINARY_DIR}/step3.timestamp|$<TARGET_FILE:toplib>\"
+    \"${CMAKE_BINARY_DIR}/step3.timestamp|$<TARGET_FILE:toplib2>\"
     \"${CMAKE_BINARY_DIR}/step3.timestamp|${CMAKE_BINARY_DIR}/DepfileSubdir/subcc.c\"
     \"${CMAKE_BINARY_DIR}/step3.timestamp|$<TARGET_FILE:subexe>\"
     \"${CMAKE_BINARY_DIR}/step3.timestamp|$<TARGET_FILE:sublib>\"

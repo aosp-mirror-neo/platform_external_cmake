@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <atomic>
 #include <cstddef>
+#include <limits>
 #include <map>
 #include <mutex>
 #include <set>
@@ -27,6 +28,7 @@
 #include "cmCryptoHash.h"
 #include "cmFileTime.h"
 #include "cmGccDepfileReader.h"
+#include "cmGccDepfileReaderTypes.h"
 #include "cmGeneratedFileStream.h"
 #include "cmQtAutoGen.h"
 #include "cmQtAutoGenerator.h"
@@ -169,8 +171,12 @@ public:
     // -- Attributes
     // - Config
     bool MultiConfig = false;
+    bool CrossConfig = false;
+    bool UseBetterGraph = false;
     IntegerVersion QtVersion = { 4, 0 };
     unsigned int ThreadCount = 0;
+    unsigned int MaxCommandLineLength =
+      std::numeric_limits<unsigned int>::max();
     // - Directories
     std::string AutogenBuildDir;
     std::string AutogenIncludeDir;
@@ -189,7 +195,7 @@ public:
   {
   public:
     // -- Parse Cache
-    std::atomic<bool> ParseCacheChanged = ATOMIC_VAR_INIT(false);
+    std::atomic<bool> ParseCacheChanged{ false };
     cmFileTime ParseCacheTime;
     ParseCacheT ParseCache;
 
@@ -331,6 +337,13 @@ public:
     void LogCommandError(GenT genType, cm::string_view message,
                          std::vector<std::string> const& command,
                          std::string const& output) const;
+
+    /*
+     * Check if command line exceeds maximum length supported by OS
+     * (if on Windows) and switch to using a response file instead.
+     */
+    void MaybeWriteResponseFile(std::string const& outputFile,
+                                std::vector<std::string>& cmd) const;
 
     /** @brief Run an external process. Use only during Process() call!  */
     bool RunProcess(GenT genType, cmWorkerPool::ProcessResultT& result,
@@ -578,7 +591,7 @@ private:
   std::string SettingsStringMoc_;
   std::string SettingsStringUic_;
   // -- Worker thread pool
-  std::atomic<bool> JobError_ = ATOMIC_VAR_INIT(false);
+  std::atomic<bool> JobError_{ false };
   cmWorkerPool WorkerPool_;
   // -- Concurrent processing
   mutable std::mutex CMakeLibMutex_;
@@ -790,6 +803,51 @@ void cmQtAutoMocUicT::JobT::LogCommandError(
   this->Gen()->Log().ErrorCommand(genType, message, command, output);
 }
 
+/*
+ * Check if command line exceeds maximum length supported by OS
+ * (if on Windows) and switch to using a response file instead.
+ */
+void cmQtAutoMocUicT::JobT::MaybeWriteResponseFile(
+  std::string const& outputFile, std::vector<std::string>& cmd) const
+{
+#ifdef _WIN32
+  // Ensure cmd is less than CommandLineLengthMax characters
+  size_t commandLineLength = cmd.size(); // account for separating spaces
+  for (std::string const& str : cmd) {
+    commandLineLength += str.length();
+  }
+  if (commandLineLength >= this->BaseConst().MaxCommandLineLength) {
+    // Command line exceeds maximum size allowed by OS
+    // => create response file
+    std::string const responseFile = cmStrCat(outputFile, ".rsp");
+
+    cmsys::ofstream fout(responseFile.c_str());
+    if (!fout) {
+      this->LogError(
+        GenT::MOC,
+        cmStrCat("AUTOMOC was unable to create a response file at\n  ",
+                 this->MessagePath(responseFile)));
+      return;
+    }
+
+    auto it = cmd.begin();
+    while (++it != cmd.end()) {
+      fout << *it << "\n";
+    }
+    fout.close();
+
+    // Keep all but executable
+    cmd.resize(1);
+
+    // Specify response file
+    cmd.emplace_back(cmStrCat('@', responseFile));
+  }
+#else
+  static_cast<void>(outputFile);
+  static_cast<void>(cmd);
+#endif
+}
+
 bool cmQtAutoMocUicT::JobT::RunProcess(GenT genType,
                                        cmWorkerPool::ProcessResultT& result,
                                        std::vector<std::string> const& command,
@@ -831,6 +889,8 @@ void cmQtAutoMocUicT::JobMocPredefsT::Process()
       cm::append(cmd, this->MocConst().OptionsDefinitions);
       // Add includes
       cm::append(cmd, this->MocConst().OptionsIncludes);
+      // Check if response file is necessary
+      MaybeWriteResponseFile(this->MocConst().PredefsFileAbs, cmd);
       // Execute command
       if (!this->RunProcess(GenT::MOC, result, cmd, reason.get())) {
         this->LogCommandError(GenT::MOC,
@@ -1752,7 +1812,7 @@ bool cmQtAutoMocUicT::JobProbeDepsMocT::Probe(MappingT const& mapping,
   if (this->MocConst().SettingsChanged) {
     if (reason != nullptr) {
       *reason = cmStrCat("Generating ", this->MessagePath(outputFile),
-                         ", because the uic settings changed, from ",
+                         ", because the moc settings changed, from ",
                          this->MessagePath(sourceFile));
     }
     return true;
@@ -1977,6 +2037,9 @@ void cmQtAutoMocUicT::JobCompileMocT::Process()
   std::string const& sourceFile = this->Mapping->SourceFile->FileName;
   std::string const& outputFile = this->Mapping->OutputFile;
 
+  // Remove output file in case the case of the source file has changed
+  cmSystemTools::RemoveFile(outputFile);
+
   // Compose moc command
   std::vector<std::string> cmd;
   {
@@ -2025,6 +2088,8 @@ void cmQtAutoMocUicT::JobCompileMocT::Process()
     cmd.push_back(outputFile);
     // Add source file
     cmd.push_back(sourceFile);
+
+    MaybeWriteResponseFile(outputFile, cmd);
   }
 
   // Execute moc command
@@ -2116,6 +2181,8 @@ void cmQtAutoMocUicT::JobCompileUicT::Process()
 
 void cmQtAutoMocUicT::JobMocsCompilationT::Process()
 {
+  std::string const& compAbs = this->MocConst().CompFileAbs;
+
   // Compose mocs compilation file content
   std::string content =
     "// This file is autogenerated. Changes will be overwritten.\n";
@@ -2133,7 +2200,6 @@ void cmQtAutoMocUicT::JobMocsCompilationT::Process()
     content += cmWrap(wrapFront, this->MocEval().CompFiles, wrapBack, "");
   }
 
-  std::string const& compAbs = this->MocConst().CompFileAbs;
   if (cmQtAutoGenerator::FileDiffers(compAbs, content)) {
     // Actually write mocs compilation file
     if (this->Log().Verbose()) {
@@ -2217,10 +2283,9 @@ cmQtAutoMocUicT::JobDepFilesMergeT::initialDependencies() const
 void cmQtAutoMocUicT::JobDepFilesMergeT::Process()
 {
   if (this->Log().Verbose()) {
-    this->Log().Info(
-      GenT::MOC,
-      cmStrCat("Merging MOC dependencies into ",
-               this->MessagePath(this->BaseConst().DepFile.c_str())));
+    this->Log().Info(GenT::MOC,
+                     cmStrCat("Merging MOC dependencies into ",
+                              this->MessagePath(this->BaseConst().DepFile)));
   }
   auto processDepFile =
     [this](const std::string& mocOutputFile) -> std::vector<std::string> {
@@ -2317,11 +2382,18 @@ bool cmQtAutoMocUicT::InitFromInfo(InfoT const& info)
 {
   // -- Required settings
   if (!info.GetBool("MULTI_CONFIG", this->BaseConst_.MultiConfig, true) ||
+      !info.GetBool("CROSS_CONFIG", this->BaseConst_.CrossConfig, true) ||
+      !info.GetBool("USE_BETTER_GRAPH", this->BaseConst_.UseBetterGraph,
+                    true) ||
       !info.GetUInt("QT_VERSION_MAJOR", this->BaseConst_.QtVersion.Major,
                     true) ||
       !info.GetUInt("QT_VERSION_MINOR", this->BaseConst_.QtVersion.Minor,
                     true) ||
       !info.GetUInt("PARALLEL", this->BaseConst_.ThreadCount, false) ||
+#ifdef _WIN32
+      !info.GetUInt("AUTOGEN_COMMAND_LINE_LENGTH_MAX",
+                    this->BaseConst_.MaxCommandLineLength, false) ||
+#endif
       !info.GetString("BUILD_DIR", this->BaseConst_.AutogenBuildDir, true) ||
       !info.GetStringConfig("INCLUDE_DIR", this->BaseConst_.AutogenIncludeDir,
                             true) ||
@@ -2329,18 +2401,48 @@ bool cmQtAutoMocUicT::InitFromInfo(InfoT const& info)
                       true) ||
       !info.GetStringConfig("PARSE_CACHE_FILE",
                             this->BaseConst_.ParseCacheFile, true) ||
-      !info.GetString("DEP_FILE", this->BaseConst_.DepFile, false) ||
-      !info.GetString("DEP_FILE_RULE_NAME", this->BaseConst_.DepFileRuleName,
-                      false) ||
       !info.GetStringConfig("SETTINGS_FILE", this->SettingsFile_, true) ||
       !info.GetArray("CMAKE_LIST_FILES", this->BaseConst_.ListFiles, true) ||
       !info.GetArray("HEADER_EXTENSIONS", this->BaseConst_.HeaderExtensions,
-                     true) ||
-      !info.GetString("QT_MOC_EXECUTABLE", this->MocConst_.Executable,
-                      false) ||
-      !info.GetString("QT_UIC_EXECUTABLE", this->UicConst_.Executable,
-                      false)) {
+                     true)) {
     return false;
+  }
+  if (this->BaseConst().UseBetterGraph) {
+    if (!info.GetStringConfig("DEP_FILE", this->BaseConst_.DepFile, false) ||
+        !info.GetStringConfig("DEP_FILE_RULE_NAME",
+                              this->BaseConst_.DepFileRuleName, false)) {
+      return false;
+    }
+
+    if (this->BaseConst_.CrossConfig) {
+      std::string const mocExecutableWithConfig =
+        "QT_MOC_EXECUTABLE_" + this->ExecutableConfig();
+      std::string const uicExecutableWithConfig =
+        "QT_UIC_EXECUTABLE_" + this->ExecutableConfig();
+      if (!info.GetString(mocExecutableWithConfig, this->MocConst_.Executable,
+                          false) ||
+          !info.GetString(uicExecutableWithConfig, this->UicConst_.Executable,
+                          false)) {
+        return false;
+      }
+    } else {
+      if (!info.GetStringConfig("QT_MOC_EXECUTABLE",
+                                this->MocConst_.Executable, false) ||
+          !info.GetStringConfig("QT_UIC_EXECUTABLE",
+                                this->UicConst_.Executable, false)) {
+        return false;
+      }
+    }
+  } else {
+    if (!info.GetString("QT_MOC_EXECUTABLE", this->MocConst_.Executable,
+                        false) ||
+        !info.GetString("QT_UIC_EXECUTABLE", this->UicConst_.Executable,
+                        false) ||
+        !info.GetString("DEP_FILE", this->BaseConst_.DepFile, false) ||
+        !info.GetString("DEP_FILE_RULE_NAME", this->BaseConst_.DepFileRuleName,
+                        false)) {
+      return false;
+    }
   }
 
   // -- Checks
@@ -2731,7 +2833,7 @@ void cmQtAutoMocUicT::CreateParseJobs(SourceFileMapT const& sourceMap)
 std::string cmQtAutoMocUicT::CollapseFullPathTS(std::string const& path) const
 {
   std::lock_guard<std::mutex> guard(this->CMakeLibMutex_);
-#if defined(__NVCOMPILER)
+#if defined(__NVCOMPILER) || defined(__LCC__)
   static_cast<void>(guard); // convince compiler var is used
 #endif
   return cmSystemTools::CollapseFullPath(path,
@@ -2973,7 +3075,7 @@ std::vector<std::string> cmQtAutoMocUicT::dependenciesFromDepFile(
   const char* filePath)
 {
   std::lock_guard<std::mutex> guard(this->CMakeLibMutex_);
-#if defined(__NVCOMPILER)
+#if defined(__NVCOMPILER) || defined(__LCC__)
   static_cast<void>(guard); // convince compiler var is used
 #endif
   auto const content = cmReadGccDepfile(filePath);
@@ -3008,7 +3110,8 @@ std::string cmQtAutoMocUicT::AbsoluteIncludePath(
 
 } // End of unnamed namespace
 
-bool cmQtAutoMocUic(cm::string_view infoFile, cm::string_view config)
+bool cmQtAutoMocUic(cm::string_view infoFile, cm::string_view config,
+                    cm::string_view executableConfig)
 {
-  return cmQtAutoMocUicT().Run(infoFile, config);
+  return cmQtAutoMocUicT().Run(infoFile, config, executableConfig);
 }

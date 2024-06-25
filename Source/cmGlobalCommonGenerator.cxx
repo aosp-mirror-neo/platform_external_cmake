@@ -2,10 +2,13 @@
    file Copyright.txt or https://cmake.org/licensing for details.  */
 #include "cmGlobalCommonGenerator.h"
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
 #include <cmext/algorithm>
+
+#include <cmsys/Glob.hxx>
 
 #include "cmGeneratorExpression.h"
 #include "cmGeneratorTarget.h"
@@ -14,6 +17,7 @@
 #include "cmStateDirectory.h"
 #include "cmStateSnapshot.h"
 #include "cmStateTypes.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 #include "cmValue.h"
 #include "cmake.h"
@@ -30,8 +34,8 @@ cmGlobalCommonGenerator::ComputeDirectoryTargets() const
 {
   std::map<std::string, DirectoryTarget> dirTargets;
   for (const auto& lg : this->LocalGenerators) {
-    std::string const& currentBinaryDir(
-      lg->GetStateSnapshot().GetDirectory().GetCurrentBinary());
+    std::string currentBinaryDir =
+      lg->GetStateSnapshot().GetDirectory().GetCurrentBinary();
     DirectoryTarget& dirTarget = dirTargets[currentBinaryDir];
     dirTarget.LG = lg.get();
     const std::vector<std::string>& configs =
@@ -64,7 +68,7 @@ cmGlobalCommonGenerator::ComputeDirectoryTargets() const
           for (cmStateSnapshot dir =
                  lg->GetStateSnapshot().GetBuildsystemDirectoryParent();
                dir.IsValid(); dir = dir.GetBuildsystemDirectoryParent()) {
-            std::string const& d = dir.GetDirectory().GetCurrentBinary();
+            std::string d = dir.GetDirectory().GetCurrentBinary();
             dirTargets[d].Targets.emplace_back(t);
           }
         }
@@ -123,4 +127,24 @@ std::string cmGlobalCommonGenerator::GetEditCacheCommand() const
   }
   cmValue edit_cmd = cm->GetCacheDefinition("CMAKE_EDIT_COMMAND");
   return edit_cmd ? *edit_cmd : std::string();
+}
+
+void cmGlobalCommonGenerator::RemoveUnknownClangTidyExportFixesFiles() const
+{
+  for (auto const& dir : this->ClangTidyExportFixesDirs) {
+    cmsys::Glob g;
+    g.SetRecurse(true);
+    g.SetListDirs(false);
+    g.FindFiles(cmStrCat(dir, "/*.yaml"));
+    for (auto const& file : g.GetFiles()) {
+      if (!this->ClangTidyExportFixesFiles.count(file) &&
+          !std::any_of(this->ClangTidyExportFixesFiles.begin(),
+                       this->ClangTidyExportFixesFiles.end(),
+                       [&file](const std::string& knownFile) -> bool {
+                         return cmSystemTools::SameFile(file, knownFile);
+                       })) {
+        cmSystemTools::RemoveFile(file);
+      }
+    }
+  }
 }

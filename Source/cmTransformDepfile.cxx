@@ -4,9 +4,7 @@
 
 #include <algorithm>
 #include <functional>
-#include <memory>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -18,6 +16,9 @@
 #include "cmGccDepfileReaderTypes.h"
 #include "cmGlobalGenerator.h"
 #include "cmLocalGenerator.h"
+#include "cmMakefile.h"
+#include "cmMessageType.h"
+#include "cmStringAlgorithms.h"
 #include "cmSystemTools.h"
 
 namespace {
@@ -90,19 +91,23 @@ void WriteMSBuildAdditionalInputs(cmsys::ofstream& fout,
   }
 
   // Write a UTF-8 BOM so MSBuild knows the encoding when reading the file.
-  static const char utf8bom[] = { char(0xEF), char(0xBB), char(0xBF) };
+  static const char utf8bom[] = { static_cast<char>(0xEF),
+                                  static_cast<char>(0xBB),
+                                  static_cast<char>(0xBF) };
   fout.write(utf8bom, sizeof(utf8bom));
 
   // Write the format expected by MSBuild CustomBuild AdditionalInputs.
   const char* sep = "";
-  for (std::string path : content.front().paths) {
-    if (!cmSystemTools::FileIsFullPath(path)) {
-      path =
-        cmSystemTools::CollapseFullPath(path, lg.GetCurrentBinaryDirectory());
+  for (const auto& c : content) {
+    for (std::string path : c.paths) {
+      if (!cmSystemTools::FileIsFullPath(path)) {
+        path = cmSystemTools::CollapseFullPath(path,
+                                               lg.GetCurrentBinaryDirectory());
+      }
+      std::replace(path.begin(), path.end(), '/', '\\');
+      fout << sep << path;
+      sep = ";";
     }
-    std::replace(path.begin(), path.end(), '/', '\\');
-    fout << sep << path;
-    sep = ";";
   }
   fout << "\n";
 }
@@ -119,6 +124,10 @@ bool cmTransformDepfile(cmDepfileFormat format, const cmLocalGenerator& lg,
       return false;
     }
     content = *std::move(result);
+  } else {
+    lg.GetMakefile()->IssueMessage(
+      MessageType::WARNING,
+      cmStrCat("Expected depfile does not exist.\n  ", infile));
   }
 
   cmSystemTools::MakeDirectory(cmSystemTools::GetFilenamePath(outfile));

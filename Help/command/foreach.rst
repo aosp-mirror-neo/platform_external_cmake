@@ -74,8 +74,7 @@ processed:
       message(STATUS "X=${X}")
   endforeach()
 
-yields
-::
+yields::
 
   -- X=0
   -- X=1
@@ -119,8 +118,7 @@ iteration variables as follows:
       message(STATUS "en=${en}, ba=${ba}")
   endforeach()
 
-yields
-::
+yields::
 
   -- num_0=one, num_1=satu
   -- num_0=two, num_1=dua
@@ -130,3 +128,11 @@ yields
   -- en=two, ba=dua
   -- en=three, ba=tiga
   -- en=four, ba=
+
+See Also
+^^^^^^^^
+
+* :command:`break`
+* :command:`continue`
+* :command:`endforeach`
+* :command:`while`

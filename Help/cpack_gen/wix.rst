@@ -111,7 +111,7 @@ Windows using WiX.
  simply provide the name of the culture.  If you specify more than one
  culture identifier in a comma or semicolon delimited list, the first one
  that is found will be used.  You can find a list of supported languages at:
- http://wix.sourceforge.net/manual-wix3/WixUI_localization.htm
+ https://wixtoolset.org/docs/v3/wixui/wixui_localization/
 
 .. variable:: CPACK_WIX_TEMPLATE
 
@@ -119,7 +119,8 @@ Windows using WiX.
 
  If this variable is set, the specified template will be used to generate
  the WiX wxs file.  This should be used if further customization of the
- output is required.
+ output is required. The template contents will override the effect of most
+ ``CPACK_WIX_`` variables.
 
  If this variable is not set, the default MSI template included with CMake
  will be used.
@@ -319,4 +320,60 @@ Windows using WiX.
  for using WiX extensions. Each declaration should be in the form name=url, where
  name is the plain namespace without the usual xmlns: prefix and url is an unquoted
  namespace url. A list of commonly known WiX schemata can be found here:
- https://wixtoolset.org/documentation/manual/v3/xsd/
+ https://wixtoolset.org/docs/v3/xsd/
+
+.. variable:: CPACK_WIX_SKIP_WIX_UI_EXTENSION
+
+ .. versionadded:: 3.23
+
+ If this variable is set then the inclusion of WixUIExtensions is skipped,
+ i.e. the ``-ext "WixUIExtension"`` command line is not included during
+ the execution of the WiX light tool.
+
+.. variable:: CPACK_WIX_ARCHITECTURE
+
+ .. versionadded:: 3.24
+
+ This variable can be optionally set to specify the target architecture
+ of the installer. May for example be set to ``x64`` or ``arm64``.
+
+ When unspecified, CPack will default to ``x64`` or ``x86``.
+
+.. variable:: CPACK_WIX_INSTALL_SCOPE
+
+ .. versionadded:: 3.29
+
+ This variable can be optionally set to specify the ``InstallScope``
+ of the installer:
+
+ ``perMachine``
+   Create an installer that installs for all users and requires
+   administrative privileges.  Start menu entries created by the
+   installer are visible to all users.
+
+ ``perUser``
+   Not yet supported. This is reserved for future use.
+
+ ``NONE``
+   Create an installer without any ``InstallScope`` attribute.
+
+   This is the default to preserve compatibility with CPack 3.28 and older.
+
+   .. deprecated:: 3.29
+
+     This value is only for compatibility with the inconsistent behavior used
+     by CPack 3.28 and older.  The resulting installer requires administrative
+     privileges and installs into the system-wide ``ProgramFiles`` directory,
+     but the start menu entry and uninstaller registration are created only
+     for the current user.
+
+   .. warning::
+
+     An installation performed by an installer created without any
+     ``InstallScope`` cannot be cleanly updated or replaced by an
+     installer with an ``InstallScope``.  In order to transition
+     a project's installers from ``NONE`` to ``perMachine``, the
+     latter installer should be distributed with instructions to
+     first manually uninstall any older version.
+
+ See https://wixtoolset.org/docs/v3/xsd/wix/package/

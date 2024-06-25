@@ -7,10 +7,9 @@
 #include <vector>
 
 #include "cmInstallGenerator.h"
-#include "cmListFileCache.h"
-#include "cmScriptGenerator.h"
 
 class cmInstallRuntimeDependencySet;
+class cmListFileBacktrace;
 class cmLocalGenerator;
 
 class cmInstallRuntimeDependencySetGenerator : public cmInstallGenerator

@@ -102,10 +102,25 @@ static void uv__init_global_job_handle(void) {
                                &info,
                                sizeof info))
     uv_fatal_error(GetLastError(), "SetInformationJobObject");
+
+
+  if (!AssignProcessToJobObject(uv_global_job_handle_, GetCurrentProcess())) {
+    /* Make sure this handle is functional. The Windows kernel has a bug that
+     * if the first use of AssignProcessToJobObject is for a Windows Store
+     * program, subsequent attempts to use the handle with fail with
+     * INVALID_PARAMETER (87). This is possibly because all uses of the handle
+     * must be for the same Terminal Services session. We can ensure it is tied
+     * to our current session now by adding ourself to it. We could remove
+     * ourself afterwards, but there doesn't seem to be a reason to.
+     */
+    DWORD err = GetLastError();
+    if (err != ERROR_ACCESS_DENIED)
+      uv_fatal_error(err, "AssignProcessToJobObject");
+  }
 }
 
 
-static int uv_utf8_to_utf16_alloc(const char* s, WCHAR** ws_ptr) {
+static int uv__utf8_to_utf16_alloc(const char* s, WCHAR** ws_ptr) {
   int ws_len, r;
   WCHAR* ws;
 
@@ -137,7 +152,7 @@ static int uv_utf8_to_utf16_alloc(const char* s, WCHAR** ws_ptr) {
 }
 
 
-static void uv_process_init(uv_loop_t* loop, uv_process_t* handle) {
+static void uv__process_init(uv_loop_t* loop, uv_process_t* handle) {
   uv__handle_init(loop, (uv_handle_t*) handle, UV_PROCESS);
   handle->exit_cb = NULL;
   handle->pid = 0;
@@ -169,10 +184,9 @@ static WCHAR* search_path_join_test(const WCHAR* dir,
                                     size_t cwd_len) {
   WCHAR *result, *result_pos;
   DWORD attrs;
-  if (
-    (dir_len > 2 && dir[0] == L'\\' && dir[1] == L'\\') ||
-    (dir_len > 2 && dir[0] == L'/' && dir[1] == L'/') 
-   ) {
+  if (dir_len > 2 &&
+      ((dir[0] == L'\\' || dir[0] == L'/') &&
+       (dir[1] == L'\\' || dir[1] == L'/'))) {
     /* It's a UNC path so ignore cwd */
     cwd_len = 0;
   } else if (dir_len >= 1 && (dir[0] == L'/' || dir[0] == L'\\')) {
@@ -315,8 +329,9 @@ static WCHAR* path_search_walk_ext(const WCHAR *dir,
  * - If there's really only a filename, check the current directory for file,
  *   then search all path directories.
  *
- * - If filename specified has *any* extension, search for the file with the
- *   specified extension first.
+ * - If filename specified has *any* extension, or already contains a path
+ *   and the UV_PROCESS_WINDOWS_FILE_PATH_EXACT_NAME flag is specified,
+ *   search for the file with the exact specified filename first.
  *
  * - If the literal filename is not found in a directory, try *appending*
  *   (not replacing) .com first and then .exe.
@@ -342,7 +357,8 @@ static WCHAR* path_search_walk_ext(const WCHAR *dir,
  */
 static WCHAR* search_path(const WCHAR *file,
                             WCHAR *cwd,
-                            const WCHAR *path) {
+                            const WCHAR *path,
+                            unsigned int flags) {
   int file_has_dir;
   WCHAR* result = NULL;
   WCHAR *file_name_start;
@@ -383,19 +399,21 @@ static WCHAR* search_path(const WCHAR *file,
         file, file_name_start - file,
         file_name_start, file_len - (file_name_start - file),
         cwd, cwd_len,
-        name_has_ext);
+        name_has_ext || (flags & UV_PROCESS_WINDOWS_FILE_PATH_EXACT_NAME));
 
   } else {
     dir_end = path;
 
-    /* The file is really only a name; look in cwd first, then scan path */
-    result = path_search_walk_ext(L"", 0,
-                                  file, file_len,
-                                  cwd, cwd_len,
-                                  name_has_ext);
+    if (NeedCurrentDirectoryForExePathW(L"")) {
+      /* The file is really only a name; look in cwd first, then scan path */
+      result = path_search_walk_ext(L"", 0,
+                                    file, file_len,
+                                    cwd, cwd_len,
+                                    name_has_ext);
+    }
 
     while (result == NULL) {
-      if (*dir_end == L'\0') {
+      if (dir_end == NULL || *dir_end == L'\0') {
         break;
       }
 
@@ -645,7 +663,7 @@ int env_strncmp(const wchar_t* a, int na, const wchar_t* b) {
   assert(r==nb);
   B[nb] = L'\0';
 
-  while (1) {
+  for (;;) {
     wchar_t AA = *A++;
     wchar_t BB = *B++;
     if (AA < BB) {
@@ -865,7 +883,7 @@ static void CALLBACK exit_wait_callback(void* data, BOOLEAN didTimeout) {
 
 
 /* Called on main thread after a child process has exited. */
-void uv_process_proc_exit(uv_loop_t* loop, uv_process_t* handle) {
+void uv__process_proc_exit(uv_loop_t* loop, uv_process_t* handle) {
   int64_t exit_code;
   DWORD status;
 
@@ -875,7 +893,7 @@ void uv_process_proc_exit(uv_loop_t* loop, uv_process_t* handle) {
   /* If we're closing, don't call the exit callback. Just schedule a close
    * callback now. */
   if (handle->flags & UV_HANDLE_CLOSING) {
-    uv_want_endgame(loop, (uv_handle_t*) handle);
+    uv__want_endgame(loop, (uv_handle_t*) handle);
     return;
   }
 
@@ -903,7 +921,7 @@ void uv_process_proc_exit(uv_loop_t* loop, uv_process_t* handle) {
 }
 
 
-void uv_process_close(uv_loop_t* loop, uv_process_t* handle) {
+void uv__process_close(uv_loop_t* loop, uv_process_t* handle) {
   uv__handle_closing(handle);
 
   if (handle->wait_handle != INVALID_HANDLE_VALUE) {
@@ -919,12 +937,12 @@ void uv_process_close(uv_loop_t* loop, uv_process_t* handle) {
   }
 
   if (!handle->exit_cb_pending) {
-    uv_want_endgame(loop, (uv_handle_t*)handle);
+    uv__want_endgame(loop, (uv_handle_t*)handle);
   }
 }
 
 
-void uv_process_endgame(uv_loop_t* loop, uv_process_t* handle) {
+void uv__process_endgame(uv_loop_t* loop, uv_process_t* handle) {
   assert(!handle->exit_cb_pending);
   assert(handle->flags & UV_HANDLE_CLOSING);
   assert(!(handle->flags & UV_HANDLE_CLOSED));
@@ -949,7 +967,7 @@ int uv_spawn(uv_loop_t* loop,
   PROCESS_INFORMATION info;
   DWORD process_flags;
 
-  uv_process_init(loop, process);
+  uv__process_init(loop, process);
   process->exit_cb = options->exit_cb;
 
   if (options->flags & (UV_PROCESS_SETGID | UV_PROCESS_SETUID)) {
@@ -971,12 +989,13 @@ int uv_spawn(uv_loop_t* loop,
   assert(!(options->flags & ~(UV_PROCESS_DETACHED |
                               UV_PROCESS_SETGID |
                               UV_PROCESS_SETUID |
+                              UV_PROCESS_WINDOWS_FILE_PATH_EXACT_NAME |
                               UV_PROCESS_WINDOWS_HIDE |
                               UV_PROCESS_WINDOWS_HIDE_CONSOLE |
                               UV_PROCESS_WINDOWS_HIDE_GUI |
                               UV_PROCESS_WINDOWS_VERBATIM_ARGUMENTS)));
 
-  err = uv_utf8_to_utf16_alloc(options->file, &application);
+  err = uv__utf8_to_utf16_alloc(options->file, &application);
   if (err)
     goto done;
 
@@ -995,7 +1014,7 @@ int uv_spawn(uv_loop_t* loop,
 
   if (options->cwd) {
     /* Explicit cwd */
-    err = uv_utf8_to_utf16_alloc(options->cwd, &cwd);
+    err = uv__utf8_to_utf16_alloc(options->cwd, &cwd);
     if (err)
       goto done;
 
@@ -1028,22 +1047,19 @@ int uv_spawn(uv_loop_t* loop,
     DWORD path_len, r;
 
     path_len = GetEnvironmentVariableW(L"PATH", NULL, 0);
-    if (path_len == 0) {
-      err = GetLastError();
-      goto done;
-    }
+    if (path_len != 0) {
+      alloc_path = (WCHAR*) uv__malloc(path_len * sizeof(WCHAR));
+      if (alloc_path == NULL) {
+        err = ERROR_OUTOFMEMORY;
+        goto done;
+      }
+      path = alloc_path;
 
-    alloc_path = (WCHAR*) uv__malloc(path_len * sizeof(WCHAR));
-    if (alloc_path == NULL) {
-      err = ERROR_OUTOFMEMORY;
-      goto done;
-    }
-    path = alloc_path;
-
-    r = GetEnvironmentVariableW(L"PATH", path, path_len);
-    if (r == 0 || r >= path_len) {
-      err = GetLastError();
-      goto done;
+      r = GetEnvironmentVariableW(L"PATH", path, path_len);
+      if (r == 0 || r >= path_len) {
+        err = GetLastError();
+        goto done;
+      }
     }
   }
 
@@ -1053,7 +1069,8 @@ int uv_spawn(uv_loop_t* loop,
 
   application_path = search_path(application,
                                  cwd,
-                                 path);
+                                 path,
+                                 options->flags);
   if (application_path == NULL) {
     /* Not found. */
     err = ERROR_FILE_NOT_FOUND;
@@ -1066,8 +1083,15 @@ int uv_spawn(uv_loop_t* loop,
   startup.lpTitle = NULL;
   startup.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 
+#if 1
+  /* cmake does not need libuv's support for passing file descriptors >= 3
+     to the MSVC C run-time in the child.  Avoid using reserved members.  */
+  startup.cbReserved2 = 0;
+  startup.lpReserved2 = NULL;
+#else
   startup.cbReserved2 = uv__stdio_size(process->child_stdio_buffer);
   startup.lpReserved2 = (BYTE*) process->child_stdio_buffer;
+#endif
 
   startup.hStdInput = uv__stdio_handle(process->child_stdio_buffer, 0);
   startup.hStdOutput = uv__stdio_handle(process->child_stdio_buffer, 1);
@@ -1105,6 +1129,7 @@ int uv_spawn(uv_loop_t* loop,
      * breakaway.
      */
     process_flags |= DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP;
+    process_flags |= CREATE_SUSPENDED;
   }
 
   if (options->cpumask != NULL) {
@@ -1163,19 +1188,7 @@ int uv_spawn(uv_loop_t* loop,
       TerminateProcess(info.hProcess, 1);
       goto done;
     }
-
-    /* The process affinity of the child is set.  Let it run.  */
-    if (ResumeThread(info.hThread) == ((DWORD)-1)) {
-      err = GetLastError();
-      TerminateProcess(info.hProcess, 1);
-      goto done;
-    }
   }
-
-  /* Spawn succeeded. Beyond this point, failure is reported asynchronously. */
-
-  process->process_handle = info.hProcess;
-  process->pid = info.dwProcessId;
 
   /* If the process isn't spawned as detached, assign to the global job object
    * so windows will kill it when the parent process dies. */
@@ -1198,6 +1211,19 @@ int uv_spawn(uv_loop_t* loop,
         uv_fatal_error(err, "AssignProcessToJobObject");
     }
   }
+
+  if (process_flags & CREATE_SUSPENDED) {
+    if (ResumeThread(info.hThread) == ((DWORD)-1)) {
+      err = GetLastError();
+      TerminateProcess(info.hProcess, 1);
+      goto done;
+    }
+  }
+
+  /* Spawn succeeded. Beyond this point, failure is reported asynchronously. */
+
+  process->process_handle = info.hProcess;
+  process->pid = info.dwProcessId;
 
   /* Set IPC pid to all IPC pipes. */
   for (i = 0; i < options->stdio_count; i++) {

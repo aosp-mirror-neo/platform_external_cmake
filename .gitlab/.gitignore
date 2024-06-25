@@ -1,0 +1,24 @@
+# Ignore files known to be downloaded by CI jobs.
+/5.15.1-0-202009071110*
+/bcc*
+/cmake*
+/intel
+/ispc*
+/innosetup
+/jom
+/llvm*
+/mingw
+/msvc*
+/ninja*
+/openmp
+/open-watcom*
+/orangec
+/python*
+/qt*
+/sccache*
+/ticlang
+/unstable-jom*
+/watcom
+/wix*
+/clang-tidy-fixes
+/num_warnings.txt

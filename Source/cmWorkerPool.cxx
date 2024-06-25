@@ -18,7 +18,6 @@
 #include "cmRange.h"
 #include "cmStringAlgorithms.h"
 #include "cmUVHandlePtr.h"
-#include "cmUVSignalHackRAII.h" // IWYU pragma: keep
 
 /**
  * @brief libuv pipe buffer class
@@ -309,7 +308,7 @@ void cmUVReadOnlyProcess::UVExit(uv_process_t* handle, int64_t exitStatus,
     // Set error message on demand
     proc.Result()->ExitStatus = exitStatus;
     proc.Result()->TermSignal = termSignal;
-    if (!proc.Result()->error()) {
+    if (proc.Result()->ErrorMessage.empty()) {
       if (termSignal != 0) {
         proc.Result()->ErrorMessage = cmStrCat(
           "Process was terminated by signal ", proc.Result()->TermSignal);
@@ -516,9 +515,6 @@ public:
   static void UVSlotEnd(uv_async_t* handle);
 
   // -- UV loop
-#ifdef CMAKE_UV_SIGNAL_HACK
-  std::unique_ptr<cmUVSignalHackRAII> UVHackRAII;
-#endif
   std::unique_ptr<uv_loop_t> UVLoop;
   cm::uv_async_ptr UVRequestBegin;
   cm::uv_async_ptr UVRequestEnd;
@@ -563,9 +559,6 @@ cmWorkerPoolInternal::cmWorkerPoolInternal(cmWorkerPool* pool)
 {
   // Initialize libuv loop
   uv_disable_stdio_inheritance();
-#ifdef CMAKE_UV_SIGNAL_HACK
-  UVHackRAII = cm::make_unique<cmUVSignalHackRAII>();
-#endif
   this->UVLoop = cm::make_unique<uv_loop_t>();
   uv_loop_init(this->UVLoop.get());
 }

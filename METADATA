@@ -1,18 +1,20 @@
+# This project was upgraded with external_updater.
+# Usage: tools/external_updater/updater.sh update external/<absolute path to project>
+# For more info, check https://cs.android.com/android/platform/superproject/+/main:tools/external_updater/README.md
+
 name: "CMake"
-description:
-    "CMake, the cross-platform, open-source build system."
-
+description: "CMake, the cross-platform, open-source build system."
 third_party {
-  url {
-    type: HOMEPAGE
-    value: "https://cmake.org/"
-  }
-  url {
-    type: GIT
-    value: "https://gitlab.kitware.com/cmake/cmake"
-  }
-  version: "v3.22.1"
-  last_upgrade_date { year: 2021 month: 12 day: 7 }
   license_type: NOTICE
+  last_upgrade_date {
+    year: 2024
+    month: 6
+    day: 25
+  }
+  homepage: "https://cmake.org/"
+  identifier {
+    type: "Git"
+    value: "https://gitlab.kitware.com/cmake/cmake"
+    version: "v3.29.6"
+  }
 }
-

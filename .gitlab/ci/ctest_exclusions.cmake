@@ -20,6 +20,20 @@ if ("$ENV{CMAKE_CONFIGURATION}" MATCHES "_asan")
     )
 endif()
 
+if ("$ENV{CMAKE_CONFIGURATION}" MATCHES "_jom")
+  list(APPEND test_exclusions
+    # JOM often fails with "Couldn't change working directory to ...".
+    "^ExternalProject$"
+    )
+endif()
+
+if ("$ENV{CMAKE_CONFIGURATION}" MATCHES "nvhpc_")
+  list(APPEND test_exclusions
+    # FIXME(#24187): This test fails with NVHPC as the CUDA host compiler.
+    "^CudaOnly.SeparateCompilationPTX$"
+    )
+endif()
+
 string(REPLACE ";" "|" test_exclusions "${test_exclusions}")
 if (test_exclusions)
   set(test_exclusions "(${test_exclusions})")

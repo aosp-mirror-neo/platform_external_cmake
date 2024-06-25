@@ -14,6 +14,7 @@
 #include "cmGeneratedFileStream.h"
 #include "cmGeneratorTarget.h"
 #include "cmGlobalGenerator.h"
+#include "cmList.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
 #include "cmRange.h"
@@ -45,7 +46,7 @@ cmExtraCodeBlocksGenerator::GetFactory()
 {
   static cmExternalMakefileProjectGeneratorSimpleFactory<
     cmExtraCodeBlocksGenerator>
-    factory("CodeBlocks", "Generates CodeBlocks project files.");
+    factory("CodeBlocks", "Generates CodeBlocks project files (deprecated).");
 
   if (factory.GetSupportedGlobalGenerators().empty()) {
 #if defined(_WIN32)
@@ -567,13 +568,13 @@ void cmExtraCodeBlocksGenerator::AppendTarget(
     std::string systemIncludeDirs = makefile->GetSafeDefinition(
       "CMAKE_EXTRA_GENERATOR_CXX_SYSTEM_INCLUDE_DIRS");
     if (!systemIncludeDirs.empty()) {
-      cm::append(allIncludeDirs, cmExpandedList(systemIncludeDirs));
+      cm::append(allIncludeDirs, cmList{ systemIncludeDirs });
     }
 
     systemIncludeDirs = makefile->GetSafeDefinition(
       "CMAKE_EXTRA_GENERATOR_C_SYSTEM_INCLUDE_DIRS");
     if (!systemIncludeDirs.empty()) {
-      cm::append(allIncludeDirs, cmExpandedList(systemIncludeDirs));
+      cm::append(allIncludeDirs, cmList{ systemIncludeDirs });
     }
 
     auto end = cmRemoveDuplicates(allIncludeDirs);
@@ -676,6 +677,12 @@ std::string cmExtraCodeBlocksGenerator::GetCBCompilerId(const cmMakefile* mf)
       compiler = "pgifortran";
     } else {
       compiler = "pgi"; // does not exist as default in CodeBlocks 16.01
+    }
+  } else if (compilerId == "LCC") {
+    if (pureFortran) {
+      compiler = "lfortran";
+    } else {
+      compiler = "lcc";
     }
   } else if (compilerId == "GNU") {
     if (pureFortran) {

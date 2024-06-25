@@ -34,9 +34,16 @@ only for the policies that do not warn by default:
   policy :policy:`CMP0126`.
 * ``CMAKE_POLICY_WARNING_CMP0128`` controls the warning for
   policy :policy:`CMP0128`.
+* ``CMAKE_POLICY_WARNING_CMP0129`` controls the warning for
+  policy :policy:`CMP0129`.
+* ``CMAKE_POLICY_WARNING_CMP0133`` controls the warning for
+  policy :policy:`CMP0133`.
 
 This variable should not be set by a project in CMake code.  Project
 developers running CMake may set this variable in their cache to
 enable the warning (e.g. ``-DCMAKE_POLICY_WARNING_CMP<NNNN>=ON``).
-Alternatively, running :manual:`cmake(1)` with the ``--debug-output``,
-``--trace``, or ``--trace-expand`` option will also enable the warning.
+Alternatively, running :manual:`cmake(1)` with the
+:option:`--debug-output <cmake --debug-output>`,
+:option:`--trace <cmake --trace>`, or
+:option:`--trace-expand <cmake --trace-expand>` option will also
+enable the warning.

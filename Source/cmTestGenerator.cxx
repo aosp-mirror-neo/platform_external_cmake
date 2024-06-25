@@ -13,6 +13,7 @@
 
 #include "cmGeneratorExpression.h"
 #include "cmGeneratorTarget.h"
+#include "cmList.h"
 #include "cmListFileCache.h"
 #include "cmLocalGenerator.h"
 #include "cmMakefile.h"
@@ -127,7 +128,8 @@ void cmTestGenerator::GenerateScriptForConfig(std::ostream& os,
   this->TestGenerated = true;
 
   // Set up generator expression evaluation context.
-  cmGeneratorExpression ge(this->Test->GetBacktrace());
+  cmGeneratorExpression ge(*this->Test->GetMakefile()->GetCMakeInstance(),
+                           this->Test->GetBacktrace());
 
   // Determine if policy CMP0110 is set to NEW.
   const bool quote_test_name =
@@ -146,16 +148,16 @@ void cmTestGenerator::GenerateScriptForConfig(std::ostream& os,
   }
 
   // Evaluate command line arguments
-  std::vector<std::string> argv =
-    this->EvaluateCommandLineArguments(this->Test->GetCommand(), ge, config);
-
-  // Expand arguments if COMMAND_EXPAND_LISTS is set
-  if (this->Test->GetCommandExpandLists()) {
-    argv = cmExpandedLists(argv.begin(), argv.end());
-    // Expanding lists on an empty command may have left it empty
-    if (argv.empty()) {
-      argv.emplace_back();
-    }
+  cmList argv{
+    this->EvaluateCommandLineArguments(this->Test->GetCommand(), ge, config),
+    // Expand arguments if COMMAND_EXPAND_LISTS is set
+    this->Test->GetCommandExpandLists() ? cmList::ExpandElements::Yes
+                                        : cmList::ExpandElements::No,
+    cmList::EmptyElements::Yes
+  };
+  // Expanding lists on an empty command may have left it empty
+  if (argv.empty()) {
+    argv.emplace_back();
   }
 
   // Check whether the command executable is a target whose name is to
@@ -166,16 +168,32 @@ void cmTestGenerator::GenerateScriptForConfig(std::ostream& os,
     // Use the target file on disk.
     exe = target->GetFullPath(config);
 
-    // Prepend with the emulator when cross compiling if required.
-    cmValue emulator = target->GetProperty("CROSSCOMPILING_EMULATOR");
-    if (cmNonempty(emulator)) {
-      std::vector<std::string> emulatorWithArgs = cmExpandedList(*emulator);
-      std::string emulatorExe(emulatorWithArgs[0]);
-      cmSystemTools::ConvertToUnixSlashes(emulatorExe);
-      os << cmOutputConverter::EscapeForCMake(emulatorExe) << " ";
-      for (std::string const& arg : cmMakeRange(emulatorWithArgs).advance(1)) {
-        os << cmOutputConverter::EscapeForCMake(arg) << " ";
+    auto addLauncher = [this, &config, &ge, &os,
+                        target](std::string const& propertyName) {
+      cmValue launcher = target->GetProperty(propertyName);
+      if (!cmNonempty(launcher)) {
+        return;
       }
+      cmList launcherWithArgs{ ge.Parse(*launcher)->Evaluate(this->LG,
+                                                             config) };
+      if (!launcherWithArgs.empty() && !launcherWithArgs[0].empty()) {
+        std::string launcherExe(launcherWithArgs[0]);
+        cmSystemTools::ConvertToUnixSlashes(launcherExe);
+        os << cmOutputConverter::EscapeForCMake(launcherExe) << " ";
+        for (std::string const& arg :
+             cmMakeRange(launcherWithArgs).advance(1)) {
+          os << cmOutputConverter::EscapeForCMake(arg) << " ";
+        }
+      }
+    };
+
+    // Prepend with the test launcher if specified.
+    addLauncher("TEST_LAUNCHER");
+
+    // Prepend with the emulator when cross compiling if required.
+    if (!this->GetTest()->GetCMP0158IsNew() ||
+        this->LG->GetMakefile()->IsOn("CMAKE_CROSSCOMPILING")) {
+      addLauncher("CROSSCOMPILING_EMULATOR");
     }
   } else {
     // Use the command name given.

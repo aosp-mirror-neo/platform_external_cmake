@@ -25,6 +25,13 @@ add_CMakeOnly_test(CheckCXXSymbolExists)
 add_CMakeOnly_test(CheckCXXCompilerFlag)
 
 add_CMakeOnly_test(CheckLanguage)
+set_property(TEST CMakeOnly.CheckLanguage APPEND PROPERTY LABELS "HIP" "Fortran")
+if (CMake_TEST_HIP)
+  add_CMakeOnly_test(CheckLanguageHIPPlatform)
+  set_property(TEST CMakeOnly.CheckLanguageHIPPlatform APPEND PROPERTY LABELS "HIP")
+  add_CMakeOnly_test(CheckLanguageHIPPlatform2)
+  set_property(TEST CMakeOnly.CheckLanguageHIPPlatform2 APPEND PROPERTY LABELS "HIP")
+endif()
 
 add_CMakeOnly_test(CheckStructHasMember)
 
@@ -45,6 +52,7 @@ endif()
 
 if(CMAKE_Fortran_COMPILER)
   add_CMakeOnly_test(CompilerIdFortran)
+  set_property(TEST CMakeOnly.CompilerIdFortran APPEND PROPERTY LABELS "Fortran")
 endif()
 if(CMAKE_GENERATOR MATCHES "Visual Studio ([^9]|9[0-9])")
   add_CMakeOnly_test(CompilerIdCSharp)

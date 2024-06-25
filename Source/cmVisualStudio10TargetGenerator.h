@@ -4,15 +4,17 @@
 
 #include "cmConfigure.h" // IWYU pragma: keep
 
-#include <iosfwd>
+#include <cstddef>
 #include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "cmGeneratorTarget.h"
+#include "cmVsProjectType.h"
 
 class cmComputeLinkInformation;
 class cmCustomCommand;
@@ -95,6 +97,7 @@ private:
   void WriteWinRTPackageCertificateKeyFile(Elem& e0);
   void WriteXamlFilesGroup(Elem& e0);
   void WritePathAndIncrementalLinkOptions(Elem& e0);
+  void WritePublicProjectContentOptions(Elem& e0);
   void WriteItemDefinitionGroups(Elem& e0);
   void VerifyNecessaryFiles();
   void WriteMissingFiles(Elem& e1);
@@ -115,6 +118,7 @@ private:
 
   std::vector<std::string> GetIncludes(std::string const& config,
                                        std::string const& lang) const;
+  std::string GetTargetOutputName() const;
 
   bool ComputeClOptions();
   bool ComputeClOptions(std::string const& configName);
@@ -130,6 +134,9 @@ private:
   bool ComputeCudaLinkOptions(std::string const& config);
   void WriteCudaLinkOptions(Elem& e1, std::string const& config);
 
+  bool ComputeMarmasmOptions();
+  bool ComputeMarmasmOptions(std::string const& config);
+  void WriteMarmasmOptions(Elem& e1, std::string const& config);
   bool ComputeMasmOptions();
   bool ComputeMasmOptions(std::string const& config);
   void WriteMasmOptions(Elem& e1, std::string const& config);
@@ -147,12 +154,18 @@ private:
   void OutputLinkIncremental(Elem& e1, std::string const& configName);
   void WriteCustomRule(Elem& e0, cmSourceFile const* source,
                        cmCustomCommand const& command);
+  enum class BuildInParallel
+  {
+    No,
+    Yes,
+  };
   void WriteCustomRuleCpp(Elem& e2, std::string const& config,
                           std::string const& script,
                           std::string const& additional_inputs,
                           std::string const& outputs,
                           std::string const& comment,
-                          cmCustomCommandGenerator const& ccg, bool symbolic);
+                          cmCustomCommandGenerator const& ccg, bool symbolic,
+                          BuildInParallel buildInParallel);
   void WriteCustomRuleCSharp(Elem& e0, std::string const& config,
                              std::string const& commandName,
                              std::string const& script,
@@ -196,8 +209,8 @@ private:
   std::string GetCSharpSourceLink(cmSourceFile const* source);
 
   void WriteStdOutEncodingUtf8(Elem& e1);
+  void UpdateCache();
 
-private:
   friend class cmVS10GeneratorOptions;
   using Options = cmVS10GeneratorOptions;
   using OptionsMap = std::map<std::string, std::unique_ptr<Options>>;
@@ -205,15 +218,13 @@ private:
   OptionsMap RcOptions;
   OptionsMap CudaOptions;
   OptionsMap CudaLinkOptions;
+  OptionsMap MarmasmOptions;
   OptionsMap MasmOptions;
   OptionsMap NasmOptions;
   OptionsMap LinkOptions;
   std::string LangForClCompile;
-  enum VsProjectType
-  {
-    vcxproj,
-    csproj
-  } ProjectType;
+
+  VsProjectType ProjectType;
   bool InSourceBuild;
   std::vector<std::string> Configurations;
   std::vector<TargetsFileAndConfigs> TargetsFileAndConfigsVec;
@@ -227,9 +238,12 @@ private:
   bool NsightTegra;
   bool Android;
   bool HaveCustomCommandDepfile = false;
+  std::map<std::string, bool> ScanSourceForModuleDependencies;
   unsigned int NsightTegraVersion[4];
   bool TargetCompileAsWinRT;
   std::set<std::string> IPOEnabledConfigurations;
+  std::set<std::string> ASanEnabledConfigurations;
+  std::set<std::string> FuzzerEnabledConfigurations;
   std::map<std::string, std::string> SpectreMitigation;
   cmGlobalVisualStudio10Generator* const GlobalGenerator;
   cmLocalVisualStudio10Generator* const LocalGenerator;
@@ -258,6 +272,15 @@ private:
   std::vector<cmSourceFile const*> XamlObjs;
   void ClassifyAllConfigSources();
   void ClassifyAllConfigSource(cmGeneratorTarget::AllConfigSource const& acs);
+
+  // .Net SDK-stype project variable and helper functions
+  void WriteClassicMsBuildProjectFile(cmGeneratedFileStream& BuildFileStream);
+  void WriteSdkStyleProjectFile(cmGeneratedFileStream& BuildFileStream);
+
+  void WriteCommonPropertyGroupGlobals(
+    cmVisualStudio10TargetGenerator::Elem& e1);
+
+  bool HasCustomCommands() const;
 
   std::unordered_map<std::string, ConfigToSettings> ParsedToolTargetSettings;
   bool PropertyIsSameInAllConfigs(const ConfigToSettings& toolSettings,

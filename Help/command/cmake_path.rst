@@ -96,6 +96,8 @@ The following conventions are used in this command's documentation:
   The name of a variable into which the result of a command will be written.
 
 
+.. _Path Structure And Terminology:
+
 Path Structure And Terminology
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -216,6 +218,8 @@ normalize a path is as follows:
    is ``.``).
 
 
+.. _Path Decomposition:
+
 Decomposition
 ^^^^^^^^^^^^^
 
@@ -233,7 +237,7 @@ The following forms of the ``GET`` subcommand each retrieve a different
 component or group of components from a path.  See
 `Path Structure And Terminology`_ for the meaning of each path component.
 
-::
+.. code-block:: cmake
 
   cmake_path(GET <path-var> ROOT_NAME <out-var>)
   cmake_path(GET <path-var> ROOT_DIRECTORY <out-var>)
@@ -385,6 +389,8 @@ Path traversal examples
   Parent path is "c:/"
 
 
+.. _Path Query:
+
 Query
 ^^^^^
 
@@ -402,7 +408,7 @@ meaning of each path component.
 .. _HAS_RELATIVE_PART:
 .. _HAS_PARENT_PATH:
 
-::
+.. code-block:: cmake
 
   cmake_path(HAS_ROOT_NAME <path-var> <out-var>)
   cmake_path(HAS_ROOT_DIRECTORY <path-var> <out-var>)
@@ -426,7 +432,7 @@ Note the following special cases:
 
 .. _IS_ABSOLUTE:
 
-::
+.. code-block:: cmake
 
   cmake_path(IS_ABSOLUTE <path-var> <out-var>)
 
@@ -440,7 +446,7 @@ false while ``HAS_ROOT_DIRECTORY`` can be true.
 
 .. _IS_RELATIVE:
 
-::
+.. code-block:: cmake
 
   cmake_path(IS_RELATIVE <path-var> <out-var>)
 
@@ -448,7 +454,7 @@ This will store the opposite of ``IS_ABSOLUTE`` in ``<out-var>``.
 
 .. _IS_PREFIX:
 
-::
+.. code-block:: cmake
 
   cmake_path(IS_PREFIX <path-var> <input> [NORMALIZE] <out-var>)
 
@@ -467,16 +473,18 @@ are :ref:`normalized <Normalization>` before the check.
   set(path "/a/b")
   cmake_path(IS_PREFIX path "/a/c/../b" NORMALIZE result)   # result = true
 
+.. _Path COMPARE:
 .. _COMPARE:
 
-::
+.. code-block:: cmake
 
   cmake_path(COMPARE <input1> EQUAL <input2> <out-var>)
   cmake_path(COMPARE <input1> NOT_EQUAL <input2> <out-var>)
 
 Compares the lexical representations of two paths provided as string literals.
-No normalization is performed on either path.  Equality is determined
-according to the following pseudo-code logic:
+No normalization is performed on either path, except multiple consecutive
+directory separators are effectively collapsed into a single separator.
+Equality is determined according to the following pseudo-code logic:
 
 ::
 
@@ -495,12 +503,14 @@ according to the following pseudo-code logic:
   takes literal strings as input, not the names of variables.
 
 
+.. _Path Modification:
+
 Modification
 ^^^^^^^^^^^^
 
 .. _cmake_path-SET:
 
-::
+.. code-block:: cmake
 
   cmake_path(SET <path-var> [NORMALIZE] <input>)
 
@@ -509,7 +519,7 @@ path, it is converted into a cmake-style path with forward-slashes
 (``/``). On Windows, the long filename marker is taken into account.
 
 When the ``NORMALIZE`` option is specified, the path is :ref:`normalized
-<Normalization>` before the conversion.
+<Normalization>` after the conversion.
 
 For example:
 
@@ -529,7 +539,7 @@ Output::
 
 .. _APPEND:
 
-::
+.. code-block:: cmake
 
   cmake_path(APPEND <path-var> [<input>...] [OUTPUT_VARIABLE <out-var>])
 
@@ -560,7 +570,7 @@ the following algorithm (pseudo-code) applies:
 
 .. _APPEND_STRING:
 
-::
+.. code-block:: cmake
 
   cmake_path(APPEND_STRING <path-var> [<input>...] [OUTPUT_VARIABLE <out-var>])
 
@@ -569,7 +579,7 @@ Append all the ``<input>`` arguments to the ``<path-var>`` without adding any
 
 .. _REMOVE_FILENAME:
 
-::
+.. code-block:: cmake
 
   cmake_path(REMOVE_FILENAME <path-var> [OUTPUT_VARIABLE <out-var>])
 
@@ -599,7 +609,7 @@ Output::
 
 .. _REPLACE_FILENAME:
 
-::
+.. code-block:: cmake
 
   cmake_path(REPLACE_FILENAME <path-var> <input> [OUTPUT_VARIABLE <out-var>])
 
@@ -618,7 +628,7 @@ equivalent to the following:
 
 .. _REMOVE_EXTENSION:
 
-::
+.. code-block:: cmake
 
   cmake_path(REMOVE_EXTENSION <path-var> [LAST_ONLY]
                                          [OUTPUT_VARIABLE <out-var>])
@@ -627,7 +637,7 @@ Removes the :ref:`extension <EXTENSION_DEF>`, if any, from ``<path-var>``.
 
 .. _REPLACE_EXTENSION:
 
-::
+.. code-block:: cmake
 
   cmake_path(REPLACE_EXTENSION <path-var> [LAST_ONLY] <input>
                                [OUTPUT_VARIABLE <out-var>])
@@ -644,12 +654,14 @@ is equivalent to the following:
   cmake_path(APPEND_STRING path "input")
 
 
+.. _Path Generation:
+
 Generation
 ^^^^^^^^^^
 
 .. _NORMAL_PATH:
 
-::
+.. code-block:: cmake
 
   cmake_path(NORMAL_PATH <path-var> [OUTPUT_VARIABLE <out-var>])
 
@@ -658,7 +670,7 @@ Normalize ``<path-var>`` according the steps described in :ref:`Normalization`.
 .. _cmake_path-RELATIVE_PATH:
 .. _RELATIVE_PATH:
 
-::
+.. code-block:: cmake
 
   cmake_path(RELATIVE_PATH <path-var> [BASE_DIRECTORY <input>]
                                       [OUTPUT_VARIABLE <out-var>])
@@ -674,7 +686,7 @@ as that used by C++
 
 .. _ABSOLUTE_PATH:
 
-::
+.. code-block:: cmake
 
   cmake_path(ABSOLUTE_PATH <path-var> [BASE_DIRECTORY <input>] [NORMALIZE]
                                       [OUTPUT_VARIABLE <out-var>])
@@ -701,7 +713,7 @@ target platform when cross-compiling.
 .. _cmake_path-NATIVE_PATH:
 .. _NATIVE_PATH:
 
-::
+.. code-block:: cmake
 
   cmake_path(NATIVE_PATH <path-var> [NORMALIZE] <out-var>)
 
@@ -715,7 +727,7 @@ When the ``NORMALIZE`` option is specified, the path is :ref:`normalized
 .. _cmake_path-TO_CMAKE_PATH_LIST:
 .. _TO_CMAKE_PATH_LIST:
 
-::
+.. code-block:: cmake
 
   cmake_path(CONVERT <input> TO_CMAKE_PATH_LIST <out-var> [NORMALIZE])
 
@@ -737,7 +749,7 @@ When the ``NORMALIZE`` option is specified, the path is :ref:`normalized
 .. _cmake_path-TO_NATIVE_PATH_LIST:
 .. _TO_NATIVE_PATH_LIST:
 
-::
+.. code-block:: cmake
 
   cmake_path(CONVERT <input> TO_NATIVE_PATH_LIST <out-var> [NORMALIZE])
 
@@ -776,7 +788,7 @@ Hashing
 
 .. _HASH:
 
-::
+.. code-block:: cmake
 
     cmake_path(HASH <path-var> <out-var>)
 

@@ -73,6 +73,9 @@ bool cmBinUtilsLinuxELFLinker::Prepare()
   if (ldConfigTool == "ldconfig") {
     this->LDConfigTool =
       cm::make_unique<cmLDConfigLDConfigTool>(this->Archive);
+    if (!this->LDConfigTool->GetLDConfigPaths(this->LDConfigPaths)) {
+      return false;
+    }
   } else {
     std::ostringstream e;
     e << "Invalid value for CMAKE_LDCONFIG_TOOL: " << ldConfigTool;
@@ -132,12 +135,8 @@ bool cmBinUtilsLinuxELFLinker::ScanDependencies(
                        parentRpaths.end());
   }
 
-  std::vector<std::string> ldConfigPaths;
-  if (!this->LDConfigTool->GetLDConfigPaths(ldConfigPaths)) {
-    return false;
-  }
-  searchPaths.insert(searchPaths.end(), ldConfigPaths.begin(),
-                     ldConfigPaths.end());
+  searchPaths.insert(searchPaths.end(), this->LDConfigPaths.begin(),
+                     this->LDConfigPaths.end());
 
   for (auto const& dep : needed) {
     if (!this->Archive->IsPreExcluded(dep)) {
@@ -154,8 +153,13 @@ bool cmBinUtilsLinuxELFLinker::ScanDependencies(
         if (!this->Archive->IsPostExcluded(path)) {
           bool unique;
           this->Archive->AddResolvedPath(dep, path, unique);
-          if (unique && !this->ScanDependencies(path, rpaths)) {
-            return false;
+          if (unique) {
+            std::vector<std::string> combinedParentRpaths = parentRpaths;
+            combinedParentRpaths.insert(combinedParentRpaths.end(),
+                                        rpaths.begin(), rpaths.end());
+            if (!this->ScanDependencies(path, combinedParentRpaths)) {
+              return false;
+            }
           }
         }
       } else {

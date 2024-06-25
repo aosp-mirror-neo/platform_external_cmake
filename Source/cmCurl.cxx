@@ -34,8 +34,19 @@
 std::string cmCurlSetCAInfo(::CURL* curl, const std::string& cafile)
 {
   std::string e;
+  std::string env_ca;
   if (!cafile.empty()) {
     ::CURLcode res = ::curl_easy_setopt(curl, CURLOPT_CAINFO, cafile.c_str());
+    check_curl_result(res, "Unable to set TLS/SSL Verify CAINFO: ");
+  }
+  /* Honor the user-configurable OpenSSL environment variables. */
+  else if (cmSystemTools::GetEnv("SSL_CERT_FILE", env_ca) &&
+           cmSystemTools::FileExists(env_ca, true)) {
+    ::CURLcode res = ::curl_easy_setopt(curl, CURLOPT_CAINFO, env_ca.c_str());
+    check_curl_result(res, "Unable to set TLS/SSL Verify CAINFO: ");
+  } else if (cmSystemTools::GetEnv("SSL_CERT_DIR", env_ca) &&
+             cmSystemTools::FileIsDirectory(env_ca)) {
+    ::CURLcode res = ::curl_easy_setopt(curl, CURLOPT_CAPATH, env_ca.c_str());
     check_curl_result(res, "Unable to set TLS/SSL Verify CAINFO: ");
   }
 #ifdef CMAKE_FIND_CAFILE
@@ -120,12 +131,12 @@ std::string cmCurlFixFileURL(std::string url)
   // Convert string from UTF-8 to ACP if this is a file:// URL.
   std::wstring wurl = cmsys::Encoding::ToWide(url);
   if (!wurl.empty()) {
-    int mblen =
-      WideCharToMultiByte(CP_ACP, 0, wurl.c_str(), -1, NULL, 0, NULL, NULL);
+    int mblen = WideCharToMultiByte(CP_ACP, 0, wurl.c_str(), -1, nullptr, 0,
+                                    nullptr, nullptr);
     if (mblen > 0) {
       std::vector<char> chars(mblen);
       mblen = WideCharToMultiByte(CP_ACP, 0, wurl.c_str(), -1, &chars[0],
-                                  mblen, NULL, NULL);
+                                  mblen, nullptr, nullptr);
       if (mblen > 0) {
         url = &chars[0];
       }

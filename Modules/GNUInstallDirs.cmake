@@ -20,11 +20,16 @@ Inclusion of this module defines the following variables:
 ``CMAKE_INSTALL_<dir>``
 
   Destination for files of a given type.  This value may be passed to
-  the ``DESTINATION`` options of :command:`install` commands for the
-  corresponding file type.  It should typically be a path relative to
-  the installation prefix so that it can be converted to an absolute
-  path in a relocatable way (see ``CMAKE_INSTALL_FULL_<dir>``).
-  However, an absolute path is also allowed.
+  the ``DESTINATION`` options of  :command:`install` commands for the
+  corresponding file type.  It should be a path relative to the installation
+  prefix so that it can be converted to an absolute path in a relocatable way.
+
+  While absolute paths are allowed, they are not recommended as they
+  do not work with the ``cmake --install`` command's
+  :option:`--prefix <cmake--install --prefix>` option, or with the
+  :manual:`cpack <cpack(1)>` installer generators. In particular, there is no
+  need to make paths absolute by prepending :variable:`CMAKE_INSTALL_PREFIX`;
+  this prefix is used by default if the DESTINATION is a relative path.
 
 ``CMAKE_INSTALL_FULL_<dir>``
 
@@ -33,6 +38,11 @@ Inclusion of this module defines the following variables:
   is constructed typically by prepending the value of the
   :variable:`CMAKE_INSTALL_PREFIX` variable.  However, there are some
   `special cases`_ as documented below.
+
+  These variables shouldn't be used in :command:`install` commands
+  as they do not work with the ``cmake --install`` command's
+  :option:`--prefix <cmake--install --prefix>` option, or with the
+  :manual:`cpack <cpack(1)>` installer generators.
 
 where ``<dir>`` is one of:
 
@@ -52,8 +62,10 @@ where ``<dir>`` is one of:
   .. versionadded:: 3.9
     run-time variable data (``LOCALSTATEDIR/run``)
 ``LIBDIR``
-  object code libraries (``lib`` or ``lib64``
-  or ``lib/<multiarch-tuple>`` on Debian)
+  object code libraries (``lib`` or ``lib64``)
+
+  On Debian, this may be ``lib/<multiarch-tuple>`` when
+  :variable:`CMAKE_INSTALL_PREFIX` is ``/usr``.
 ``INCLUDEDIR``
   C header files (``include``)
 ``OLDINCLUDEDIR``
@@ -109,6 +121,8 @@ The following values of :variable:`CMAKE_INSTALL_PREFIX` are special:
   if it is not user-specified as an absolute path.
   For example, the ``SYSCONFDIR`` value ``etc`` becomes ``/etc/opt/...``.
   This is defined by the `Filesystem Hierarchy Standard`_.
+
+  This behavior does not apply to paths under ``/opt/homebrew/...``.
 
 .. _`Filesystem Hierarchy Standard`: https://refspecs.linuxfoundation.org/FHS_3.0/fhs/index.html
 
@@ -328,7 +342,7 @@ else()
     "Info documentation (DATAROOTDIR/info)")
 endif()
 
-if(CMAKE_SYSTEM_NAME MATCHES "^(([^k].*)?BSD|DragonFly)$")
+if(CMAKE_SYSTEM_NAME MATCHES "^(([^k].*)?BSD|DragonFly)$" AND NOT CMAKE_SYSTEM_NAME MATCHES "^(FreeBSD)$")
   _GNUInstallDirs_cache_path_fallback(CMAKE_INSTALL_MANDIR "man"
     "Man documentation (man)")
 else()
@@ -398,7 +412,7 @@ macro(GNUInstallDirs_get_absolute_install_dir absvar var)
       else()
         set(${absvar} "${CMAKE_INSTALL_PREFIX}/${${var}}")
       endif()
-    elseif("${CMAKE_INSTALL_PREFIX}" MATCHES "^/opt/.*")
+    elseif("${CMAKE_INSTALL_PREFIX}" MATCHES "^/opt/" AND NOT "${CMAKE_INSTALL_PREFIX}" MATCHES "^/opt/homebrew/")
       if("${GGAID_dir}" STREQUAL "SYSCONFDIR" OR "${GGAID_dir}" STREQUAL "LOCALSTATEDIR" OR "${GGAID_dir}" STREQUAL "RUNSTATEDIR")
         set(${absvar} "/${${var}}${CMAKE_INSTALL_PREFIX}")
       else()

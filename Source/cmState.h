@@ -10,11 +10,14 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include <cm/optional>
+
 #include "cmDefinitions.h"
+#include "cmDependencyProvider.h"
 #include "cmLinkedTree.h"
-#include "cmListFileCache.h"
 #include "cmPolicies.h"
 #include "cmProperty.h"
 #include "cmPropertyDefinition.h"
@@ -30,6 +33,11 @@ class cmMakefile;
 class cmStateSnapshot;
 class cmMessenger;
 class cmExecutionStatus;
+class cmListFileBacktrace;
+struct cmListFileArgument;
+
+template <typename T>
+class BT;
 
 class cmState
 {
@@ -44,6 +52,7 @@ public:
     FindPackage,
     CTest,
     CPack,
+    Help
   };
 
   enum class ProjectKind
@@ -133,11 +142,17 @@ public:
   // Define a property
   void DefineProperty(const std::string& name, cmProperty::ScopeType scope,
                       const std::string& ShortDescription,
-                      const std::string& FullDescription, bool chain = false);
+                      const std::string& FullDescription, bool chain = false,
+                      const std::string& initializeFromVariable = "");
 
   // get property definition
   cmPropertyDefinition const* GetPropertyDefinition(
     const std::string& name, cmProperty::ScopeType scope) const;
+
+  const cmPropertyDefinitionMap& GetPropertyDefinitions() const
+  {
+    return this->PropertyDefinitions;
+  }
 
   bool IsPropertyChained(const std::string& name,
                          cmProperty::ScopeType scope) const;
@@ -168,7 +183,8 @@ public:
   void AddFlowControlCommand(std::string const& name, Command command);
   void AddFlowControlCommand(std::string const& name, BuiltinCommand command);
   void AddDisallowedCommand(std::string const& name, BuiltinCommand command,
-                            cmPolicies::PolicyID policy, const char* message);
+                            cmPolicies::PolicyID policy, const char* message,
+                            const char* additionalWarning = nullptr);
   void AddUnexpectedCommand(std::string const& name, const char* error);
   void AddUnexpectedFlowControlCommand(std::string const& name,
                                        const char* error);
@@ -178,7 +194,7 @@ public:
   void RemoveUserDefinedCommands();
   std::vector<std::string> GetCommandNames() const;
 
-  void SetGlobalProperty(const std::string& prop, const char* value);
+  void SetGlobalProperty(const std::string& prop, const std::string& value);
   void SetGlobalProperty(const std::string& prop, cmValue value);
   void AppendGlobalProperty(const std::string& prop, const std::string& value,
                             bool asString = false);
@@ -204,6 +220,8 @@ public:
   bool UseNMake() const;
   void SetMSYSShell(bool mSYSShell);
   bool UseMSYSShell() const;
+  void SetNinja(bool ninja);
+  bool UseNinja() const;
   void SetNinjaMulti(bool ninjaMulti);
   bool UseNinjaMulti() const;
 
@@ -217,34 +235,41 @@ public:
 
   ProjectKind GetProjectKind() const;
 
+  void ClearDependencyProvider() { this->DependencyProvider.reset(); }
+  void SetDependencyProvider(cmDependencyProvider provider)
+  {
+    this->DependencyProvider = std::move(provider);
+  }
+  cm::optional<cmDependencyProvider> const& GetDependencyProvider() const
+  {
+    return this->DependencyProvider;
+  }
+  Command GetDependencyProviderCommand(
+    cmDependencyProvider::Method method) const;
+
+  void SetInTopLevelIncludes(bool inTopLevelIncludes)
+  {
+    this->ProcessingTopLevelIncludes = inTopLevelIncludes;
+  }
+  bool InTopLevelIncludes() const { return this->ProcessingTopLevelIncludes; }
+
 private:
   friend class cmake;
-  void AddCacheEntry(const std::string& key, const char* value,
-                     const char* helpString, cmStateEnums::CacheEntryType type)
-  {
-    this->AddCacheEntry(key,
-                        value ? cmValue(std::string(value)) : cmValue(nullptr),
-                        helpString, type);
-  }
-  void AddCacheEntry(const std::string& key, const std::string& value,
-                     const char* helpString, cmStateEnums::CacheEntryType type)
-  {
-    this->AddCacheEntry(key, cmValue(value), helpString, type);
-  }
   void AddCacheEntry(const std::string& key, cmValue value,
-                     const char* helpString,
+                     const std::string& helpString,
                      cmStateEnums::CacheEntryType type);
 
   bool DoWriteGlobVerifyTarget() const;
   std::string const& GetGlobVerifyScript() const;
   std::string const& GetGlobVerifyStamp() const;
-  bool SaveVerificationScript(const std::string& path);
+  bool SaveVerificationScript(const std::string& path, cmMessenger* messenger);
   void AddGlobCacheEntry(bool recurse, bool listDirectories,
                          bool followSymlinks, const std::string& relative,
                          const std::string& expression,
                          const std::vector<std::string>& files,
                          const std::string& variable,
-                         cmListFileBacktrace const& bt);
+                         cmListFileBacktrace const& bt,
+                         cmMessenger* messenger);
 
   cmPropertyDefinitionMap PropertyDefinitions;
   std::vector<std::string> EnabledLanguages;
@@ -274,7 +299,10 @@ private:
   bool MinGWMake = false;
   bool NMake = false;
   bool MSYSShell = false;
+  bool Ninja = false;
   bool NinjaMulti = false;
   Mode StateMode = Unknown;
   ProjectKind StateProjectKind = ProjectKind::Normal;
+  cm::optional<cmDependencyProvider> DependencyProvider;
+  bool ProcessingTopLevelIncludes = false;
 };

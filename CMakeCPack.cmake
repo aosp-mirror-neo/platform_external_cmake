@@ -22,6 +22,7 @@ set(CPACK_PACKAGE_NAME "${CMAKE_PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${CMake_VERSION}")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "${CPACK_PACKAGE_NAME}")
 set(CPACK_SOURCE_PACKAGE_FILE_NAME "cmake-${CMake_VERSION}")
+set(CPACK_DMG_SLA_USE_RESOURCE_FILE_LICENSE OFF)
 
 # Installers for 32- vs. 64-bit CMake:
 #  - Root install directory (displayed to end user at installer-run time)
@@ -262,6 +263,10 @@ set(CPACK_SOURCE_IGNORE_FILES
   "/#"
   "~$"
   )
+
+if(CMake_CPACK_CUSTOM_SCRIPT)
+  include(${CMake_CPACK_CUSTOM_SCRIPT})
+endif()
 
 # include CPack model once all variables are set
 include(CPack)

@@ -17,9 +17,7 @@ cmCPackCygwinBinaryGenerator::cmCPackCygwinBinaryGenerator()
 {
 }
 
-cmCPackCygwinBinaryGenerator::~cmCPackCygwinBinaryGenerator()
-{
-}
+cmCPackCygwinBinaryGenerator::~cmCPackCygwinBinaryGenerator() = default;
 
 int cmCPackCygwinBinaryGenerator::InitializeInternal()
 {
@@ -43,12 +41,12 @@ int cmCPackCygwinBinaryGenerator::PackageFiles()
   // create an extra scope to force the stream
   // to create the file before the super class is called
   {
-    cmGeneratedFileStream ofs(manifestFile.c_str());
+    cmGeneratedFileStream ofs(manifestFile);
     for (std::string const& file : files) {
       // remove the temp dir and replace with /usr
-      ofs << file.substr(tempdir.size()) << "\n";
+      ofs << file.substr(tempdir.size()) << '\n';
     }
-    ofs << manifest << "\n";
+    ofs << manifest << '\n';
   }
   // add the manifest file to the list of all files
   files.push_back(manifestFile);
@@ -62,7 +60,7 @@ const char* cmCPackCygwinBinaryGenerator::GetOutputExtension()
   this->OutputExtension = "-";
   cmValue patchNumber = this->GetOption("CPACK_CYGWIN_PATCH_NUMBER");
   if (!patchNumber) {
-    this->OutputExtension += "1";
+    this->OutputExtension += '1';
     cmCPackLogger(cmCPackLog::LOG_WARNING,
                   "CPACK_CYGWIN_PATCH_NUMBER not specified using 1"
                     << std::endl);

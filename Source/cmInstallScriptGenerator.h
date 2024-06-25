@@ -9,7 +9,6 @@
 
 #include "cmInstallGenerator.h"
 #include "cmListFileCache.h"
-#include "cmScriptGenerator.h"
 
 class cmLocalGenerator;
 
@@ -41,5 +40,5 @@ protected:
   std::string const Script;
   bool const Code;
   cmLocalGenerator* LocalGenerator;
-  bool AllowGenex;
+  bool AllowGenex = false;
 };

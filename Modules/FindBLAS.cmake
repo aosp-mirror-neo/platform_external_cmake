@@ -12,7 +12,7 @@ This module finds an installed Fortran library that implements the
 
 At least one of the ``C``, ``CXX``, or ``Fortran`` languages must be enabled.
 
-.. _`BLAS linear-algebra interface`: http://www.netlib.org/blas/
+.. _`BLAS linear-algebra interface`: https://netlib.org/blas/
 
 Input Variables
 ^^^^^^^^^^^^^^^
@@ -34,6 +34,12 @@ The following variables may be set to influence this module's behavior:
 
   if set ``pkg-config`` will be used to search for a BLAS library first
   and if one is found that is preferred
+
+``BLA_PKGCONFIG_BLAS``
+  .. versionadded:: 3.25
+
+  If set, the ``pkg-config`` method will look for this module name instead of
+  just ``blas``.
 
 ``BLA_SIZEOF_INTEGER``
   .. versionadded:: 3.22
@@ -86,6 +92,11 @@ BLAS/LAPACK Vendors
 
 ``ACML``, ``ACML_MP``, ``ACML_GPU``
   AMD Core Math Library
+
+``AOCL``, ``AOCL_mt``
+  .. versionadded:: 3.27
+
+  AMD Optimizing CPU Libraries
 
 ``Apple``, ``NAS``
   Apple BLAS (Accelerate), and Apple NAS (vecLib)
@@ -273,8 +284,11 @@ endif()
 include(${CMAKE_CURRENT_LIST_DIR}/FindPackageHandleStandardArgs.cmake)
 
 if(BLA_PREFER_PKGCONFIG)
-  find_package(PkgConfig)
-  pkg_check_modules(PKGC_BLAS blas)
+  if(NOT BLA_PKGCONFIG_BLAS)
+    set(BLA_PKGCONFIG_BLAS "blas")
+  endif()
+  find_package(PkgConfig QUIET)
+  pkg_check_modules(PKGC_BLAS QUIET ${BLA_PKGCONFIG_BLAS})
   if(PKGC_BLAS_FOUND)
     set(BLAS_FOUND ${PKGC_BLAS_FOUND})
     set(BLAS_LIBRARIES "${PKGC_BLAS_LINK_LIBRARIES}")
@@ -377,10 +391,10 @@ set(BLAS_LINKER_FLAGS)
 set(BLAS_LIBRARIES)
 set(BLAS95_LIBRARIES)
 set(_blas_fphsa_req_var BLAS_LIBRARIES)
-if(NOT $ENV{BLA_VENDOR} STREQUAL "")
-  set(BLA_VENDOR $ENV{BLA_VENDOR})
-else()
-  if(NOT BLA_VENDOR)
+if(NOT BLA_VENDOR)
+  if(NOT "$ENV{BLA_VENDOR}" STREQUAL "")
+    set(BLA_VENDOR "$ENV{BLA_VENDOR}")
+  else()
     set(BLA_VENDOR "All")
   endif()
 endif()
@@ -437,7 +451,7 @@ if(BLA_VENDOR MATCHES "Intel" OR BLA_VENDOR STREQUAL "All")
           set(BLAS_mkl_END_GROUP "")
         endif()
         # Switch to GNU Fortran support layer if needed (but not on Apple, where MKL does not provide it)
-        if(CMAKE_Fortran_COMPILER_LOADED AND CMAKE_Fortran_COMPILER_ID STREQUAL "GNU" AND NOT APPLE)
+        if(CMAKE_Fortran_COMPILER_LOADED AND (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU" OR CMAKE_Fortran_COMPILER_ID STREQUAL "LCC") AND NOT APPLE)
             set(BLAS_mkl_INTFACE "gf")
             set(BLAS_mkl_THREADING "gnu")
             set(BLAS_mkl_OMP "gomp")
@@ -732,7 +746,11 @@ if(BLA_VENDOR STREQUAL "OpenBLAS" OR BLA_VENDOR STREQUAL "All")
   set(_blas_openblas_lib "openblas")
 
   if(_blas_sizeof_integer EQUAL 8)
-    string(APPEND _blas_openblas_lib "64")
+    if(MINGW)
+      string(APPEND _blas_openblas_lib "_64")
+    else()
+      string(APPEND _blas_openblas_lib "64")
+    endif()
   endif()
 
   if(NOT BLAS_LIBRARIES)
@@ -756,10 +774,10 @@ if(BLA_VENDOR STREQUAL "OpenBLAS" OR BLA_VENDOR STREQUAL "All")
     set(_threadlibs "${CMAKE_THREAD_LIBS_INIT}")
     if(BLA_STATIC)
       if (CMAKE_C_COMPILER_LOADED)
-        find_package(OpenMP COMPONENTS C)
+        find_package(OpenMP QUIET COMPONENTS C)
         list(PREPEND _threadlibs "${OpenMP_C_LIBRARIES}")
       elseif(CMAKE_CXX_COMPILER_LOADED)
-        find_package(OpenMP COMPONENTS CXX)
+        find_package(OpenMP QUIET COMPONENTS CXX)
         list(PREPEND _threadlibs "${OpenMP_CXX_LIBRARIES}")
       endif()
     endif()
@@ -837,6 +855,38 @@ if(BLA_VENDOR STREQUAL "FLAME" OR BLA_VENDOR STREQUAL "All")
   endif()
 
   unset(_blas_flame_lib)
+endif()
+
+# AOCL's blis library? (https://developer.amd.com/amd-aocl/)
+if(BLA_VENDOR MATCHES "AOCL" OR BLA_VENDOR STREQUAL "All")
+  set(_blas_aocl_lib "blis")
+
+  if(_blas_sizeof_integer EQUAL 8)
+    set(_blas_aocl_subdir "ILP64")
+  else()
+    set(_blas_aocl_subdir "LP64")
+  endif()
+
+  # Check for multi-threaded support
+  if(BLA_VENDOR MATCHES "_mt")
+    string(APPEND _blas_aocl_lib "-mt")
+  endif()
+
+  if(NOT BLAS_LIBRARIES)
+    check_blas_libraries(
+      BLAS_LIBRARIES
+      BLAS
+      sgemm
+      ""
+      "${_blas_aocl_lib}"
+      ""
+      ""
+      "${_blas_aocl_subdir}"
+      )
+  endif()
+
+  unset(_blas_aocl_lib)
+  unset(_blas_aocl_subdir)
 endif()
 
 # BLAS in the ATLAS library? (http://math-atlas.sourceforge.net/)

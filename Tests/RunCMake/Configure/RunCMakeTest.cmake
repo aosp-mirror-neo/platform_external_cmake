@@ -1,9 +1,8 @@
 include(RunCMake)
 
 run_cmake(ContinueAfterError)
+run_cmake(CopyFileABI)
 run_cmake(CustomTargetAfterError)
-run_cmake(ErrorLogs)
-run_cmake(FailCopyFileABI)
 
 # Use a single build tree for a few tests without cleaning.
 set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/RerunCMake-build)
@@ -55,4 +54,20 @@ if(NOT RunCMake_GENERATOR MATCHES "^Ninja Multi-Config$")
   run_cmake(NoCMAKE_CROSS_CONFIGS)
   run_cmake(NoCMAKE_DEFAULT_BUILD_TYPE)
   run_cmake(NoCMAKE_DEFAULT_CONFIGS)
+endif()
+
+if(NOT CMAKE_HOST_WIN32)
+  block()
+    # Test a non-writable build directory.
+    # Exclude when running as root because directories are always writable.
+    get_unix_uid(uid)
+    if(NOT uid STREQUAL "0")
+      set(RunCMake_TEST_BINARY_DIR ${RunCMake_BINARY_DIR}/ReadOnly-build)
+      file(REMOVE_RECURSE "${RunCMake_TEST_BINARY_DIR}")
+      file(MAKE_DIRECTORY "${RunCMake_TEST_BINARY_DIR}")
+      file(CHMOD "${RunCMake_TEST_BINARY_DIR}" PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
+      set(RunCMake_TEST_NO_CLEAN 1)
+      run_cmake(ReadOnly)
+    endif()
+  endblock()
 endif()

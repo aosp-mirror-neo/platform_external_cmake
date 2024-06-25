@@ -88,7 +88,8 @@ void TargetIncludeDirectoriesImpl::HandleInterfaceContent(
                                                         system);
   if (system) {
     std::string joined = this->Join(content);
-    tgt->AppendProperty("INTERFACE_SYSTEM_INCLUDE_DIRECTORIES", joined);
+    tgt->AppendProperty("INTERFACE_SYSTEM_INCLUDE_DIRECTORIES", joined,
+                        this->Makefile->GetBacktrace());
   }
 }
 
@@ -99,8 +100,7 @@ bool cmTargetIncludeDirectoriesCommand(std::vector<std::string> const& args,
 {
   return TargetIncludeDirectoriesImpl(status).HandleArguments(
     args, "INCLUDE_DIRECTORIES",
-    TargetIncludeDirectoriesImpl::ArgumentFlags(
-      TargetIncludeDirectoriesImpl::PROCESS_BEFORE |
+    TargetIncludeDirectoriesImpl::PROCESS_BEFORE |
       TargetIncludeDirectoriesImpl::PROCESS_AFTER |
-      TargetIncludeDirectoriesImpl::PROCESS_SYSTEM));
+      TargetIncludeDirectoriesImpl::PROCESS_SYSTEM);
 }

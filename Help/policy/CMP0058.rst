@@ -50,7 +50,7 @@ that ensure ``byproduct.txt`` will exist before its consumers
 need it.  See discussion of this problem in `Ninja Issue 760`_
 for further details on why Ninja works this way.
 
-.. _`Ninja Issue 760`: https://github.com/martine/ninja/issues/760
+.. _Ninja Issue 760: https://github.com/ninja-build/ninja/issues/760
 
 Instead of leaving byproducts undeclared in the rules that generate
 them, Ninja expects byproducts to be listed along with other outputs.
@@ -70,6 +70,9 @@ really missing.  It also works poorly in in-source builds where
 every custom command dependency, even on source files, needs to
 be treated this way because CMake does not have enough information
 to know which files are generated as byproducts of custom commands.
+
+Introducing Byproducts
+^^^^^^^^^^^^^^^^^^^^^^
 
 CMake 3.2 introduced the ``BYPRODUCTS`` option to the
 :command:`add_custom_command` and :command:`add_custom_target`
@@ -101,12 +104,12 @@ rules for unknown dependencies in the build tree.  The ``NEW``
 behavior for this policy is to not generate these and instead
 require projects to specify custom command ``BYPRODUCTS`` explicitly.
 
-This policy was introduced in CMake version 3.3.
-CMake version |release| warns when it sees unknown dependencies in
-out-of-source build trees if the policy is not set and then uses
-``OLD`` behavior.  Use the :command:`cmake_policy` command to set
-the policy to ``OLD`` or ``NEW`` explicitly.  The policy setting
-must be in scope at the end of the top-level ``CMakeLists.txt``
-file of the project and has global effect.
+.. |INTRODUCED_IN_CMAKE_VERSION| replace:: 3.3
+.. |WARNS_OR_DOES_NOT_WARN| replace::
+   warns when it sees unknown dependencies in out-of-source build trees
+.. include:: STANDARD_ADVICE.txt
+
+The policy setting must be in scope at the end of the top-level
+``CMakeLists.txt`` file of the project and has global effect.
 
 .. include:: DEPRECATED.txt

@@ -32,16 +32,6 @@ AddCMakeTest(ProcessorCount "-DKWSYS_TEST_EXE=$<TARGET_FILE:cmsysTestsCxx>")
 AddCMakeTest(PushCheckState "")
 AddCMakeTest(While "")
 
-AddCMakeTest(FileDownload "")
-set_tests_properties(CMake.FileDownload PROPERTIES
-  PASS_REGULAR_EXPRESSION "file already exists with expected MD5 sum"
-  FAIL_REGULAR_EXPRESSION "Unexpected status|incorrectly interpreted"
-  )
-AddCMakeTest(FileDownloadBadHash "")
-set_property(TEST CMake.FileDownloadBadHash PROPERTY
-  WILL_FAIL TRUE
-  )
-
 AddCMakeTest(FileUpload "")
 
 set(EndStuff_PreArgs
@@ -58,19 +48,4 @@ if(GIT_EXECUTABLE)
     "-DGIT_EXECUTABLE:STRING=${GIT_EXECUTABLE}"
     )
   AddCMakeTest(PolicyCheck "${PolicyCheck_PreArgs}")
-endif()
-
-# Run CheckSourceTree as the very last test in the CMake/CTest/CPack test
-# suite. It detects if any changes have been made to the CMake source tree
-# by any previous configure, build or test steps.
-#
-if(GIT_EXECUTABLE)
-  string(REPLACE "\\" "/" ENV_HOME "$ENV{HOME}")
-  set(CheckSourceTree_PreArgs
-    "-DCMake_BINARY_DIR:PATH=${CMake_BINARY_DIR}"
-    "-DCMake_SOURCE_DIR:PATH=${CMake_SOURCE_DIR}"
-    "-DGIT_EXECUTABLE:STRING=${GIT_EXECUTABLE}"
-    "-DHOME:STRING=${ENV_HOME}"
-    )
-  AddCMakeTest(CheckSourceTree "${CheckSourceTree_PreArgs}")
 endif()
