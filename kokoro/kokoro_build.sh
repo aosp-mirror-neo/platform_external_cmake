@@ -57,12 +57,5 @@ python3 $cmake_src/kokoro/build.py $cmake_src $out $out/artifact "${KOKORO_BUILD
   --android-cmake=$top/external/android-cmake \
   --extra-notices="$extra_notices"
 
-if [ -f /.dockerenv ]; then
-  # Necessary because the git repo is mounted from the host, and the git
-  # directories will have different permissions than the container expects. This
-  # prevents "fatal: detected dubious ownership in repository at ...".
-  git config --global --add safe.directory '*'
-fi
-
 $top/toolchain/ndk-kokoro/gen_manifest.py --root $top \
   -o "$out/artifact/manifest-${KOKORO_BUILD_ID:-dev}.xml"
