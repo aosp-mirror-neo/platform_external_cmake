@@ -23,7 +23,7 @@ if [ "$(uname)" == "Darwin" ]; then
   echo "Selected Xcode: $(xcode-select -p)"
 elif [ "$(uname)" == "Linux" ]; then
   host=linux-x86
-  . /opt/rh/devtoolset-10/enable
+  . /opt/rh/gcc-toolset-10/enable
 
   # Build openssl and link it statically.
   #  * We can't use libssl.so from the host because it might not be installed,
@@ -56,6 +56,13 @@ python3 $cmake_src/kokoro/build.py $cmake_src $out $out/artifact "${KOKORO_BUILD
   --ninja=$top/prebuilts/ninja/$host/ninja \
   --android-cmake=$top/external/android-cmake \
   --extra-notices="$extra_notices"
+
+if [ -f /.dockerenv ]; then
+  # Necessary because the git repo is mounted from the host, and the git
+  # directories will have different permissions than the container expects. This
+  # prevents "fatal: detected dubious ownership in repository at ...".
+  git config --global --add safe.directory '*'
+fi
 
 $top/toolchain/ndk-kokoro/gen_manifest.py --root $top \
   -o "$out/artifact/manifest-${KOKORO_BUILD_ID:-dev}.xml"
