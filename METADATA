@@ -8,13 +8,13 @@ third_party {
   license_type: NOTICE
   last_upgrade_date {
     year: 2024
-    month: 10
-    day: 8
+    month: 11
+    day: 6
   }
   homepage: "https://cmake.org/"
   identifier {
     type: "Git"
     value: "https://gitlab.kitware.com/cmake/cmake"
-    version: "v3.30.5"
+    version: "v3.31.0"
   }
 }
