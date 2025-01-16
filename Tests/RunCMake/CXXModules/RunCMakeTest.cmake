@@ -71,9 +71,15 @@ set(scopes
   Interface
   Private
   Public)
+set(target_types
+  Interface
+  Static
+  )
 foreach (fileset_type IN LISTS fileset_types)
   foreach (scope IN LISTS scopes)
-    run_cmake("FileSet${fileset_type}${scope}")
+    foreach (target_type IN LISTS target_types)
+      run_cmake("FileSet${fileset_type}${scope}On${target_type}")
+    endforeach ()
   endforeach ()
   run_cmake("FileSet${fileset_type}InterfaceImported")
 
@@ -315,6 +321,7 @@ endif ()
 
 # Tests which require collation work.
 if ("collation" IN_LIST CMake_TEST_MODULE_COMPILATION)
+  run_cxx_module_test(duplicate-sources)
   run_cxx_module_test(public-req-private)
   set(RunCMake_CXXModules_NO_TEST 1)
   run_cxx_module_test(req-private-other-target)

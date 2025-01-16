@@ -777,6 +777,10 @@ void cmGlobalUnixMakefileGenerator3::WriteConvenienceRules2(
       makeTargetName = cmStrCat(localName, "/codegen");
       commands.push_back(
         lg.GetRecursiveMakeCall(makefileName, makeTargetName));
+      if (targetMessages) {
+        lg.AppendEcho(commands, "Finished codegen for target " + name,
+                      cmLocalUnixMakefileGenerator3::EchoNormal, &progress);
+      }
       this->AppendCodegenTargetDepends(depends, gtarget.get());
       rootLG.WriteMakeRule(ruleFileStream, "codegen rule for target.",
                            makeTargetName, depends, commands, true);
@@ -946,6 +950,9 @@ void cmGlobalUnixMakefileGenerator3::WriteHelpRule(
   lg->AppendEcho(commands, "... clean");
   if (!this->GlobalSettingIsOn("CMAKE_SUPPRESS_REGENERATION")) {
     lg->AppendEcho(commands, "... depend");
+  }
+  if (this->CheckCMP0171()) {
+    lg->AppendEcho(commands, "... codegen");
   }
 
   // Keep track of targets already listed.

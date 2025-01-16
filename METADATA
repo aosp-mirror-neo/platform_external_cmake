@@ -7,14 +7,14 @@ description: "CMake, the cross-platform, open-source build system."
 third_party {
   license_type: NOTICE
   last_upgrade_date {
-    year: 2024
-    month: 11
-    day: 21
+    year: 2025
+    month: 1
+    day: 16
   }
   homepage: "https://cmake.org/"
   identifier {
     type: "Git"
     value: "https://gitlab.kitware.com/cmake/cmake"
-    version: "v3.31.1"
+    version: "v3.31.4"
   }
 }
