@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 #pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
@@ -110,5 +110,5 @@ private:
   std::vector<std::string> DefaultConfigurations;
 
   std::map<std::string, std::string> LinkTargets;
-  std::set<std::string> Requirements;
+  std::map<std::string, std::set<std::string>> Requirements;
 };

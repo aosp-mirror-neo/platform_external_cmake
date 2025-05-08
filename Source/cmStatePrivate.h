@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 
 #pragma once
 
@@ -21,7 +21,7 @@ struct BuildsystemDirectoryStateType;
 struct PolicyStackEntry;
 } // namespace cmStateDetail
 
-static const std::string cmPropertySentinal = std::string();
+static std::string const cmPropertySentinel = std::string();
 
 struct cmStateDetail::SnapshotDataType
 {

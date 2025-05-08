@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 #pragma once
 
 #include <map>
@@ -14,7 +14,7 @@ class cmLocalGenerator;
 struct cmGeneratorExpressionContext
 {
   cmGeneratorExpressionContext(cmLocalGenerator* lg, std::string config,
-                               bool quiet, const cmGeneratorTarget* headTarget,
+                               bool quiet, cmGeneratorTarget const* headTarget,
                                cmGeneratorTarget const* currentTarget,
                                bool evaluateForBuildsystem,
                                cmListFileBacktrace backtrace,

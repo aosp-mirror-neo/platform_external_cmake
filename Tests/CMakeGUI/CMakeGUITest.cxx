@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 #include "CMakeGUITest.h"
 
 #include "QCMake.h"
@@ -210,7 +210,7 @@ void CMakeGUITest::presetArg()
 }
 
 namespace {
-QCMakePropertyList makePresetProperties(const QString& name)
+QCMakePropertyList makePresetProperties(QString const& name)
 {
   return QCMakePropertyList{
     QCMakeProperty{
@@ -313,7 +313,7 @@ void CMakeGUITest::presetArg_data()
 }
 
 namespace {
-void writePresets(const QString& buildDir, const QStringList& names)
+void writePresets(QString const& buildDir, QStringList const& names)
 {
   QJsonArray presets{
     QJsonObject{

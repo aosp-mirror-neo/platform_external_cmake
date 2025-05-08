@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 #pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
@@ -34,7 +34,7 @@ public:
   /**
    * To check validity of a found path using user's validator, if any
    */
-  bool Validate(const std::string& path) const;
+  bool Validate(std::string const& path) const;
 
 protected:
   friend class cmFindBaseDebugState;
@@ -46,7 +46,7 @@ protected:
   bool CheckForVariableDefined();
 
   void NormalizeFindResult();
-  void StoreFindResult(const std::string& value);
+  void StoreFindResult(std::string const& value);
 
   // actual find command name
   std::string FindCommandName;

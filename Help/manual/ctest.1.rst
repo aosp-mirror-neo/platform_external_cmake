@@ -353,18 +353,32 @@ Run Tests
  This allows the user to widen the output to avoid clipping the test
  name which can be very annoying.
 
-.. option:: --interactive-debug-mode [0|1]
+.. option:: --interactive-debug-mode <0|1>
 
- Set the interactive mode to ``0`` or ``1``.
+ Disable (``0``) or enable (``1``) interactive debug mode.
 
  This option causes CTest to run tests in either an interactive mode
  or a non-interactive mode.  In dashboard mode (``Experimental``, ``Nightly``,
  ``Continuous``), the default is non-interactive.  In non-interactive mode,
  the environment variable :envvar:`DASHBOARD_TEST_FROM_CTEST` is set.
 
- Prior to CMake 3.11, interactive mode on Windows allowed system debug
- popup windows to appear.  Now, due to CTest's use of ``libuv`` to launch
- test processes, all system debug popup windows are always blocked.
+ Interactive Mode allows Windows Error Reporting (WER) to show debug popup
+ windows and to create core dumps.  To enable core dumps in tests,
+ use interactive mode, and follow the Windows documentation
+ on `Collecting User-Mode Dumps`_.
+
+ .. versionchanged:: 4.0
+   Windows Error Reporting (WER) is enabled in interactive mode, so
+   test processes may show debug popup windows and create core dumps.
+   This was made possible by updates to ``libuv``.
+
+ .. versionchanged:: 3.11
+   Windows Error Reporting (WER) is disabled in both interactive and
+   non-interactive modes, so test processes do not show popup windows
+   or create core dumps.  This is due to launching test processes with
+   ``libuv``.
+
+.. _`Collecting User-Mode Dumps`: https://learn.microsoft.com/en-us/windows/win32/wer/collecting-user-mode-dumps
 
 .. option:: --no-label-summary
 
@@ -421,11 +435,8 @@ Run Tests
 
 .. option:: --force-new-ctest-process
 
- Run child CTest instances as new processes.
-
- By default CTest will run child CTest instances within the same
- process.  If this behavior is not desired, this argument will
- enforce new processes for child CTest processes.
+ Ignored.  This option once disabled a now-removed optimization
+ for tests running ``ctest`` itself.
 
 .. option:: --schedule-random
 
@@ -540,7 +551,7 @@ that are mapped to subprojects.
 
 When the :prop_test:`PROCESSORS` test property is set, CTest will display a
 weighted test timing result in label and subproject summaries. The time is
-reported with `sec*proc` instead of just `sec`.
+reported with ``sec * proc`` instead of just ``sec``.
 
 The weighted time summary reported for each label or subproject ``j``
 is computed as::
@@ -784,9 +795,8 @@ The available ``<dashboard-options>`` are the following:
 
 .. option:: --extra-submit <file>[;<file>]
 
- Submit extra files to the dashboard.
-
- This option will submit extra files to the dashboard.
+ Submit extra ``.xml`` part files to the dashboard.
+ See the :command:`ctest_submit` command's ``PARTS ExtraFiles`` option.
 
 .. option:: --http-header <header>
 
@@ -800,10 +810,10 @@ The available ``<dashboard-options>`` are the following:
 
 .. option:: --http1.0
 
- Submit using `HTTP 1.0`.
+ Submit using ``HTTP 1.0``.
 
- This option will force CTest to use `HTTP 1.0` to submit files to the
- dashboard, instead of `HTTP 1.1`.
+ This option will force CTest to use ``HTTP 1.0`` to submit files to the
+ dashboard, instead of ``HTTP 1.1``.
 
 .. option:: --no-compress-output
 
@@ -1505,7 +1515,7 @@ Configuration settings include:
 
   * `CTest Script`_ variable: :variable:`CTEST_DROP_SITE_PASSWORD`
   * :module:`CTest` module variable: ``DROP_SITE_PASSWORD`` if set,
-    else ``CTEST_DROP_SITE_PASWORD``
+    else ``CTEST_DROP_SITE_PASSWORD``
 
 ``DropSiteUser``
   Legacy option.  When ``SubmitURL`` is not set, it is constructed from

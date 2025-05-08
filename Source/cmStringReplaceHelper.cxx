@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 
 #include "cmStringReplaceHelper.h"
 
@@ -8,7 +8,7 @@
 
 #include "cmMakefile.h"
 
-cmStringReplaceHelper::cmStringReplaceHelper(const std::string& regex,
+cmStringReplaceHelper::cmStringReplaceHelper(std::string const& regex,
                                              std::string replace_expr,
                                              cmMakefile* makefile)
   : RegExString(regex)
@@ -19,7 +19,7 @@ cmStringReplaceHelper::cmStringReplaceHelper(const std::string& regex,
   this->ParseReplaceExpression();
 }
 
-bool cmStringReplaceHelper::Replace(const std::string& input,
+bool cmStringReplaceHelper::Replace(std::string const& input,
                                     std::string& output)
 {
   output.clear();
@@ -46,7 +46,7 @@ bool cmStringReplaceHelper::Replace(const std::string& input,
     }
 
     // Concatenate the replacement for the match.
-    for (const auto& replacement : this->Replacements) {
+    for (auto const& replacement : this->Replacements) {
       if (replacement.Number < 0) {
         // This is just a plain-text part of the replacement.
         output += replacement.Value;

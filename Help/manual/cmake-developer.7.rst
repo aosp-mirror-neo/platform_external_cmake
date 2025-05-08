@@ -126,7 +126,9 @@ In either case (or even when providing both variables and imported
 targets), find modules should provide backwards compatibility with old
 versions that had the same name.
 
-A FindFoo.cmake module will typically be loaded by the command::
+A FindFoo.cmake module will typically be loaded by the command:
+
+.. code-block:: cmake
 
   find_package(Foo [major[.minor[.patch[.tweak]]]]
                [EXACT] [QUIET] [REQUIRED]
@@ -216,7 +218,11 @@ for any macros, functions and imported targets defined by the Find module.
   variable for use by client code. This should not be a cache entry.
 
 ``Xxx_ROOT_DIR``
-  Where to find the base directory of the module.
+  The base directory of the installation of ``Xxx`` that can be optionally set
+  by the find module if ``Xxx`` is found. This is useful for large packages
+  where many files need to be referenced relative to a common base (or root)
+  directory. Not to be confused with the ``Xxx_ROOT`` hint variable set from the
+  outside for the find module to know where to look for the ``Xxx``.
 
 ``Xxx_VERSION_VV``
   Variables of this form specify whether the ``Xxx`` module being provided
@@ -335,7 +341,7 @@ reStructuredText-format documentation.  For example:
 ::
 
   # Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-  # file Copyright.txt or https://cmake.org/licensing for details.
+  # file LICENSE.rst or https://cmake.org/licensing for details.
 
   #[=======================================================================[.rst:
   FindFoo
@@ -417,18 +423,18 @@ information from the ``Foo.pc`` file.
 
 Now we need to find the libraries and include files; we use the
 information from ``pkg-config`` to provide hints to CMake about where to
-look.
+look before checking other default paths.
 
 .. code-block:: cmake
 
   find_path(Foo_INCLUDE_DIR
     NAMES foo.h
-    PATHS ${PC_Foo_INCLUDE_DIRS}
+    HINTS ${PC_Foo_INCLUDE_DIRS}
     PATH_SUFFIXES Foo
   )
   find_library(Foo_LIBRARY
     NAMES foo
-    PATHS ${PC_Foo_LIBRARY_DIRS}
+    HINTS ${PC_Foo_LIBRARY_DIRS}
   )
 
 Alternatively, if the library is available with multiple configurations, you can
@@ -439,11 +445,11 @@ use :module:`SelectLibraryConfigurations` to automatically set the
 
   find_library(Foo_LIBRARY_RELEASE
     NAMES foo
-    PATHS ${PC_Foo_LIBRARY_DIRS}/Release
+    HINTS ${PC_Foo_LIBRARY_DIRS}/Release
   )
   find_library(Foo_LIBRARY_DEBUG
     NAMES foo
-    PATHS ${PC_Foo_LIBRARY_DIRS}/Debug
+    HINTS ${PC_Foo_LIBRARY_DIRS}/Debug
   )
 
   include(SelectLibraryConfigurations)
@@ -466,7 +472,6 @@ rest of the work for us
 
   include(FindPackageHandleStandardArgs)
   find_package_handle_standard_args(Foo
-    FOUND_VAR Foo_FOUND
     REQUIRED_VARS
       Foo_LIBRARY
       Foo_INCLUDE_DIR

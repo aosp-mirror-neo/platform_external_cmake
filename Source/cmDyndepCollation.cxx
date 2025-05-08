@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 
 #include "cmDyndepCollation.h"
 
@@ -239,7 +239,7 @@ Json::Value CollationInformationBmiInstallation(cmGeneratorTarget const* gt,
 
     tdi_bmi_info["permissions"] = bmi_gen->GetFilePermissions();
     tdi_bmi_info["destination"] = bmi_gen->GetDestination(config);
-    const char* msg_level = "";
+    char const* msg_level = "";
     switch (bmi_gen->GetMessageLevel()) {
       case cmInstallGenerator::MessageDefault:
         break;

@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 // .NAME cmDynamicLoader - class interface to system dynamic libraries
 // .SECTION Description
 // cmDynamicLoader provides a portable interface to loading dynamic
@@ -18,7 +18,7 @@ public:
   // Load a dynamic library into the current process.
   // The returned cmsys::DynamicLoader::LibraryHandle can be used to access
   // the symbols in the library.
-  static cmsys::DynamicLoader::LibraryHandle OpenLibrary(const char*);
+  static cmsys::DynamicLoader::LibraryHandle OpenLibrary(char const*);
 
   // Description:
   // Flush the cache of dynamic loader.

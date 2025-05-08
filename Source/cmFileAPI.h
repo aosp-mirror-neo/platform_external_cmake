@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 #pragma once
 
 #include "cmConfigure.h" // IWYU pragma: keep
@@ -180,7 +180,7 @@ private:
   static Json::Value BuildReplyError(std::string const& error);
   Json::Value const& AddReplyIndexObject(Object const& o);
 
-  static const char* ObjectKindName(ObjectKind kind);
+  static char const* ObjectKindName(ObjectKind kind);
   static std::string ObjectName(Object const& o);
 
   static Json::Value BuildVersion(unsigned int major, unsigned int minor);

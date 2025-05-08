@@ -1,5 +1,5 @@
 /* Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-   file Copyright.txt or https://cmake.org/licensing for details.  */
+   file LICENSE.rst or https://cmake.org/licensing for details.  */
 #include "cmFindPathCommand.h"
 
 #include <utility>
@@ -106,7 +106,7 @@ std::string cmFindPathCommand::FindHeaderInFramework(
   globIt.FindFiles(glob);
   std::vector<std::string> files = globIt.GetFiles();
   if (!files.empty()) {
-    std::string fheader = cmSystemTools::CollapseFullPath(files[0]);
+    std::string fheader = cmSystemTools::ToNormalizedPathOnDisk(files[0]);
     debug.FoundAt(fheader);
     if (this->IncludeFileInPath) {
       return fheader;

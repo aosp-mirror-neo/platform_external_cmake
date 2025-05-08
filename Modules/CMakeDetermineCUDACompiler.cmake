@@ -1,5 +1,5 @@
 # Distributed under the OSI-approved BSD 3-Clause License.  See accompanying
-# file Copyright.txt or https://cmake.org/licensing for details.
+# file LICENSE.rst or https://cmake.org/licensing for details.
 
 include(${CMAKE_ROOT}/Modules/CMakeDetermineCompiler.cmake)
 include(${CMAKE_ROOT}/Modules/CMakeParseImplicitLinkInfo.cmake)
@@ -112,9 +112,14 @@ if(NOT CMAKE_CUDA_COMPILER_ID_RUN)
   cmake_cuda_architectures_validate(CUDA)
 
   if(CMAKE_CUDA_COMPILER_ID STREQUAL "Clang")
-    # Clang doesn't automatically select an architecture supported by the SDK.
-    # Try in reverse order of deprecation with the most recent at front (i.e. the most likely to work for new setups).
-    foreach(arch "52" "30" "20")
+    # Clang does not automatically select an architecture supported by the SDK.
+    # Prefer NVCC's default for each SDK version, and fall back to older archs.
+    set(archs "")
+    if(NOT CMAKE_CUDA_COMPILER_TOOLKIT_VERSION VERSION_LESS 11.0)
+      list(APPEND archs 52)
+    endif()
+    list(APPEND archs 30 20)
+    foreach(arch IN LISTS archs)
       list(APPEND CMAKE_CUDA_COMPILER_ID_TEST_FLAGS_FIRST "${clang_test_flags} --cuda-gpu-arch=sm_${arch}")
     endforeach()
   elseif(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")

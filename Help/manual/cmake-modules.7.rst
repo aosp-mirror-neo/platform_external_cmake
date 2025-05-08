@@ -85,7 +85,6 @@ These modules are loaded using the :command:`include` command.
    /module/InstallRequiredSystemLibraries
    /module/ProcessorCount
    /module/SelectLibraryConfigurations
-   /module/SquishTestScript
    /module/TestForANSIForScope
    /module/TestForANSIStreamHeaders
    /module/TestForSSTREAM
@@ -133,7 +132,6 @@ They are normally called through the :command:`find_package` command.
    /module/FindFontconfig
    /module/FindFreetype
    /module/FindGCCXML
-   /module/FindGDAL
    /module/FindGettext
    /module/FindGIF
    /module/FindGit
@@ -275,12 +273,13 @@ Deprecated Utility Modules
    /module/Documentation
    /module/GetPrerequisites
    /module/MacroAddFileDependencies
+   /module/SquishTestScript
    /module/TestBigEndian
    /module/TestCXXAcceptsFlag
+   /module/Use_wxWindows
    /module/UseJavaClassFilelist
    /module/UseJavaSymlinks
    /module/UsePkgConfig
-   /module/Use_wxWindows
    /module/WriteBasicConfigVersionFile
    /module/WriteCompilerDetectionHeader
 
@@ -293,6 +292,7 @@ Deprecated Find Modules
    /module/FindBoost
    /module/FindCUDA
    /module/FindDart
+   /module/FindGDAL
    /module/FindITK
    /module/FindPythonInterp
    /module/FindPythonLibs
