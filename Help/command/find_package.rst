@@ -50,6 +50,8 @@ Search Modes
 
 The command has a few modes by which it searches for packages:
 
+.. _`Module mode`:
+
 **Module mode**
   In this mode, CMake searches for a file called ``Find<PackageName>.cmake``,
   looking first in the locations listed in the :variable:`CMAKE_MODULE_PATH`,
@@ -69,6 +71,8 @@ The command has a few modes by which it searches for packages:
 
   Module mode is only supported by the
   :ref:`basic command signature <Basic Signature>`.
+
+.. _`Config mode`:
 
 **Config mode**
   In this mode, CMake searches for a file called
@@ -132,7 +136,7 @@ Basic Signature
 .. code-block:: cmake
 
   find_package(<PackageName> [version] [EXACT] [QUIET] [MODULE]
-               [REQUIRED] [[COMPONENTS] [components...]]
+               [REQUIRED|OPTIONAL] [[COMPONENTS] [components...]]
                [OPTIONAL_COMPONENTS components...]
                [REGISTRY_VIEW  (64|32|64_32|32_64|HOST|TARGET|BOTH)]
                [GLOBAL]
@@ -158,6 +162,13 @@ satisfied, the package overall is considered to be not found.  If the
 otherwise execution still continues.  As a form of shorthand, if the
 ``REQUIRED`` option is present, the ``COMPONENTS`` keyword can be omitted
 and the required components can be listed directly after ``REQUIRED``.
+
+The :variable:`CMAKE_FIND_REQUIRED` variable can be enabled to make this call
+``REQUIRED`` by default. This behavior can be overridden by providing the
+``OPTIONAL`` keyword. As with the ``REQUIRED`` option, a list of components
+can be listed directly after ``OPTIONAL``, which is equivalent to listing
+them after the ``COMPONENTS`` keyword. When the ``OPTIONAL`` keyword is given,
+the warning output when a package is not found is suppressed.
 
 Additional optional components may be listed after ``OPTIONAL_COMPONENTS``.
 If these cannot be satisfied, the package overall can still be considered
@@ -246,7 +257,7 @@ Full Signature
 .. code-block:: cmake
 
   find_package(<PackageName> [version] [EXACT] [QUIET]
-               [REQUIRED] [[COMPONENTS] [components...]]
+               [REQUIRED|OPTIONAL] [[COMPONENTS] [components...]]
                [OPTIONAL_COMPONENTS components...]
                [CONFIG|NO_MODULE]
                [GLOBAL]
@@ -429,7 +440,7 @@ target architecture, in the following order:
   ``REGISTRY_VIEW`` can be specified to manage ``Windows`` registry queries
   specified as part of ``PATHS`` and ``HINTS``.
 
-  .. include:: FIND_XXX_REGISTRY_VIEW.txt
+  .. include:: include/FIND_XXX_REGISTRY_VIEW.rst
 
 If ``PATH_SUFFIXES`` is specified, the suffixes are appended to each
 (``W``) or (``U``) directory entry one-by-one.
@@ -613,8 +624,8 @@ before calling ``find_package``.
    and ``<prefix>/<name>.framework/Versions/*/Resources/CMake``.  In previous
    versions of CMake, this order was unspecified.
 
-.. include:: FIND_XXX_ROOT.txt
-.. include:: FIND_XXX_ORDER.txt
+.. include:: include/FIND_XXX_ROOT.rst
+.. include:: include/FIND_XXX_ORDER.rst
 
 By default the value stored in the result variable will be the path at
 which the file is found.  The :variable:`CMAKE_FIND_PACKAGE_RESOLVE_SYMLINKS`
@@ -632,6 +643,9 @@ Every non-REQUIRED ``find_package`` call can be disabled or made REQUIRED:
 
 Setting both variables to ``TRUE`` simultaneously is an error.
 
+The :variable:`CMAKE_REQUIRE_FIND_PACKAGE_<PackageName>` variable takes priority
+over the ``OPTIONAL`` keyword in determining whether a package is required.
+
 .. _`version selection`:
 
 Config Mode Version Selection
@@ -648,6 +662,8 @@ version (see :ref:`format specification <FIND_PACKAGE_VERSION_FORMAT>`).  If
 the ``EXACT`` option is given, only a version of the package claiming an exact
 match of the requested version may be found.  CMake does not establish any
 convention for the meaning of version numbers.
+
+.. _`cmake script version selection`:
 
 CMake-script
 """"""""""""
@@ -781,6 +797,8 @@ and the corresponding package configuration file is loaded.
   As a result, it is not possible to use a version range to extend the range
   of compatible package versions that will be accepted.
 
+.. _`cps version selection`:
+
 |CPS|
 """""
 
@@ -807,6 +825,9 @@ expecting the ``compat_version`` should be able to use the package, even if the
 package's actual version is newer.  If not specified, the ``compat_version``
 is implicitly equal to the package version, i.e. no backwards compatibility is
 provided.
+
+.. TODO Rework the preceding paragraph when COMPAT_VERSION has broader support
+        in CMake.
 
 When a package uses a recognized schema, CMake will determine the package's
 acceptability according to the following rules:

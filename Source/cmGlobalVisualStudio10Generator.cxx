@@ -297,8 +297,10 @@ bool cmGlobalVisualStudio10Generator::SetGeneratorToolset(
                    this->GetPlatformToolsetString(),
                    ",version=", this->GeneratorToolsetVersion,
                    "\n"
-                   "has multiple matches installed at\n",
-                   "  ", auxProps, "\n",
+                   "has multiple matches installed at\n"
+                   "  ",
+                   auxProps,
+                   "\n"
                    "The toolset and version specification must resolve \n"
                    "to a single installed toolset"));
 
@@ -476,9 +478,7 @@ bool cmGlobalVisualStudio10Generator::InitializeSystem(cmMakefile* mf)
     if (!this->InitializeWindowsStore(mf)) {
       return false;
     }
-  } else if (this->SystemName == "WindowsKernelModeDriver"_s &&
-             cmExperimental::HasSupportEnabled(
-               *mf, cmExperimental::Feature::WindowsKernelModeDriver)) {
+  } else if (this->SystemName == "WindowsKernelModeDriver"_s) {
     this->SystemIsWindowsKernelModeDriver = true;
     if (!this->InitializeWindowsKernelModeDriver(mf)) {
       return false;
