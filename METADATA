@@ -9,12 +9,12 @@ third_party {
   last_upgrade_date {
     year: 2025
     month: 8
-    day: 5
+    day: 27
   }
   homepage: "https://cmake.org/"
   identifier {
     type: "Git"
     value: "https://gitlab.kitware.com/cmake/cmake"
-    version: "v4.1.0"
+    version: "v4.1.1"
   }
 }
