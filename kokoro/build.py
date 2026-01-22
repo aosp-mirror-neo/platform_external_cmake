@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import argparse
-import enum
 import glob
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import sys
@@ -11,24 +11,11 @@ import zipfile
 import textwrap
 
 
-@enum.unique
-class Host(enum.Enum):
-    """Enumeration of supported hosts."""
-    Darwin = 'darwin'
-    Linux = 'linux'
-    Windows = 'windows'
+CMAKE_SRC = Path(__file__).parent.parent
+TOP = CMAKE_SRC.parent.parent
 
-
-def get_default_host():
-    """Returns the Host matching the current machine."""
-    if sys.platform.startswith('linux'):
-        return Host.Linux
-    elif sys.platform.startswith('darwin'):
-        return Host.Darwin
-    elif sys.platform.startswith('win'):
-        return Host.Windows
-    else:
-        raise RuntimeError('Unsupported host: {}'.format(sys.platform))
+sys.path.append(str(TOP / 'toolchain/ndk-kokoro'))
+from build_utils import Host, get_default_host, run_cmd, zip_dir_to_zip
 
 
 def parse_arguments():
@@ -49,20 +36,6 @@ def parse_arguments():
                         default='',
                         help='Extra license files to install.')
     return parser.parse_args()
-
-
-def check_call(cmd, **kwargs):
-    print(subprocess.list2cmdline(cmd))
-    sys.stdout.flush()
-    subprocess.check_call(cmd, **kwargs)
-
-
-def find_latest_clang(repo_path):
-    all_dirs = (f for f in os.listdir(repo_path)
-                if os.path.isdir(os.path.join(repo_path, f)))
-    clangs = (f for f in all_dirs if f.startswith('clang-r'))
-    latest_clang = max(clangs)
-    return os.path.join(repo_path, latest_clang)
 
 
 def get_toolchain_flags(host):
@@ -132,13 +105,13 @@ def build_cmake_target(host, args):
     for key, value in defines.items():
         config_cmd.append("-D{}={}".format(key, value))
 
-    check_call(config_cmd, cwd=build_dir)
+    run_cmd(config_cmd, cwd=build_dir)
 
     if host == Host.Windows:
         ninja_target = 'install'
     else:
         ninja_target = 'install/strip'
-    check_call([args.ninja, ninja_target], cwd=build_dir)
+    run_cmd([args.ninja, ninja_target], cwd=build_dir)
 
     # e.g.: /path/to/openssl-1.1.1k/LICENSE:doc/openssl-1.1.1k/LICENSE
     for notice in args.extra_notices.split():
@@ -148,15 +121,6 @@ def build_cmake_target(host, args):
         shutil.copy2(src, dst)
 
     return install_dir
-
-
-def zip_dir(path, ziph):
-    """Zip a folder with archive paths relative to the root"""
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            install_file = os.path.join(root, file)
-            rel_file = os.path.relpath(install_file, path)
-            ziph.write(install_file, rel_file)
 
 
 def package_target(install_dir, dest_dir):
@@ -169,7 +133,7 @@ def package_target(install_dir, dest_dir):
     sys.stdout.flush()
 
     with zipfile.ZipFile(package_path, 'w', zipfile.ZIP_DEFLATED) as zip:
-        zip_dir(install_dir, zip)
+        zip_dir_to_zip(install_dir, zip)
 
 
 def package_target_for_studio(install_dir, cmake_version, ninja_path,
@@ -187,7 +151,7 @@ def package_target_for_studio(install_dir, cmake_version, ninja_path,
     module_path = glob.glob(os.path.join(install_dir, 'share', 'cmake-*'))[0]
     module_path = os.path.basename(module_path)
     with zipfile.ZipFile(package_path, 'w', zipfile.ZIP_DEFLATED) as zip:
-        zip_dir(install_dir, zip)
+        zip_dir_to_zip(install_dir, zip)
         zip.writestr("source.properties", source_properties)
         zip.write(ninja_path, os.path.join("bin",
                                            os.path.basename(ninja_path)))
