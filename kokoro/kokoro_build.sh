@@ -22,8 +22,12 @@ if [ "$(uname)" == "Darwin" ]; then
   host=darwin-x86
   echo "Selected Xcode: $(xcode-select -p)"
 elif [ "$(uname)" == "Linux" ]; then
-  host=linux-x86
-  . /opt/rh/gcc-toolset-10/enable
+  if [ "$(uname -m)" == "aarch64" ]; then
+    host=linux-arm64
+  else
+    host=linux-x86
+    . /opt/rh/gcc-toolset-10/enable
+  fi
 else
   echo "Unrecognized uname -s: $(uname -s)"
   exit 1

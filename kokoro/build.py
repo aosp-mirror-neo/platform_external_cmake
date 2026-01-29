@@ -16,7 +16,7 @@ CMAKE_SRC = Path(__file__).parent.parent
 TOP = CMAKE_SRC.parent.parent
 
 sys.path.append(str(TOP / 'toolchain/ndk-kokoro'))
-from build_utils import Host, get_default_host, run_cmd, zip_dir_to_zip, create_new_dir
+from build_utils import Host, get_default_host, run_cmd, zip_dir_to_zip, create_new_dir, LinuxArm64Musl
 
 
 def parse_arguments():
@@ -56,8 +56,18 @@ def build_openssl(host, args) -> (Path, List[str]):
 
   configure = openssl_src / 'Configure'
   configure_cmd = [configure, 'no-shared', f'--prefix={install_dir}']
-  configure_cmd += ['linux-x86_64']
-  run_cmd(configure_cmd, cwd=build_dir)
+
+  env = os.environ.copy()
+  if host == Host.Linux:
+    configure_cmd += ['linux-x86_64']
+  elif host == Host.LinuxArm64:
+    configure_cmd += ['linux-aarch64']
+    env['CC'] = LinuxArm64Musl.CC
+    env['CXX'] = LinuxArm64Musl.CXX
+    env['CFLAGS'] = LinuxArm64Musl.CFLAGS
+    env['LDFLAGS'] = LinuxArm64Musl.LDFLAGS
+
+  run_cmd(configure_cmd, cwd=build_dir, env=env)
 
   run_cmd(['make', f'-j{os.cpu_count()}'], cwd=build_dir)
   # Use install_sw to skip installing OpenSSL docs, which is slow.
@@ -76,6 +86,13 @@ def get_toolchain_flags(host):
         ldflags.append('-static-libstdc++')
         ldflags.append('-static-libgcc')
         ldflags.append('-pthread')
+    if host == Host.LinuxArm64:
+        cflags.append(LinuxArm64Musl.CFLAGS)
+        ldflags.append(LinuxArm64Musl.LDFLAGS)
+        ldflags.append('-static-libstdc++')
+        ldflags.append('-Wl,-rpath,\$ORIGIN')
+        ldflags.append('-Wl,-rpath,\$ORIGIN/../lib')
+
     return (cflags, ldflags)
 
 
@@ -105,6 +122,11 @@ def get_cmake_defines(host, args):
     if host == Host.Linux:
         defines['OPENSSL_USE_STATIC_LIBS'] = 'ON'
 
+    if host == Host.LinuxArm64:
+        defines['CMAKE_SYSROOT'] = LinuxArm64Musl.SYSROOT
+        defines['CMAKE_C_COMPILER'] = LinuxArm64Musl.CC
+        defines['CMAKE_CXX_COMPILER'] = LinuxArm64Musl.CXX
+
     if host == Host.Darwin:
         # This will be used to set -mmacosx-version-min. And helps to choose SDK.
         # To specify a SDK, set CMAKE_OSX_SYSROOT or SDKROOT environment variable.
@@ -124,6 +146,7 @@ def build_cmake_target(host, args, openssl_install_dir: Path, extra_notices: Lis
 
     os.makedirs(build_dir, exist_ok=True)
     os.makedirs(install_dir, exist_ok=True)
+    copy_extra_libs(host, args, install_dir)
 
     defines = get_cmake_defines(host, args)
     defines['CMAKE_INSTALL_PREFIX'] = install_dir
@@ -142,9 +165,16 @@ def build_cmake_target(host, args, openssl_install_dir: Path, extra_notices: Lis
         ninja_target = 'install'
     else:
         ninja_target = 'install/strip'
-    run_cmd([args.ninja, ninja_target], cwd=build_dir)
+
+    env = os.environ.copy()
+    env['LD_LIBRARY_PATH'] = install_dir + '/lib'
+
+    run_cmd([args.ninja, ninja_target], cwd=build_dir, env=env)
 
     # e.g.: /path/to/openssl-1.1.1k/LICENSE:doc/openssl-1.1.1k/LICENSE
+    if host == Host.LinuxArm64:
+        extra_notices += [f'{notice}:doc/musl/{notice.name}' for notice in LinuxArm64Musl.LIBC_MUSL_NOTICES]
+
     for notice in extra_notices:
         (src, dst) = notice.split(':')
         dst = os.path.join(install_dir, dst)
@@ -228,13 +258,19 @@ def get_cmake_version(install_dir):
     return version
 
 
+def copy_extra_libs(host, args, install_dir):
+    if host == Host.LinuxArm64:
+        os.makedirs(install_dir + '/lib', exist_ok=True)
+        shutil.copy(LinuxArm64Musl.LIBC_MUSL, install_dir + '/lib/libc_musl.so')
+
+
 def main():
     args = parse_arguments()
     host = get_default_host()
 
     openssl_install_dir = None
     openssl_notices = []
-    if host == Host.Linux:
+    if host == Host.Linux or host == Host.LinuxArm64:
         openssl_install_dir, openssl_notices = build_openssl(host, args)
 
     install_dir = build_cmake_target(host, args, openssl_install_dir, openssl_notices)
