@@ -9,13 +9,14 @@ import subprocess
 import sys
 import zipfile
 import textwrap
+from typing import List, Union
 
 
 CMAKE_SRC = Path(__file__).parent.parent
 TOP = CMAKE_SRC.parent.parent
 
 sys.path.append(str(TOP / 'toolchain/ndk-kokoro'))
-from build_utils import Host, get_default_host, run_cmd, zip_dir_to_zip
+from build_utils import Host, get_default_host, run_cmd, zip_dir_to_zip, create_new_dir
 
 
 def parse_arguments():
@@ -32,10 +33,38 @@ def parse_arguments():
                         help='Path to ninja binary.')
     parser.add_argument('--android-cmake',
                         help='Path to android-cmake repository.')
-    parser.add_argument('--extra-notices',
-                        default='',
-                        help='Extra license files to install.')
     return parser.parse_args()
+
+
+def build_openssl(host, args) -> (Path, List[str]):
+  """ Build openssl and link it statically.
+    * We can't use libssl.so from the host because it might not be installed,
+      and filenames vary (libssl.so.10 and libssl.so.1.0.2k on CentOS 7,
+      libssl.so.1.0.0 on Ubuntu 16.04, libssl.so.1.1 on Ubuntu 20.04).
+    * We can't use the CentOS openssl-static package because it has too many
+      dependencies (e.g. libcom_err and various kerberos libraries).
+  """
+
+  openssl_dir = Path(args.out_dir) / 'openssl'
+  build_dir = openssl_dir / 'build'
+  install_dir = openssl_dir / 'install'
+  create_new_dir(openssl_dir)
+  create_new_dir(build_dir)
+
+  run_cmd(['tar', '-C', openssl_dir, '-xf', TOP / 'tools/ndkports/openssl/src.tar.gz'])
+  openssl_src = list(openssl_dir.glob('openssl-*'))[0]
+
+  configure = openssl_src / 'Configure'
+  configure_cmd = [configure, 'no-shared', f'--prefix={install_dir}']
+  configure_cmd += ['linux-x86_64']
+  run_cmd(configure_cmd, cwd=build_dir)
+
+  run_cmd(['make', f'-j{os.cpu_count()}'], cwd=build_dir)
+  # Use install_sw to skip installing OpenSSL docs, which is slow.
+  run_cmd(['make', 'install_sw'], cwd=build_dir)
+
+  extra_notices=[f'{openssl_src}/LICENSE.txt:doc/{openssl_src.name}/LICENSE.txt']
+  return install_dir, extra_notices
 
 
 def get_toolchain_flags(host):
@@ -84,7 +113,7 @@ def get_cmake_defines(host, args):
     return defines
 
 
-def build_cmake_target(host, args):
+def build_cmake_target(host, args, openssl_install_dir: Path, extra_notices: List[str]):
     build_dir = os.path.join(args.out_dir, 'build')
     install_dir = os.path.join(args.out_dir, 'install')
 
@@ -100,6 +129,8 @@ def build_cmake_target(host, args):
     defines['CMAKE_INSTALL_PREFIX'] = install_dir
     if args.ninja:
         defines['CMAKE_MAKE_PROGRAM'] = args.ninja
+    if openssl_install_dir:
+        defines['OPENSSL_ROOT_DIR'] = openssl_install_dir
 
     config_cmd = [args.cmake, '-G', 'Ninja', args.src]
     for key, value in defines.items():
@@ -114,7 +145,7 @@ def build_cmake_target(host, args):
     run_cmd([args.ninja, ninja_target], cwd=build_dir)
 
     # e.g.: /path/to/openssl-1.1.1k/LICENSE:doc/openssl-1.1.1k/LICENSE
-    for notice in args.extra_notices.split():
+    for notice in extra_notices:
         (src, dst) = notice.split(':')
         dst = os.path.join(install_dir, dst)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -200,7 +231,13 @@ def get_cmake_version(install_dir):
 def main():
     args = parse_arguments()
     host = get_default_host()
-    install_dir = build_cmake_target(host, args)
+
+    openssl_install_dir = None
+    openssl_notices = []
+    if host == Host.Linux:
+        openssl_install_dir, openssl_notices = build_openssl(host, args)
+
+    install_dir = build_cmake_target(host, args, openssl_install_dir, openssl_notices)
     cmake_target_version = get_cmake_version(install_dir)
     package_target(install_dir, args.dest_dir)
     package_target_for_studio(install_dir, cmake_target_version, args.ninja,
