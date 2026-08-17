@@ -262,6 +262,7 @@ def copy_extra_libs(host, args, install_dir):
     if host == Host.LinuxArm64:
         os.makedirs(install_dir + '/lib', exist_ok=True)
         shutil.copy(LinuxArm64Musl.LIBC_MUSL, install_dir + '/lib/libc_musl.so')
+        shutil.copy(LinuxArm64Musl.LIBJEMALLOC, install_dir + '/lib/libjemalloc5.so')
 
 
 def main():
